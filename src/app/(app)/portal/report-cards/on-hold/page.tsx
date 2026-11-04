@@ -75,17 +75,17 @@ function ChildChips({
           >
             <span
               className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
                 active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
               )}
             >
               {initialsOf(kid.name)}
             </span>
             <span className="flex flex-col leading-tight">
-              <span className={cn("text-[13px] font-medium", active ? "text-primary" : "text-foreground")}>
+              <span className={cn("text-compact font-medium", active ? "text-primary" : "text-foreground")}>
                 {firstName(kid.name)}
               </span>
-              <span className="text-[11px] text-muted-foreground">{classNameOf(kid.classId)}</span>
+              <span className="text-2xs text-muted-foreground">{classNameOf(kid.classId)}</span>
             </span>
           </button>
         );
@@ -109,17 +109,17 @@ function HoldView({
     <div className="space-y-4">
       <SectionCard>
         <div className="flex items-start gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#c47a16]/12">
-            <CirclePause className="size-6 text-[#c47a16]" />
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-warning/12">
+            <CirclePause className="size-6 text-warning" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-foreground">Report card on hold</h2>
               <StatusBadge tone="warning" label="On hold" />
             </div>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mt-1.5 text-compact leading-relaxed text-muted-foreground">
               {firstName(child.name)}&apos;s report card cannot be released until the outstanding
-              school balance is cleared. The results themselves are fine — the card is simply held
+              school balance is cleared. The results themselves are fine. The card is simply held
               by the bursary.
             </p>
           </div>
@@ -127,16 +127,16 @@ function HoldView({
 
         <div className="mt-5 grid gap-4 rounded-lg border border-border/80 p-4 sm:grid-cols-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               Reason
             </p>
-            <p className="mt-1 text-[13px] font-medium text-foreground">{hold.reason}</p>
+            <p className="mt-1 text-compact font-medium text-foreground">{hold.reason}</p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               Detail
             </p>
-            <p className="mt-1 text-[13px] leading-relaxed text-foreground">{hold.detail}</p>
+            <p className="mt-1 text-compact leading-relaxed text-foreground">{hold.detail}</p>
           </div>
         </div>
 
@@ -148,7 +148,7 @@ function HoldView({
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                   {i + 1}
                 </span>
-                <p className="text-[13px] leading-relaxed text-foreground">{step}</p>
+                <p className="text-compact leading-relaxed text-foreground">{step}</p>
               </li>
             ))}
           </ol>
@@ -166,7 +166,7 @@ function HoldView({
           >
             <Phone className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-foreground">+255 754 000 210</span>
+              <span className="block text-compact font-medium text-foreground">+255 754 000 210</span>
               <span className="block text-xs text-muted-foreground">Bursary phone</span>
             </span>
           </a>
@@ -176,7 +176,7 @@ function HoldView({
           >
             <Mail className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-foreground">
+              <span className="block text-compact font-medium text-foreground">
                 accounts@josephian.ac.tz
               </span>
               <span className="block text-xs text-muted-foreground">Bursary email</span>
@@ -185,8 +185,8 @@ function HoldView({
           <div className="flex min-h-11 items-center gap-3 rounded-lg border border-border/80 px-3 py-2.5">
             <Clock className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-foreground">
-                Mon – Fri · 08:00 – 16:00
+              <span className="block text-compact font-medium text-foreground">
+                Mon. Fri · 08:00-16:00
               </span>
               <span className="block text-xs text-muted-foreground">Office hours</span>
             </span>
@@ -197,8 +197,8 @@ function HoldView({
       <div className="flex flex-col gap-2.5 rounded-lg border border-border/80 bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2.5">
           <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            This does not affect your access to progress information — you can still view subjects
+          <p className="text-compact leading-relaxed text-muted-foreground">
+            This does not affect your access to progress information. You can still view subjects
             and targets.
           </p>
         </div>
@@ -216,7 +216,7 @@ function NoHoldView({ child, onOpen }: { child: Student; onOpen: () => void }) {
   return (
     <SectionCard>
       <div className="flex flex-col items-center px-6 py-10 text-center">
-        <CircleCheck className="mb-1 size-6 text-[#16834a]" />
+        <CircleCheck className="mb-1 size-6 text-success" />
         <p className="text-sm font-medium text-foreground">No cards on hold</p>
         <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
           {firstName(child.name)}&apos;s Term 1 report card is available to view and download.

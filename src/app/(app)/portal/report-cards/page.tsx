@@ -81,17 +81,17 @@ function ChildChips({
           >
             <span
               className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
                 active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
               )}
             >
               {initialsOf(kid.name)}
             </span>
             <span className="flex flex-col leading-tight">
-              <span className={cn("text-[13px] font-medium", active ? "text-primary" : "text-foreground")}>
+              <span className={cn("text-compact font-medium", active ? "text-primary" : "text-foreground")}>
                 {firstName(kid.name)}
               </span>
-              <span className="text-[11px] text-muted-foreground">{classNameOf(kid.classId)}</span>
+              <span className="text-2xs text-muted-foreground">{classNameOf(kid.classId)}</span>
             </span>
           </button>
         );
@@ -132,17 +132,17 @@ export default function PortalReportCardsPage() {
         description="Term 1 · 2026 report cards for your children."
       />
 
-      {/* Child selector — screen only */}
+      {/* Child selector: screen only */}
       <div className="print:hidden">
         <ChildChips kids={children} selectedId={selectedId} onSelect={setSelectedId} />
       </div>
 
       {child ? (
         <SectionCard>
-          {/* Toolbar — screen only */}
+          {/* Toolbar: screen only */}
           <div className="print:hidden mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-foreground">
+              <p className="text-compact font-medium text-foreground">
                 Terminal report · {firstName(child.name)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -154,13 +154,13 @@ export default function PortalReportCardsPage() {
             </Button>
           </div>
 
-          {/* Hold warning strip — screen only */}
+          {/* Hold warning strip: screen only */}
           {hold ? (
-            <div className="print:hidden mb-5 flex flex-col gap-2.5 rounded-lg border border-[#c47a16]/35 bg-[#c47a16]/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="print:hidden mb-5 flex flex-col gap-2.5 rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-2.5">
-                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[#c47a16]" />
-                <p className="text-[13px] leading-relaxed text-[#9a5f11]">
-                  <span className="font-medium">Card on hold — fees balance.</span> This card is held
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                <p className="text-compact leading-relaxed text-warning-strong">
+                  <span className="font-medium">Card on hold. Fees balance.</span> This card is held
                   by the bursary until the outstanding balance is cleared.
                 </p>
               </div>
@@ -188,7 +188,7 @@ export default function PortalReportCardsPage() {
 
             <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
               <p className="text-base font-semibold text-foreground">{child.name}</p>
-              <p className="text-[13px] tabular text-muted-foreground">
+              <p className="text-compact tabular text-muted-foreground">
                 {classNameOf(child.classId)} · Admission no. {child.admissionNo}
               </p>
             </div>
@@ -200,7 +200,7 @@ export default function PortalReportCardsPage() {
                     <TableHead>Subject</TableHead>
                     <TableHead className="text-right">Mark</TableHead>
                     <TableHead className="text-center">Grade</TableHead>
-                    <TableHead className="min-w-[200px]">Teacher&apos;s remark</TableHead>
+                    <TableHead className="min-w-50">Teacher&apos;s remark</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -210,15 +210,15 @@ export default function PortalReportCardsPage() {
                     return (
                       <TableRow key={sub.id}>
                         <TableCell className="font-medium text-foreground">{sub.name}</TableCell>
-                        <TableCell className="text-right tabular">{mark ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular">{mark ?? "-"}</TableCell>
                         <TableCell className="text-center">
                           {grade ? (
                             <GradePill grade={grade} className="mx-auto" />
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-[13px] text-muted-foreground">
+                        <TableCell className="text-compact text-muted-foreground">
                           {mark !== null ? subjectRemark(mark) : "Not assessed"}
                         </TableCell>
                       </TableRow>
@@ -230,23 +230,23 @@ export default function PortalReportCardsPage() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-border/80 p-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Average
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular text-foreground">
-                  {result ? formatAvg(result.average) : "—"}
+                  {result ? formatAvg(result.average) : "-"}
                 </p>
               </div>
               <div className="rounded-lg border border-border/80 p-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Position
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular text-foreground">
-                  {result ? `${result.rank} of ${classSize}` : "—"}
+                  {result ? `${result.rank} of ${classSize}` : "-"}
                 </p>
               </div>
               <div className="rounded-lg border border-border/80 p-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Attendance
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular text-foreground">
@@ -257,10 +257,10 @@ export default function PortalReportCardsPage() {
             </div>
 
             <div className="mt-5 rounded-lg border border-border/80 bg-muted/40 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Class teacher&apos;s remark
               </p>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-foreground">
+              <p className="mt-1.5 text-compact leading-relaxed text-foreground">
                 {comment.classTeacher ?? "Awaiting remark"}
               </p>
               {classTeacher ? (

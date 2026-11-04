@@ -62,9 +62,9 @@ function fmtLongDate(iso: string): string {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
-/** "09:00 – 09:20" → "09:00" (start of the slot window). */
+/** "09:00 - 09:20" → "09:00" (start of the slot window). */
 function slotStart(label: string): string {
-  return label.split(/–|-/)[0].trim();
+  return label.split("-")[0].trim();
 }
 
 /* ---- Child selector chips (mobile: horizontal scroll) ------------------- */
@@ -95,17 +95,17 @@ function ChildChips({
           >
             <span
               className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
                 active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
               )}
             >
               {initialsOf(kid.name)}
             </span>
             <span className="flex flex-col leading-tight">
-              <span className={cn("text-[13px] font-medium", active ? "text-primary" : "text-foreground")}>
+              <span className={cn("text-compact font-medium", active ? "text-primary" : "text-foreground")}>
                 {firstName(kid.name)}
               </span>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 Bookings for {firstName(kid.name)}
               </span>
             </span>
@@ -189,8 +189,8 @@ export default function PortalParentsDayPage() {
           <CalendarDays className="size-4 text-primary" />
         </div>
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-foreground">
-            Parents&apos; consultation day — {fmtLongDate(parentsDayEvent.date)},{" "}
+          <p className="text-compact font-medium text-foreground">
+            Parents&apos; consultation day: {fmtLongDate(parentsDayEvent.date)},{" "}
             {parentsDayEvent.window}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -201,7 +201,7 @@ export default function PortalParentsDayPage() {
 
       {/* Teacher select */}
       <div>
-        <p className="text-[13px] font-medium text-foreground">Choose a teacher</p>
+        <p className="text-compact font-medium text-foreground">Choose a teacher</p>
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
           {teacherOptions.map(({ teacher, className }) => {
             const active = teacher.id === selectedTeacherId;
@@ -218,15 +218,15 @@ export default function PortalParentsDayPage() {
               >
                 <span
                   className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                    "flex size-8 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
                     active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                   )}
                 >
                   {teacher.initials}
                 </span>
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[13px] font-medium text-foreground">{teacher.name}</span>
-                  <span className="text-[11px] text-muted-foreground">Class teacher · {className}</span>
+                  <span className="text-compact font-medium text-foreground">{teacher.name}</span>
+                  <span className="text-2xs text-muted-foreground">Class teacher · {className}</span>
                 </span>
               </button>
             );
@@ -251,7 +251,7 @@ export default function PortalParentsDayPage() {
                   onClick={() => setCancelTarget(slot)}
                   className="flex min-h-14 flex-col justify-center rounded-lg border border-primary bg-primary px-3 py-2 text-left transition-colors hover:bg-primary/90"
                 >
-                  <span className="text-[13px] font-medium tabular text-primary-foreground">
+                  <span className="text-compact font-medium tabular text-primary-foreground">
                     {slot.slot}
                   </span>
                   <span className="text-xs text-primary-foreground/80">
@@ -267,7 +267,7 @@ export default function PortalParentsDayPage() {
                   aria-disabled
                   className="flex min-h-14 flex-col justify-center rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2"
                 >
-                  <span className="text-[13px] font-medium tabular text-muted-foreground">
+                  <span className="text-compact font-medium tabular text-muted-foreground">
                     {slot.slot}
                   </span>
                   <span className="text-xs text-muted-foreground">Booked</span>
@@ -281,7 +281,7 @@ export default function PortalParentsDayPage() {
                 onClick={() => setBookTarget(slot)}
                 className="flex min-h-14 flex-col justify-center rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
               >
-                <span className="text-[13px] font-medium tabular text-foreground">{slot.slot}</span>
+                <span className="text-compact font-medium tabular text-foreground">{slot.slot}</span>
                 <span className="text-xs text-muted-foreground">Open</span>
               </button>
             );
@@ -296,8 +296,8 @@ export default function PortalParentsDayPage() {
       {/* Your appointments */}
       <SectionCard title="Your appointments" description={`All booked meetings for ${firstName(child.name)}.`}>
         {appointments.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">
-            No appointments yet — pick an open slot above.
+          <p className="text-compact text-muted-foreground">
+            No appointments yet. Pick an open slot above.
           </p>
         ) : (
           <div className="divide-y divide-border/70">
@@ -307,7 +307,7 @@ export default function PortalParentsDayPage() {
                 className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-foreground">
+                  <p className="truncate text-compact font-medium text-foreground">
                     {teacherById(slot.teacherId)?.name ?? "Teacher"}
                   </p>
                   <p className="text-xs tabular text-muted-foreground">{slot.slot}</p>

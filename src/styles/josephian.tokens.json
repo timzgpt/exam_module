@@ -1,0 +1,258 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Josephian Schools token source. Mirrors the CSS custom properties in src/app/globals.css; the CSS layer is the runtime, this file is the measured source of truth.",
+  "primitive": {
+    "cream": {
+      "50": {
+        "$type": "color",
+        "$value": "#fdf7f3"
+      },
+      "100": {
+        "$type": "color",
+        "$value": "#faf8f5"
+      },
+      "200": {
+        "$type": "color",
+        "$value": "#f4ece8"
+      }
+    },
+    "stone": {
+      "200": {
+        "$type": "color",
+        "$value": "#e5e1dc"
+      },
+      "400": {
+        "$type": "color",
+        "$value": "#a8a29e"
+      },
+      "500": {
+        "$type": "color",
+        "$value": "#617081"
+      }
+    },
+    "ink": {
+      "900": {
+        "$type": "color",
+        "$value": "#202938"
+      }
+    },
+    "burgundy": {
+      "400": {
+        "$type": "color",
+        "$value": "#a34a50"
+      },
+      "700": {
+        "$type": "color",
+        "$value": "#650f12"
+      },
+      "800": {
+        "$type": "color",
+        "$value": "#4b0b0e"
+      },
+      "900": {
+        "$type": "color",
+        "$value": "#3a080a"
+      }
+    },
+    "cocoa": {
+      "900": {
+        "$type": "color",
+        "$value": "#211816"
+      },
+      "950": {
+        "$type": "color",
+        "$value": "#17110f"
+      }
+    },
+    "green": {
+      "800": {
+        "$type": "color",
+        "$value": "#116b3c"
+      }
+    },
+    "amber": {
+      "800": {
+        "$type": "color",
+        "$value": "#9a5f11"
+      }
+    },
+    "red": {
+      "500": {
+        "$type": "color",
+        "$value": "#ef4444"
+      },
+      "600": {
+        "$type": "color",
+        "$value": "#dc2626"
+      },
+      "700": {
+        "$type": "color",
+        "$value": "#b91c1c"
+      }
+    },
+    "violet": {
+      "800": {
+        "$type": "color",
+        "$value": "#5a3f8a"
+      }
+    },
+    "white": {
+      "12": {
+        "$type": "color",
+        "$value": "rgb(255 255 255 / 0.12)"
+      }
+    }
+  },
+  "semantic": {
+    "$description": "Purpose-based tokens. Use these in designs and layouts",
+    "text": {
+      "primary": {
+        "$type": "color",
+        "$value": "{primitive.ink.900}"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "{primitive.stone.500}"
+      },
+      "tertiary": {
+        "$type": "color",
+        "$value": "{primitive.stone.400}"
+      },
+      "link": {
+        "$type": "color",
+        "$value": "{primitive.burgundy.700}"
+      },
+      "on-action": {
+        "$type": "color",
+        "$value": "{primitive.cream.50}"
+      }
+    },
+    "surface": {
+      "page": {
+        "$type": "color",
+        "$value": "{primitive.cream.100}"
+      },
+      "card": {
+        "$type": "color",
+        "$value": "#ffffff"
+      },
+      "raised": {
+        "$type": "color",
+        "$value": "#ffffff"
+      }
+    },
+    "border": {
+      "default": {
+        "$type": "color",
+        "$value": "{primitive.stone.200}"
+      },
+      "strong": {
+        "$type": "color",
+        "$value": "#857d72"
+      }
+    },
+    "action": {
+      "primary": {
+        "$type": "color",
+        "$value": "{primitive.burgundy.700}"
+      },
+      "primary-hover": {
+        "$type": "color",
+        "$value": "{primitive.burgundy.800}"
+      },
+      "primary-active": {
+        "$type": "color",
+        "$value": "{primitive.burgundy.900}"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "{primitive.cream.200}"
+      },
+      "destructive": {
+        "$type": "color",
+        "$value": "{primitive.red.600}"
+      },
+      "destructive-hover": {
+        "$type": "color",
+        "$value": "{primitive.red.700}"
+      }
+    },
+    "feedback": {
+      "success-text": {
+        "$type": "color",
+        "$value": "{primitive.green.800}"
+      },
+      "warning-text": {
+        "$type": "color",
+        "$value": "{primitive.amber.800}"
+      },
+      "error-text": {
+        "$type": "color",
+        "$value": "{primitive.red.700}"
+      },
+      "info-text": {
+        "$type": "color",
+        "$value": "{primitive.violet.800}"
+      }
+    }
+  },
+  "dark": {
+    "$description": "Dark mode semantic overrides, swapped at :root.dark",
+    "text": {
+      "primary": {
+        "$type": "color",
+        "$value": "{primitive.cream.50}"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "{primitive.stone.400}"
+      },
+      "tertiary": {
+        "$type": "color",
+        "$value": "{primitive.stone.500}"
+      },
+      "link": {
+        "$type": "color",
+        "$value": "#c98a8f"
+      },
+      "on-action": {
+        "$type": "color",
+        "$value": "{primitive.cream.50}"
+      }
+    },
+    "surface": {
+      "page": {
+        "$type": "color",
+        "$value": "{primitive.cocoa.950}"
+      },
+      "card": {
+        "$type": "color",
+        "$value": "{primitive.cocoa.900}"
+      },
+      "raised": {
+        "$type": "color",
+        "$value": "{primitive.cocoa.900}"
+      }
+    },
+    "border": {
+      "default": {
+        "$type": "color",
+        "$value": "#332a26"
+      },
+      "strong": {
+        "$type": "color",
+        "$value": "#9a938b"
+      }
+    },
+    "action": {
+      "primary": {
+        "$type": "color",
+        "$value": "{primitive.burgundy.400}"
+      },
+      "destructive": {
+        "$type": "color",
+        "$value": "{primitive.red.500}"
+      }
+    }
+  }
+}

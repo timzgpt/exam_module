@@ -130,7 +130,7 @@ export default function ClassSubjectsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={`Subjects — ${cls.name}`}
+        title={`Subjects: ${cls.name}`}
         description={`Subject allocation for ${cls.level} · assign teachers, weekly periods and rooms per subject.`}
         actions={
           <>
@@ -149,6 +149,7 @@ export default function ClassSubjectsPage() {
                 </DialogHeader>
                 <div className="grid gap-1.5 py-1">
                   <Label htmlFor="new-subject">Subject</Label>
+                  {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
                   <Select value={newSubjectId} onValueChange={setNewSubjectId}>
                     <SelectTrigger id="new-subject" className="w-full">
                       <SelectValue placeholder="Choose a subject…" />
@@ -196,7 +197,7 @@ export default function ClassSubjectsPage() {
         />
         <StatCard
           label="Class teacher"
-          value={classTeacher?.name ?? "—"}
+          value={classTeacher?.name ?? "-"}
           icon={Users}
           hint={classTeacher?.role ?? "Unassigned"}
         />
@@ -219,8 +220,8 @@ export default function ClassSubjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[220px] pl-4">Subject</TableHead>
-                  <TableHead className="min-w-[200px]">Assigned teacher</TableHead>
+                  <TableHead className="min-w-55 pl-4">Subject</TableHead>
+                  <TableHead className="min-w-50">Assigned teacher</TableHead>
                   <TableHead className="w-28 text-center">Periods/week</TableHead>
                   <TableHead className="w-28">Room</TableHead>
                   <TableHead className="w-14 pr-4 text-right">Remove</TableHead>
@@ -233,17 +234,18 @@ export default function ClassSubjectsPage() {
                   return (
                     <TableRow key={alloc.subjectId}>
                       <TableCell className="pl-4">
-                        <p className="text-[13.5px] font-medium text-foreground">{subject.name}</p>
+                        <p className="text-compact font-medium text-foreground">{subject.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {subject.code} · {subject.department}
                         </p>
                       </TableCell>
                       <TableCell>
+                        {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
                         <Select
                           value={alloc.teacherId}
                           onValueChange={(v) => update(alloc.subjectId, { teacherId: v })}
                         >
-                          <SelectTrigger className="h-8 w-full min-w-44 text-[13px]">
+                          <SelectTrigger className="h-8 w-full min-w-44 text-compact">
                             <SelectValue placeholder="Assign teacher…" />
                           </SelectTrigger>
                           <SelectContent>
@@ -267,7 +269,7 @@ export default function ClassSubjectsPage() {
                               periods: Number.isNaN(n) ? 1 : Math.min(8, Math.max(1, n)),
                             });
                           }}
-                          className="mx-auto h-8 w-16 text-center text-[13px] tabular"
+                          className="mx-auto h-8 w-16 text-center text-compact tabular"
                           aria-label={`Periods per week for ${subject.name}`}
                         />
                       </TableCell>
@@ -275,7 +277,7 @@ export default function ClassSubjectsPage() {
                         <Input
                           value={alloc.room}
                           onChange={(e) => update(alloc.subjectId, { room: e.target.value })}
-                          className="h-8 w-24 text-[13px]"
+                          className="h-8 w-24 text-compact"
                           aria-label={`Room for ${subject.name}`}
                         />
                       </TableCell>
@@ -321,14 +323,14 @@ export default function ClassSubjectsPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-[13px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-compact text-muted-foreground">
           <span className="tabular">
             Total periods <span className="font-medium text-foreground">{totalPeriods}</span> / {MAX_PERIODS}
           </span>
           {totalPeriods > MAX_PERIODS ? (
             <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
               <AlertTriangle className="size-3.5" />
-              Total exceeds 40 periods — reduce allocations
+              Total exceeds 40 periods. Reduce allocations
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5">

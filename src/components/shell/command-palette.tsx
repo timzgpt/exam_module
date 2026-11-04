@@ -77,7 +77,7 @@ export function CommandPalette() {
             <span className="text-sm">Verify a report card</span>
           </CommandItem>
         </CommandGroup>
-        <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+        <div className="border-t px-3 py-2 text-2xs text-muted-foreground">
           {SCHOOL.name} · School Reports
         </div>
       </CommandList>

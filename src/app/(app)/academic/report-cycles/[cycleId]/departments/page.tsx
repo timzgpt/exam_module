@@ -27,7 +27,7 @@ import { cycleById, currentCycle, cycleStatsFor, departmentStats } from "@/lib/d
 import { formatAvg } from "@/lib/grading";
 
 const subjectChartConfig = {
-  avg: { label: "Mean score", color: "#650f12" },
+  avg: { label: "Mean score", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 /** Complete when every entry is in, Partial when some are, Overdue when none. */
@@ -55,7 +55,7 @@ export default function DepartmentsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Departments"
-        description={`HOD summary for ${cycle.name} — subject performance, pass rates and marks submission by department.`}
+        description={`HOD summary for ${cycle.name}. Subject performance, pass rates and marks submission by department.`}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -92,31 +92,31 @@ export default function DepartmentsPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="min-w-[160px] pl-4">Department</TableHead>
+                <TableHead className="min-w-40 pl-4">Department</TableHead>
                 <TableHead>HOD</TableHead>
                 <TableHead className="text-center">Subjects</TableHead>
                 <TableHead>Mean score</TableHead>
                 <TableHead>Pass rate</TableHead>
-                <TableHead className="min-w-[170px] pr-4">Submission progress</TableHead>
+                <TableHead className="min-w-42 pr-4">Submission progress</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {deptStats.map((dept) => (
                 <TableRow key={dept.department}>
                   <TableCell className="pl-4">
-                    <p className="text-[13.5px] font-medium text-foreground">{dept.department}</p>
+                    <p className="text-compact font-medium text-foreground">{dept.department}</p>
                     <p className="text-xs text-muted-foreground">
                       {dept.subjects.map((s) => s.name).join(", ")}
                     </p>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-[13px]">{dept.hodName}</TableCell>
-                  <TableCell className="text-center text-[13px] tabular">{dept.subjects.length}</TableCell>
-                  <TableCell className="text-[13px] tabular">{formatAvg(dept.avg)}</TableCell>
-                  <TableCell className="text-[13px] tabular">{dept.passRate}%</TableCell>
+                  <TableCell className="whitespace-nowrap text-compact">{dept.hodName}</TableCell>
+                  <TableCell className="text-center text-compact tabular">{dept.subjects.length}</TableCell>
+                  <TableCell className="text-compact tabular">{formatAvg(dept.avg)}</TableCell>
+                  <TableCell className="text-compact tabular">{dept.passRate}%</TableCell>
                   <TableCell className="pr-4">
                     <div className="flex items-center gap-2">
                       <Progress value={dept.submissionRate} className="h-1.5 w-28" />
-                      <span className="w-9 text-right text-[12px] tabular text-muted-foreground">
+                      <span className="w-9 text-right text-xs tabular text-muted-foreground">
                         {dept.submissionRate}%
                       </span>
                     </div>
@@ -130,7 +130,7 @@ export default function DepartmentsPage() {
 
       <SectionCard
         title="Subject comparison"
-        description="Mean score of every subject across all classes — departments are compared on these averages."
+        description="Mean score of every subject across all classes. Departments are compared on these averages."
       >
         <ChartContainer config={subjectChartConfig} className="h-[280px] w-full">
           <BarChart data={subjectChartData} layout="vertical" margin={{ left: 8, right: 16 }}>
@@ -138,7 +138,7 @@ export default function DepartmentsPage() {
             <XAxis type="number" domain={[0, 100]} tickLine={false} axisLine={false} />
             <YAxis type="category" dataKey="name" width={118} tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="avg" fill="#650f12" radius={[0, 4, 4, 0]} barSize={13} />
+            <Bar dataKey="avg" className="fill-primary" radius={[0, 4, 4, 0]} barSize={13} />
           </BarChart>
         </ChartContainer>
       </SectionCard>
@@ -170,9 +170,9 @@ export default function DepartmentsPage() {
                   <TableBody>
                     {dept.subjects.map((sub) => (
                       <TableRow key={sub.subjectId}>
-                        <TableCell className="pl-3 text-[13px] font-medium text-foreground">{sub.name}</TableCell>
-                        <TableCell className="text-[13px] tabular">{formatAvg(sub.avg)}</TableCell>
-                        <TableCell className="pr-3 text-[13px] tabular">{sub.passRate}%</TableCell>
+                        <TableCell className="pl-3 text-compact font-medium text-foreground">{sub.name}</TableCell>
+                        <TableCell className="text-compact tabular">{formatAvg(sub.avg)}</TableCell>
+                        <TableCell className="pr-3 text-compact tabular">{sub.passRate}%</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -186,7 +186,7 @@ export default function DepartmentsPage() {
                       <TableHead className="pl-3">Teacher</TableHead>
                       <TableHead>Subject</TableHead>
                       <TableHead>Entries</TableHead>
-                      <TableHead className="min-w-[150px]">Progress</TableHead>
+                      <TableHead className="min-w-38">Progress</TableHead>
                       <TableHead className="pr-3">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -195,9 +195,9 @@ export default function DepartmentsPage() {
                       const status = submissionStatus(t.done, t.total);
                       return (
                         <TableRow key={`${t.name}-${t.subject}`}>
-                          <TableCell className="pl-3 text-[13px] font-medium text-foreground">{t.name}</TableCell>
-                          <TableCell className="text-[13px] text-muted-foreground">{t.subject}</TableCell>
-                          <TableCell className="text-[13px] tabular">
+                          <TableCell className="pl-3 text-compact font-medium text-foreground">{t.name}</TableCell>
+                          <TableCell className="text-compact text-muted-foreground">{t.subject}</TableCell>
+                          <TableCell className="text-compact tabular">
                             {t.done}/{t.total}
                           </TableCell>
                           <TableCell>

@@ -10,20 +10,20 @@ export type BadgeTone =
 
 const toneClasses: Record<BadgeTone, string> = {
   neutral: "bg-muted text-muted-foreground border-border",
-  success: "bg-[#16834a]/10 text-[#116b3c] border-[#16834a]/25",
-  warning: "bg-[#c47a16]/10 text-[#9a5f11] border-[#c47a16]/30",
-  destructive: "bg-[#dc2626]/10 text-[#b91c1c] border-[#dc2626]/25",
+  success: "bg-success/10 text-success-strong border-success/25",
+  warning: "bg-warning/10 text-warning-strong border-warning/30",
+  destructive: "bg-destructive/10 text-destructive-strong border-destructive/25",
   primary: "bg-primary/8 text-primary border-primary/25",
-  info: "bg-[#6b4f9e]/10 text-[#5a3f8a] border-[#6b4f9e]/25",
+  info: "bg-info/10 text-info-strong border-info/25",
 };
 
 const dotClasses: Record<BadgeTone, string> = {
   neutral: "bg-muted-foreground/60",
-  success: "bg-[#16834a]",
-  warning: "bg-[#c47a16]",
-  destructive: "bg-[#dc2626]",
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
   primary: "bg-primary",
-  info: "bg-[#6b4f9e]",
+  info: "bg-info",
 };
 
 interface StatusBadgeProps {

@@ -32,7 +32,7 @@ export const useAppContext = create<AppState>()(
     {
       name: "josephian-context",
       // Rehydrate after mount (see AppShell) so server-rendered markup always
-      // matches the first client render — avoids hydration mismatches.
+      // matches the first client render: avoids hydration mismatches.
       skipHydration: true,
     },
   ),

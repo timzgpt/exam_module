@@ -26,7 +26,7 @@ export default function HomePage() {
           </h1>
           <p className="mt-2 max-w-xl text-sm text-primary-foreground/75">
             One workspace for exam administration, marks entry, report
-            generation, release and the parent portal — {currentCycle.term}{" "}
+            generation, release and the parent portal: {currentCycle.term}{" "}
             {currentCycle.academicYear} is currently in review.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -69,7 +69,7 @@ export default function HomePage() {
         {NAV_GROUPS.map((group) => (
           <section
             key={group.label}
-            className="rounded-xl border border-border/80 bg-card"
+            className="overflow-hidden rounded-xl border border-border/80 bg-card"
           >
             <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
               <h2 className="text-sm font-semibold text-foreground">
@@ -96,7 +96,7 @@ export default function HomePage() {
                     >
                       <item.icon className="size-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] font-medium text-foreground">
+                        <span className="block truncate text-compact font-medium text-foreground">
                           {item.label}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">

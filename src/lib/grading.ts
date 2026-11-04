@@ -5,12 +5,12 @@ export const DEFAULT_SCHEME_ID = "gs-2026";
 
 /** Deterministic tone per grade letter for pills, chips and charts. */
 export const GRADE_TONES: Record<string, string> = {
-  A: "bg-[#16834a]/12 text-[#116b3c] border-[#16834a]/30",
-  B: "bg-[#3d7d2f]/12 text-[#35682a] border-[#3d7d2f]/30",
-  C: "bg-[#c47a16]/14 text-[#9a5f11] border-[#c47a16]/35",
-  D: "bg-[#b05c1c]/12 text-[#96491a] border-[#b05c1c]/30",
-  E: "bg-[#b3352e]/12 text-[#a02a25] border-[#b3352e]/30",
-  F: "bg-[#dc2626]/12 text-[#dc2626] border-[#dc2626]/30",
+  A: "bg-success/12 text-success-strong border-success/30",
+  B: "bg-grade-b/12 text-grade-b-strong border-grade-b/30",
+  C: "bg-warning/14 text-warning-strong border-warning/35",
+  D: "bg-grade-d/12 text-grade-d-strong border-grade-d/30",
+  E: "bg-grade-e/12 text-grade-e-strong border-grade-e/30",
+  F: "bg-destructive/12 text-destructive border-destructive/30",
 };
 
 export function gradeFor(

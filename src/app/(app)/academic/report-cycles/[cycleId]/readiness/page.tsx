@@ -63,7 +63,7 @@ export default function CycleReadinessPage() {
     return { cls, marksPct, done, total, commentsPct, cp, approval, eligible };
   });
 
-  /* Blocking issues — incomplete marks, and pending approvals on classes with incomplete marks. */
+  /* Blocking issues: incomplete marks, and pending approvals on classes with incomplete marks. */
   const marksIssues = marksDeadlines
     .filter((d) => d.entriesDone < d.entriesTotal)
     .sort((a, b) => a.entriesDone / a.entriesTotal - b.entriesDone / b.entriesTotal);
@@ -76,14 +76,14 @@ export default function CycleReadinessPage() {
     .map((c) => ({ cls: c.cls, approval: c.approval, marksPct: c.marksPct }));
   const blockingCount = marksIssues.length + approvalIssues.length;
 
-  /* Warnings — classes with missing class-teacher comments. */
+  /* Warnings: classes with missing class-teacher comments. */
   const commentWarnings = perClass.filter((c) => c.cp.done < c.cp.total);
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Readiness check"
-        description={`${cycle.name} — can report cards be generated? Review marks entry, comments and approvals before batching.`}
+        description={`${cycle.name}. Can report cards be generated? Review marks entry, comments and approvals before batching.`}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" asChild>
@@ -130,7 +130,7 @@ export default function CycleReadinessPage() {
                     endAngle={-270}
                     strokeWidth={0}
                   >
-                    <Cell fill="#16834a" />
+                    <Cell className="fill-success" />
                     <Cell fill="var(--muted)" />
                   </Pie>
                 </PieChart>
@@ -143,8 +143,8 @@ export default function CycleReadinessPage() {
             <p
               className={
                 blockingCount === 0
-                  ? "flex items-center gap-1.5 text-sm font-medium text-[#16834a]"
-                  : "flex items-center gap-1.5 text-sm font-medium text-[#b91c1c]"
+                  ? "flex items-center gap-1.5 text-sm font-medium text-success"
+                  : "flex items-center gap-1.5 text-sm font-medium text-destructive-strong"
               }
             >
               {blockingCount === 0 ? (
@@ -153,8 +153,8 @@ export default function CycleReadinessPage() {
                 <AlertTriangle className="size-4" />
               )}
               {blockingCount === 0
-                ? "Ready — no blocking issues"
-                : `Not ready — ${blockingCount} blocking issue${blockingCount === 1 ? "" : "s"}`}
+                ? "Ready. No blocking issues"
+                : `Not ready: ${blockingCount} blocking issue${blockingCount === 1 ? "" : "s"}`}
             </p>
             <div className="space-y-2.5">
               <div>
@@ -202,12 +202,12 @@ export default function CycleReadinessPage() {
                   <li key={d.id} className="flex items-start gap-2.5 px-1 py-2.5 first:pt-0 last:pb-0">
                     <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
                     <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-foreground">
+                      <p className="text-compact font-medium text-foreground">
                         {subject?.name ?? "Subject"} · {classNameOf(d.classId)}
                       </p>
                       <p className="text-xs text-muted-foreground tabular">
                         {d.entriesDone} of {d.entriesTotal} entries entered · {missing} missing
-                        (overdue — due {d.dueDate})
+                        (overdue, due {d.dueDate})
                       </p>
                     </div>
                   </li>
@@ -220,12 +220,12 @@ export default function CycleReadinessPage() {
                 >
                   <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-foreground">
+                    <p className="text-compact font-medium text-foreground">
                       {cls.name} · approval {labelForStatus(approval.status).toLowerCase()}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {approval.status === "changes-requested"
-                        ? `${approval.reviewedBy ?? "Reviewer"} requested changes${approval.note ? ` — ${approval.note}` : ""}`
+                        ? `${approval.reviewedBy ?? "Reviewer"} requested changes${approval.note ? `: ${approval.note}` : ""}`
                         : `Class has not submitted for review and marks are only ${marksPct}% entered.`}
                     </p>
                   </div>
@@ -258,9 +258,9 @@ export default function CycleReadinessPage() {
             <ul className="space-y-2.5">
               {commentWarnings.map((c) => (
                 <li key={c.cls.id} className="flex items-start gap-2.5">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#c47a16]" />
-                  <p className="text-[13px] text-foreground tabular">
-                    {c.cls.name} — {c.cp.done} of {c.cp.total} class-teacher comments complete
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <p className="text-compact text-foreground tabular">
+                    {c.cls.name}: {c.cp.done} of {c.cp.total} class-teacher comments complete
                   </p>
                 </li>
               ))}
@@ -290,7 +290,7 @@ export default function CycleReadinessPage() {
                 {perClass.map((c) => (
                   <TableRow key={c.cls.id}>
                     <TableCell className="pl-4">
-                      <p className="text-[13.5px] font-medium text-foreground">{c.cls.name}</p>
+                      <p className="text-compact font-medium text-foreground">{c.cls.name}</p>
                       <p className="text-xs text-muted-foreground">{c.cls.level}</p>
                     </TableCell>
                     <TableCell>
@@ -325,8 +325,8 @@ export default function CycleReadinessPage() {
                       <span
                         className={
                           c.eligible
-                            ? "inline-flex items-center gap-1.5 text-[13px] font-medium text-[#16834a]"
-                            : "inline-flex items-center gap-1.5 text-[13px] font-medium text-destructive"
+                            ? "inline-flex items-center gap-1.5 text-compact font-medium text-success"
+                            : "inline-flex items-center gap-1.5 text-compact font-medium text-destructive"
                         }
                       >
                         {c.eligible ? (

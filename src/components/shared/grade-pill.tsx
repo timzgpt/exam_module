@@ -6,7 +6,7 @@ interface GradePillProps {
   className?: string;
 }
 
-/** Coloured grade letter (A–F) using the shared grade tone palette. */
+/** Coloured grade letter (A-F) using the shared grade tone palette. */
 export function GradePill({ grade, className }: GradePillProps) {
   return (
     <span

@@ -86,7 +86,7 @@ export default function GradingSchemesPage() {
   const spanMax = Math.max(...draft.map((b) => b.max), 100);
   const span = spanMax - spanMin || 1;
 
-  /* Grade simulator — evaluates against the edited draft boundaries. */
+  /* Grade simulator: evaluates against the edited draft boundaries. */
   const simValue = simMark.trim() === "" ? null : Number(simMark);
   const simValid = simValue !== null && !Number.isNaN(simValue) && simValue >= 0 && simValue <= 100;
   const simGrade = simValid && simValue !== null ? gradeFor(simValue, { ...scheme, boundaries: draft }) : undefined;
@@ -111,11 +111,12 @@ export default function GradingSchemesPage() {
       {/* Grade-range band + scheme picker */}
       <SectionCard
         title="Grade band"
-        description={`How the 0–100 mark range is split by ${scheme.name}. Segments are sized by the width of each boundary.`}
+        description={`How the 0-100 mark range is split by ${scheme.name}. Segments are sized by the width of each boundary.`}
         actions={
           <div className="w-56">
+            {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
             <Select value={scheme.id} onValueChange={selectScheme}>
-              <SelectTrigger className="h-8 w-full text-[13px]">
+              <SelectTrigger className="h-8 w-full text-compact">
                 <SelectValue placeholder="Select scheme" />
               </SelectTrigger>
               <SelectContent>
@@ -141,11 +142,11 @@ export default function GradingSchemesPage() {
                     "flex min-w-0 flex-col items-center justify-center border-r border-border/40 last:border-r-0",
                     gradeToneClass(b.grade),
                   )}
-                  title={`${b.grade}: ${b.min}–${b.max} (${b.points} pts)`}
+                  title={`${b.grade}: ${b.min}-${b.max} (${b.points} pts)`}
                 >
                   <span className="text-sm font-semibold leading-none">{b.grade}</span>
-                  <span className="mt-1 text-[10px] leading-none tabular opacity-80">
-                    {b.min}–{b.max}
+                  <span className="mt-1 text-3xs leading-none tabular opacity-80">
+                    {b.min}-{b.max}
                   </span>
                 </div>
               );
@@ -169,7 +170,7 @@ export default function GradingSchemesPage() {
             <span className="inline-flex items-center gap-1.5">
               <Wand2 className="size-3.5" /> Points range{" "}
               <span className="font-medium text-foreground tabular">
-                {Math.min(...draft.map((b) => b.points))}–{Math.max(...draft.map((b) => b.points))}
+                {Math.min(...draft.map((b) => b.points))}-{Math.max(...draft.map((b) => b.points))}
               </span>
             </span>
           </div>
@@ -205,7 +206,7 @@ export default function GradingSchemesPage() {
                       <Input
                         type="number"
                         aria-label={`${b.grade} minimum`}
-                        className="h-8 w-20 text-[13px] tabular"
+                        className="h-8 w-20 text-compact tabular"
                         value={b.min}
                         onChange={(e) => updateBoundary(i, "min", e.target.value)}
                       />
@@ -214,7 +215,7 @@ export default function GradingSchemesPage() {
                       <Input
                         type="number"
                         aria-label={`${b.grade} maximum`}
-                        className="h-8 w-20 text-[13px] tabular"
+                        className="h-8 w-20 text-compact tabular"
                         value={b.max}
                         onChange={(e) => updateBoundary(i, "max", e.target.value)}
                       />
@@ -223,7 +224,7 @@ export default function GradingSchemesPage() {
                       <Input
                         type="number"
                         aria-label={`${b.grade} points`}
-                        className="h-8 w-16 text-[13px] tabular"
+                        className="h-8 w-16 text-compact tabular"
                         value={b.points}
                         onChange={(e) => updateBoundary(i, "points", e.target.value)}
                       />
@@ -231,7 +232,7 @@ export default function GradingSchemesPage() {
                     <TableCell className="pr-4">
                       <Input
                         aria-label={`${b.grade} remark`}
-                        className="h-8 min-w-36 text-[13px]"
+                        className="h-8 min-w-36 text-compact"
                         value={b.remark}
                         onChange={(e) => updateBoundary(i, "remark", e.target.value)}
                       />
@@ -243,7 +244,7 @@ export default function GradingSchemesPage() {
           </div>
           <p className="border-t border-border/70 px-4 py-2.5 text-xs text-muted-foreground">
             {dirty
-              ? "You have unsaved edits — use Save changes or Reset."
+              ? "You have unsaved edits. Use Save changes or Reset."
               : "Showing the saved boundaries for this scheme."}
           </p>
         </SectionCard>
@@ -251,7 +252,7 @@ export default function GradingSchemesPage() {
         {/* Rules + simulator */}
         <div className="space-y-5">
           <SectionCard title="Rules" description="Applied when grading marks in this scheme.">
-            <div className="space-y-3.5 text-[13px]">
+            <div className="space-y-3.5 text-compact">
               <div className="flex items-center justify-between rounded-md border border-border/70 px-3 py-2.5">
                 <span className="inline-flex items-center gap-2 text-muted-foreground">
                   <SlidersHorizontal className="size-4" /> Pass mark
@@ -262,7 +263,7 @@ export default function GradingSchemesPage() {
                 <p className="font-medium text-foreground">Rounding rule</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   Subject marks are entered as whole numbers. Averages are kept to one decimal place and are
-                  not rounded up before grading — 79.5 grades as a B, not an A.
+                  not rounded up before grading. 79.5 grades as a B, not an A.
                 </p>
               </div>
               <div>
@@ -286,14 +287,14 @@ export default function GradingSchemesPage() {
           >
             <div className="space-y-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="sim-mark">Mark (0–100)</Label>
+                <Label htmlFor="sim-mark">Mark (0-100)</Label>
                 <Input
                   id="sim-mark"
                   type="number"
                   min={0}
                   max={100}
                   placeholder="e.g. 72"
-                  className="h-9 text-[13px] tabular"
+                  className="h-9 text-compact tabular"
                   value={simMark}
                   onChange={(e) => setSimMark(e.target.value)}
                 />
@@ -304,7 +305,7 @@ export default function GradingSchemesPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{simGrade.remark}</p>
                     <p className="text-xs text-muted-foreground tabular">
-                      {simGrade.min}–{simGrade.max} · {simGrade.points}{" "}
+                      {simGrade.min}-{simGrade.max} · {simGrade.points}{" "}
                       {simGrade.points === 1 ? "point" : "points"}
                     </p>
                   </div>

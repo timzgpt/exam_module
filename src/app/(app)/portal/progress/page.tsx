@@ -95,17 +95,17 @@ function ChildChips({
           >
             <span
               className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
                 active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
               )}
             >
               {initialsOf(kid.name)}
             </span>
             <span className="flex flex-col leading-tight">
-              <span className={cn("text-[13px] font-medium", active ? "text-primary" : "text-foreground")}>
+              <span className={cn("text-compact font-medium", active ? "text-primary" : "text-foreground")}>
                 {firstName(kid.name)}
               </span>
-              <span className="text-[11px] text-muted-foreground">{classNameOf(kid.classId)}</span>
+              <span className="text-2xs text-muted-foreground">{classNameOf(kid.classId)}</span>
             </span>
           </button>
         );
@@ -146,7 +146,7 @@ export default function PortalProgressPage() {
   }
   if (best) {
     recommendations.push(
-      `Keep up the strong work in ${best.sub.name} — the best result this term.`,
+      `Keep up the strong work in ${best.sub.name}. The best result this term.`,
     );
   }
 
@@ -162,13 +162,13 @@ export default function PortalProgressPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Term average"
-          value={result ? formatAvg(result.average) : "—"}
+          value={result ? formatAvg(result.average) : "-"}
           icon={BarChart3}
           hint={`${currentCycle.term} · ${currentCycle.academicYear}`}
         />
         <StatCard
           label="Position"
-          value={result ? `${result.rank} of ${classSize}` : "—"}
+          value={result ? `${result.rank} of ${classSize}` : "-"}
           icon={Award}
           hint={`${classNameOf(child.classId)} ranking`}
         />
@@ -181,7 +181,7 @@ export default function PortalProgressPage() {
         />
         <StatCard
           label="Class teacher"
-          value={classTeacher?.name ?? "—"}
+          value={classTeacher?.name ?? "-"}
           icon={User}
           hint={classNameOf(child.classId)}
         />
@@ -203,7 +203,7 @@ export default function PortalProgressPage() {
               <div key={sub.id} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] font-medium text-foreground">{sub.name}</p>
+                    <p className="text-compact font-medium text-foreground">{sub.name}</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                       {mark !== null ? subjectRemark(mark) : "Not assessed yet"}
                     </p>
@@ -211,14 +211,14 @@ export default function PortalProgressPage() {
                   <div className="flex shrink-0 items-center gap-2">
                     {mark !== null ? (
                       delta === 0 ? (
-                        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
                           0
                         </span>
                       ) : (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
-                            up ? "bg-[#16834a]/10 text-[#16834a]" : "bg-[#dc2626]/10 text-[#dc2626]",
+                            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-2xs font-medium",
+                            up ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
                           )}
                         >
                           {up ? (
@@ -232,20 +232,20 @@ export default function PortalProgressPage() {
                       )
                     ) : null}
                     <span className="w-7 text-right text-sm font-semibold tabular text-foreground">
-                      {mark ?? "—"}
+                      {mark ?? "-"}
                     </span>
                     {grade ? (
                       <GradePill grade={grade} />
                     ) : (
                       <span className="flex size-6 items-center justify-center text-muted-foreground">
-                        —
+                        -
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="mt-2.5 flex items-center gap-3">
                   <Progress value={pct} className="h-1.5 flex-1" aria-label={`${sub.name} progress toward target`} />
-                  <span className="shrink-0 text-[11px] tabular text-muted-foreground">
+                  <span className="shrink-0 text-2xs tabular text-muted-foreground">
                     Target {target.targetAverage}
                   </span>
                 </div>
@@ -262,10 +262,10 @@ export default function PortalProgressPage() {
         <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-3.5">
           <Target className="mt-0.5 size-4 shrink-0 text-primary" />
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-foreground">Focus area: {target.focus}</p>
+            <p className="text-compact font-medium text-foreground">Focus area: {target.focus}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Target average {target.targetAverage} — currently{" "}
-              {result ? formatAvg(result.average) : "—"}.
+              Target average {target.targetAverage}. Currently{" "}
+              {result ? formatAvg(result.average) : "-"}.
             </p>
           </div>
         </div>
@@ -274,7 +274,7 @@ export default function PortalProgressPage() {
           {recommendations.map((rec) => (
             <li key={rec} className="flex items-start gap-2.5">
               <Lightbulb className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <p className="text-[13px] leading-relaxed text-foreground">{rec}</p>
+              <p className="text-compact leading-relaxed text-foreground">{rec}</p>
             </li>
           ))}
         </ul>

@@ -100,7 +100,7 @@ export default function ReleasePage() {
   const params = useParams<{ cycleId?: string; studentId?: string }>();
   const { toast } = useToast();
 
-  // Param resolution — never crash on unknown ids.
+  // Param resolution: never crash on unknown ids.
   const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
 
   const [rows, setRows] = useState<ClassRelease[]>(() =>
@@ -133,7 +133,7 @@ export default function ReleasePage() {
     );
     toast({
       title: "Report cards released",
-      description: `${cls?.name ?? "Class"} is now visible in the parent portal — parents have been notified.`,
+      description: `${cls?.name ?? "Class"} is now visible in the parent portal. Parents have been notified.`,
     });
   };
 
@@ -149,7 +149,7 @@ export default function ReleasePage() {
     );
     toast({
       title: "Hold placed",
-      description: `${cls?.name ?? "Class"} report cards are held — reason: ${holdReason}.`,
+      description: `${cls?.name ?? "Class"} report cards are held. Reason: ${holdReason}.`,
     });
     setHoldFor(null);
     setHoldReason("");
@@ -188,8 +188,8 @@ export default function ReleasePage() {
 
       <div className="flex items-start gap-2.5 rounded-lg border border-primary/25 bg-primary/5 px-4 py-3">
         <Info className="mt-0.5 size-4 shrink-0 text-primary" />
-        <p className="text-[13px] text-foreground">
-          Releasing a card makes it visible in the parent portal and triggers a notification — simulated in this demo.
+        <p className="text-compact text-foreground">
+          Releasing a card makes it visible in the parent portal and triggers a notification. Simulated in this demo.
         </p>
       </div>
 
@@ -198,7 +198,7 @@ export default function ReleasePage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="min-w-[140px] pl-4">Class</TableHead>
+                <TableHead className="min-w-35 pl-4">Class</TableHead>
                 <TableHead>Approval status</TableHead>
                 <TableHead>Hold reason</TableHead>
                 <TableHead>Release date</TableHead>
@@ -215,8 +215,8 @@ export default function ReleasePage() {
                 return (
                   <TableRow key={r.classId}>
                     <TableCell className="pl-4">
-                      <p className="text-[13.5px] font-medium text-foreground">{cls?.name ?? "Class"}</p>
-                      <p className="text-xs text-muted-foreground">{cls ? `${cls.level} · Room ${cls.room}` : "—"}</p>
+                      <p className="text-compact font-medium text-foreground">{cls?.name ?? "Class"}</p>
+                      <p className="text-xs text-muted-foreground">{cls ? `${cls.level} · Room ${cls.room}` : "-"}</p>
                     </TableCell>
                     <TableCell>
                       <StatusBadge
@@ -227,17 +227,17 @@ export default function ReleasePage() {
                     <TableCell>
                       {r.hold ? (
                         <>
-                          <p className="text-[13px] font-medium text-foreground">{r.hold.reason}</p>
+                          <p className="text-compact font-medium text-foreground">{r.hold.reason}</p>
                           {r.hold.detail ? (
                             <p className="max-w-[240px] text-xs text-muted-foreground">{r.hold.detail}</p>
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-[13px] text-muted-foreground">—</span>
+                        <span className="text-compact text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-[13px] tabular text-muted-foreground">
-                      {r.releasedAt ? fmtStamp(r.releasedAt) : "—"}
+                    <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
+                      {r.releasedAt ? fmtStamp(r.releasedAt) : "-"}
                     </TableCell>
                     <TableCell>
                       <StatusBadge tone={meta.tone} label={meta.label} />
@@ -316,14 +316,14 @@ export default function ReleasePage() {
               const cls = classById(r.classId);
               return (
                 <div key={r.classId} className="relative">
-                  <span className="absolute -left-[25px] top-1 flex size-2.5 items-center justify-center rounded-full bg-[#16834a]" />
-                  <p className="text-[13.5px] text-foreground">
-                    <span className="font-medium">{cls?.name ?? "Class"}</span> released —{" "}
-                    {fmtStamp(r.releasedAt ?? "")} by {r.releasedBy ?? "—"}
+                  <span className="absolute -left-6 top-1 flex size-2.5 items-center justify-center rounded-full bg-success" />
+                  <p className="text-compact text-foreground">
+                    <span className="font-medium">{cls?.name ?? "Class"}</span> released:{" "}
+                    {fmtStamp(r.releasedAt ?? "")} by {r.releasedBy ?? "-"}
                   </p>
                   {r.hold ? (
                     <p className="text-xs text-muted-foreground">
-                      Note: placed on hold afterwards ({r.hold.reason}) — cards are hidden again.
+                      Note: placed on hold afterwards ({r.hold.reason}). Cards are hidden again.
                     </p>
                   ) : null}
                 </div>
@@ -337,7 +337,7 @@ export default function ReleasePage() {
       <Dialog open={!!holdFor} onOpenChange={(open) => !open && setHoldFor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Place hold — {holdFor ? classById(holdFor.classId)?.name : ""}</DialogTitle>
+            <DialogTitle>Place hold: {holdFor ? classById(holdFor.classId)?.name : ""}</DialogTitle>
             <DialogDescription>
               Held report cards are hidden from the parent portal until the hold is lifted.
             </DialogDescription>
@@ -345,6 +345,7 @@ export default function ReleasePage() {
           <div className="grid gap-3.5 py-1">
             <div className="grid gap-1.5">
               <Label>Reason</Label>
+              {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
               <Select value={holdReason} onValueChange={setHoldReason}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a reason" />
@@ -363,7 +364,7 @@ export default function ReleasePage() {
               <Textarea
                 id="hold-detail"
                 rows={3}
-                placeholder="e.g. 3 students have an outstanding balance — cards held until cleared."
+                placeholder="e.g. 3 students have an outstanding balance. Cards held until cleared."
                 value={holdDetail}
                 onChange={(e) => setHoldDetail(e.target.value)}
               />

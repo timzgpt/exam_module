@@ -16,9 +16,9 @@ interface StatCardProps {
 
 const toneStyles: Record<NonNullable<StatCardProps["tone"]>, string> = {
   default: "text-foreground",
-  success: "text-[#16834a]",
-  warning: "text-[#c47a16]",
-  destructive: "text-[#dc2626]",
+  success: "text-success",
+  warning: "text-warning",
+  destructive: "text-destructive",
   primary: "text-primary",
 };
 
@@ -36,7 +36,7 @@ export function StatCard({
     <Card className={cn("border-border/80 shadow-none", className)}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
+          <p className="text-compact font-medium text-muted-foreground">{label}</p>
           {Icon ? (
             <Icon className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
           ) : null}
@@ -48,10 +48,10 @@ export function StatCard({
           {delta ? (
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-2xs font-medium",
                 delta.up
-                  ? "bg-[#16834a]/10 text-[#16834a]"
-                  : "bg-[#dc2626]/10 text-[#dc2626]",
+                  ? "bg-success/10 text-success"
+                  : "bg-destructive/10 text-destructive",
               )}
             >
               {delta.up ? (

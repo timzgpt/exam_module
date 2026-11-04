@@ -324,7 +324,7 @@ export function getMarks(
   const subjectOffset = (hashStr(subjectId) % 15) - 7;
   const result: Record<string, number | null> = {};
   for (const s of studentsInClass(classId)) {
-    const ability = 44 + (hashStr(s.id) % 46); // 44 – 89 latent ability
+    const ability = 44 + (hashStr(s.id) % 46); // 44-89 latent ability
     const jitter = rnd() * 18 - 9;
     const mark = Math.round(ability + classOffset + subjectOffset + jitter);
     result[s.id] = Math.max(14, Math.min(99, mark));
@@ -383,7 +383,7 @@ export const commentTemplates: string[] = [
   "A cheerful member of the class who works well with others. Aim for a higher standard in assignments.",
   "Capable of excellent results. Needs to submit homework on time and revise regularly.",
   "Very strong in practical work. Continue building confidence in theory sections.",
-  "Excellent attendance and attitude. A role model to peers — very proud of this term's effort.",
+  "Excellent attendance and attitude. A role model to peers. Very proud of this term's effort.",
   "Should make greater use of the library and attempt more past examination papers.",
 ];
 
@@ -444,7 +444,7 @@ export const approvals: ClassApproval[] = classes.map((cls) => {
       at: "2026-03-10 09:05",
       actor: "Mrs. Agnes Nyoni",
       action: "Changes requested",
-      detail: "Mathematics marks for 3 students look inconsistent with coursework — please verify.",
+      detail: "Mathematics marks for 3 students look inconsistent with coursework. Please verify.",
     });
   }
   if (status === "approved") {
@@ -463,7 +463,7 @@ export const approvals: ClassApproval[] = classes.map((cls) => {
     reviewedBy: status === "approved" || status === "changes-requested" ? "Mrs. Agnes Nyoni" : null,
     note:
       status === "changes-requested"
-        ? "Mathematics marks for 3 students look inconsistent with coursework — please verify."
+        ? "Mathematics marks for 3 students look inconsistent with coursework. Please verify."
         : null,
     audit,
   };
@@ -523,7 +523,7 @@ export const releases: ClassRelease[] = [
     classId: "cls-1b",
     releasedAt: null,
     releasedBy: null,
-    hold: { reason: "Fees balance", detail: "3 students have an outstanding balance — cards held until cleared." },
+    hold: { reason: "Fees balance", detail: "3 students have an outstanding balance. Cards held until cleared." },
   },
   {
     classId: "cls-2a",
@@ -565,7 +565,7 @@ export const releaseFor = (classId: string): ClassRelease =>
 
 export const parentsDayEvent = {
   date: "2026-03-27",
-  window: "09:00 – 12:40",
+  window: "09:00-12:40",
   slots: ["09:00", "09:20", "09:40", "10:00", "10:20", "10:40", "11:00", "11:20", "11:40", "12:00"],
 };
 
@@ -595,7 +595,7 @@ export function slotLabel(slot: string): string {
   const end = m + 20;
   const eh = end >= 60 ? h + 1 : h;
   const em = end % 60;
-  return `${slot} – ${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+  return `${slot}: ${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
 }
 
 /* ================================================================
@@ -707,7 +707,7 @@ export function classResults(classId: string): StudentResult[] {
       }
     }
     const average = count > 0 ? total / count : 0;
-    return { student, marks, total, count, average, grade: count > 0 ? gradeFor(average, defaultScheme)?.grade ?? "F" : "—", rank: 0 };
+    return { student, marks, total, count, average, grade: count > 0 ? gradeFor(average, defaultScheme)?.grade ?? "F" : "-", rank: 0 };
   });
   rows.sort((a, b) => b.average - a.average);
   rows.forEach((r, i) => (r.rank = i + 1));
@@ -858,7 +858,7 @@ export function departmentStats(): DepartmentStat[] {
     const hod = teachers.find((t) => t.role.includes(`HOD ${dept}`));
     return {
       department: dept,
-      hodName: hod?.name ?? "—",
+      hodName: hod?.name ?? "-",
       avg: rows.reduce((a, r) => a + r.avg, 0) / rows.length,
       passRate: Math.round(rows.reduce((a, r) => a + r.passRate, 0) / rows.length),
       submissionRate: submissionTotal ? Math.round((submissionDone / submissionTotal) * 100) : 0,
@@ -887,7 +887,7 @@ export function studentEffort(studentId: string, subjectId: string): string {
 export function subjectRemark(mark: number): string {
   const g = gradeFor(mark, defaultScheme)?.grade ?? "F";
   if (g === "A") return "Excellent understanding of the topic.";
-  if (g === "B") return "Very good performance — keep improving.";
+  if (g === "B") return "Very good performance. Keep improving.";
   if (g === "C") return "Good effort; revise weaker areas.";
   if (g === "D") return "Satisfactory; needs more practice.";
   if (g === "E") return "Pass; attend remedial sessions.";

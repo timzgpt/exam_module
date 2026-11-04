@@ -72,7 +72,7 @@ function validationFor(classId: string): ValidationCheck[] {
       ok: approval.status !== "changes-requested",
       detail:
         approval.status === "changes-requested"
-          ? "Changes requested — resolve in review first"
+          ? "Changes requested. Resolve in review first"
           : labelForStatus(approval.status),
     },
   ];
@@ -82,7 +82,7 @@ export default function BatchesPage() {
   const params = useParams<{ cycleId?: string; studentId?: string }>();
   const { toast } = useToast();
 
-  // Param resolution — never crash on unknown ids.
+  // Param resolution: never crash on unknown ids.
   const cycle: ReportCycle = cycleById(params.cycleId ?? "") ?? currentCycle;
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -137,8 +137,8 @@ export default function BatchesPage() {
     setRunList(list);
     setProgress(0);
     setLogs([
-      `[info] Batch ${id} started — ${list.length} students across ${passingIds.length} class${passingIds.length === 1 ? "" : "es"}`,
-      `[info] Options — class-teacher comments: ${includeComments ? "on" : "off"} · attendance summary: ${includeAttendance ? "on" : "off"}`,
+      `[info] Batch ${id} started: ${list.length} students across ${passingIds.length} class${passingIds.length === 1 ? "" : "es"}`,
+      `[info] Options. Class-teacher comments: ${includeComments ? "on" : "off"} · attendance summary: ${includeAttendance ? "on" : "off"}`,
     ]);
     setDone(false);
     setStep(3);
@@ -155,7 +155,7 @@ export default function BatchesPage() {
       j += 1;
       const s = list[j - 1];
       if (s) {
-        setLogs((prev) => [...prev, `[ok] Report generated — ${s.name} (${classNameOf(s.classId)})`]);
+        setLogs((prev) => [...prev, `[ok] Report generated: ${s.name} (${classNameOf(s.classId)})`]);
       }
       if (j >= list.length) {
         clearInterval(logTimer);
@@ -176,7 +176,7 @@ export default function BatchesPage() {
     setProgress(0);
     setLogs([]);
     setDone(false);
-    toast({ title: "Wizard reset", description: "Scope cleared — choose classes to start another batch." });
+    toast({ title: "Wizard reset", description: "Scope cleared. Choose classes to start another batch." });
   };
 
   const downloadManifest = () => {
@@ -219,13 +219,13 @@ export default function BatchesPage() {
             return (
               <Fragment key={label}>
                 {i > 0 ? (
-                  <div className={cn("mx-2 h-px flex-1 sm:mx-3", n <= step ? "bg-[#16834a]" : "bg-border")} />
+                  <div className={cn("mx-2 h-px flex-1 sm:mx-3", n <= step ? "bg-success" : "bg-border")} />
                 ) : null}
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       "flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular",
-                      completed && "border-[#16834a]/40 bg-[#16834a]/10 text-[#116b3c]",
+                      completed && "border-success/40 bg-success/10 text-success-strong",
                       current && "border-primary bg-primary text-primary-foreground",
                       !completed && !current && "border-border bg-background text-muted-foreground",
                     )}
@@ -247,7 +247,7 @@ export default function BatchesPage() {
         </div>
       </SectionCard>
 
-      {/* Step 1 — Scope */}
+      {/* Step 1: Scope */}
       {step === 1 ? (
         <SectionCard
           title="Step 1 · Scope"
@@ -257,7 +257,7 @@ export default function BatchesPage() {
           }
         >
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-border/80 bg-muted/30 px-4 py-3 text-[13px]">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-border/80 bg-muted/30 px-4 py-3 text-compact">
               <span className="font-medium text-foreground">{cycle.name}</span>
               <span className="text-muted-foreground tabular">
                 {cycle.startDate} → {cycle.endDate}
@@ -274,13 +274,13 @@ export default function BatchesPage() {
                   <label
                     key={cls.id}
                     className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                      "flex flex-wrap cursor-pointer items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2.5 transition-colors",
                       checked ? "border-primary/40 bg-primary/5" : "border-border/80 hover:bg-muted/30",
                     )}
                   >
                     <Checkbox checked={checked} onCheckedChange={(v) => toggleClass(cls.id, v === true)} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-medium text-foreground">{cls.name}</p>
+                      <p className="text-compact font-medium text-foreground">{cls.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {studentsInClass(cls.id).length} students · Room {cls.room}
                       </p>
@@ -294,14 +294,14 @@ export default function BatchesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2.5">
                 <div>
-                  <p className="text-[13px] font-medium text-foreground">Include class-teacher comments</p>
+                  <p className="text-compact font-medium text-foreground">Include class-teacher comments</p>
                   <p className="text-xs text-muted-foreground">Print the remark block on every card.</p>
                 </div>
                 <Switch checked={includeComments} onCheckedChange={setIncludeComments} aria-label="Include class-teacher comments" />
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2.5">
                 <div>
-                  <p className="text-[13px] font-medium text-foreground">Include attendance summary</p>
+                  <p className="text-compact font-medium text-foreground">Include attendance summary</p>
                   <p className="text-xs text-muted-foreground">Add days present / total to each card.</p>
                 </div>
                 <Switch checked={includeAttendance} onCheckedChange={setIncludeAttendance} aria-label="Include attendance summary" />
@@ -317,7 +317,7 @@ export default function BatchesPage() {
         </SectionCard>
       ) : null}
 
-      {/* Step 2 — Validation */}
+      {/* Step 2: Validation */}
       {step === 2 ? (
         <SectionCard
           title="Step 2 · Validation"
@@ -330,21 +330,21 @@ export default function BatchesPage() {
                 return (
                   <div key={classId} className="rounded-lg border border-border/80 p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13.5px] font-medium text-foreground">{classNameOf(classId)}</p>
+                      <p className="text-compact font-medium text-foreground">{classNameOf(classId)}</p>
                       <StatusBadge tone={passing ? "success" : "destructive"} label={passing ? "Pass" : "Failing"} />
                     </div>
                     <ul className="mt-3 space-y-1.5">
                       {checks.map((c) => (
-                        <li key={c.label} className="flex items-start gap-2 text-[13px]">
+                        <li key={c.label} className="flex items-start gap-2 text-compact">
                           {c.ok ? (
-                            <CircleCheck className="mt-0.5 size-4 shrink-0 text-[#16834a]" />
+                            <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
                           ) : (
-                            <XCircle className="mt-0.5 size-4 shrink-0 text-[#dc2626]" />
+                            <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
                           )}
                           <span>
                             <span className="text-foreground">{c.label}</span>{" "}
                             <span className={c.ok ? "text-muted-foreground" : "text-destructive"}>
-                              — {c.detail}
+                             : {c.detail}
                             </span>
                           </span>
                         </li>
@@ -358,15 +358,15 @@ export default function BatchesPage() {
             <div
               className={cn(
                 "flex items-start gap-2.5 rounded-lg border px-4 py-3",
-                skippedRows.length === 0 ? "border-[#16834a]/30 bg-[#16834a]/5" : "border-[#c47a16]/35 bg-[#c47a16]/5",
+                skippedRows.length === 0 ? "border-success/30 bg-success/5" : "border-warning/35 bg-warning/5",
               )}
             >
               {skippedRows.length === 0 ? (
-                <CircleCheck className="mt-0.5 size-4 shrink-0 text-[#16834a]" />
+                <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
               ) : (
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-[#9a5f11]" />
+                <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning-strong" />
               )}
-              <p className="text-[13px]">
+              <p className="text-compact">
                 <span className="font-medium text-foreground">
                   {passingIds.length} of {validationRows.length} classes pass validation.
                 </span>{" "}
@@ -393,14 +393,14 @@ export default function BatchesPage() {
         </SectionCard>
       ) : null}
 
-      {/* Step 3 — Generate */}
+      {/* Step 3: Generate */}
       {step === 3 ? (
         <SectionCard
           title="Step 3 · Generate"
           description={
             done
               ? `Batch ${runId} finished.`
-              : `Generating ${total} report cards — this is a simulated run.`
+              : `Generating ${total} report cards. This is a simulated run.`
           }
           actions={
             done ? (
@@ -412,7 +412,7 @@ export default function BatchesPage() {
         >
           <div className="space-y-4">
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[13px]">
+              <div className="flex items-center justify-between text-compact">
                 <span className="text-muted-foreground">Progress</span>
                 <span className="font-medium text-foreground tabular">
                   {progress} of {total}
@@ -435,7 +435,7 @@ export default function BatchesPage() {
 
             {done ? (
               <div className="rounded-lg border border-border/80 p-4">
-                <p className="text-[13.5px] font-medium text-foreground">
+                <p className="text-compact font-medium text-foreground">
                   {runList.length} report cards generated for {passingIds.map(classNameOf).join(", ")}.
                 </p>
                 {skippedRows.length > 0 ? (
@@ -443,7 +443,7 @@ export default function BatchesPage() {
                     <p className="text-xs font-medium text-muted-foreground">Skipped classes:</p>
                     {skippedRows.map(({ classId, checks }) => (
                       <p key={classId} className="text-xs text-destructive">
-                        {classNameOf(classId)} — {checks.filter((c) => !c.ok).map((c) => c.detail).join("; ")}
+                        {classNameOf(classId)}: {checks.filter((c) => !c.ok).map((c) => c.detail).join("; ")}
                       </p>
                     ))}
                   </div>
@@ -472,7 +472,7 @@ export default function BatchesPage() {
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="pl-4">Batch</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="min-w-[240px]">Scope</TableHead>
+                <TableHead className="min-w-60">Scope</TableHead>
                 <TableHead className="text-center">Generated</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="pr-4">Started by</TableHead>
@@ -482,13 +482,13 @@ export default function BatchesPage() {
               {batchRuns.map((run) => (
                 <TableRow key={run.id}>
                   <TableCell className="pl-4">
-                    <p className="text-[13.5px] font-medium text-foreground tabular">{run.id}</p>
+                    <p className="text-compact font-medium text-foreground tabular">{run.id}</p>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-[13px] tabular text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
                     {run.createdAt}
                   </TableCell>
                   <TableCell>
-                    <p className="text-[13px] text-foreground">{run.scopeLabel}</p>
+                    <p className="text-compact text-foreground">{run.scopeLabel}</p>
                     {run.failed.length > 0 ? (
                       <div className="mt-0.5 space-y-0.5">
                         {run.failed.map((f) => (
@@ -499,11 +499,11 @@ export default function BatchesPage() {
                       </div>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-center text-[13px] tabular">{run.generated}</TableCell>
+                  <TableCell className="text-center text-compact tabular">{run.generated}</TableCell>
                   <TableCell>
                     <StatusBadge tone={toneForStatus(run.status)} label={labelForStatus(run.status)} />
                   </TableCell>
-                  <TableCell className="pr-4 text-[13px] text-muted-foreground">{run.startedBy}</TableCell>
+                  <TableCell className="pr-4 text-compact text-muted-foreground">{run.startedBy}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

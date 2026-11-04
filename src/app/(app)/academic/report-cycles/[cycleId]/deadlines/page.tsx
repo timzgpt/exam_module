@@ -96,7 +96,7 @@ export default function CycleDeadlinesPage() {
     const teacher = row.enteredBy ?? "the class teacher";
     toast({
       title: "Reminder sent",
-      description: `Reminder sent to ${teacher} — ${subject} · ${classNameOf(row.classId)} (${row.entriesDone}/${row.entriesTotal} entries).`,
+      description: `Reminder sent to ${teacher}: ${subject} · ${classNameOf(row.classId)} (${row.entriesDone}/${row.entriesTotal} entries).`,
     });
   };
 
@@ -104,7 +104,7 @@ export default function CycleDeadlinesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Marks deadlines"
-        description={`${cycle.name} — subject mark sheets were due ${rows[0]?.dueDate ?? "2026-03-06"}. Incomplete sheets are overdue.`}
+        description={`${cycle.name}. Subject mark sheets were due ${rows[0]?.dueDate ?? "2026-03-06"}. Incomplete sheets are overdue.`}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -120,7 +120,7 @@ export default function CycleDeadlinesPage() {
           value={counts.overdue}
           icon={CircleX}
           tone="destructive"
-          hint="No entries entered — due date passed"
+          hint="No entries entered. Due date passed"
         />
         <StatCard
           label="Partial"
@@ -144,7 +144,7 @@ export default function CycleDeadlinesPage() {
       >
         <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="h-8">
+            <TabsList className="min-h-8 max-w-full flex-wrap">
               {STATUS_TABS.map((t) => (
                 <TabsTrigger key={t} value={t} className="h-7 px-2.5 text-xs capitalize">
                   {t}
@@ -153,8 +153,9 @@ export default function CycleDeadlinesPage() {
             </TabsList>
           </Tabs>
           <div className="sm:w-52">
+            {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
             <Select value={classFilter} onValueChange={setClassFilter}>
-              <SelectTrigger className="h-8 w-full text-[13px]">
+              <SelectTrigger className="h-8 w-full text-compact">
                 <SelectValue placeholder="Filter by class" />
               </SelectTrigger>
               <SelectContent>
@@ -180,11 +181,11 @@ export default function CycleDeadlinesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[160px] pl-4">Subject</TableHead>
+                  <TableHead className="min-w-40 pl-4">Subject</TableHead>
                   <TableHead>Class</TableHead>
                   <TableHead>Teacher</TableHead>
                   <TableHead>Due date</TableHead>
-                  <TableHead className="min-w-[150px]">Progress</TableHead>
+                  <TableHead className="min-w-38">Progress</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="pr-4 text-right">Action</TableHead>
                 </TableRow>
@@ -200,16 +201,16 @@ export default function CycleDeadlinesPage() {
                   return (
                     <TableRow key={d.id}>
                       <TableCell className="pl-4">
-                        <p className="text-[13.5px] font-medium text-foreground">
+                        <p className="text-compact font-medium text-foreground">
                           {subject?.name ?? "Subject"}
                         </p>
                         <p className="text-xs text-muted-foreground tabular">{subject?.code}</p>
                       </TableCell>
-                      <TableCell className="text-[13px]">{classNameOf(d.classId)}</TableCell>
-                      <TableCell className="text-[13px] text-muted-foreground">
-                        {d.enteredBy ?? "—"}
+                      <TableCell className="text-compact">{classNameOf(d.classId)}</TableCell>
+                      <TableCell className="text-compact text-muted-foreground">
+                        {d.enteredBy ?? "-"}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-[13px] tabular text-muted-foreground">
+                      <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
                         {d.dueDate}
                       </TableCell>
                       <TableCell>

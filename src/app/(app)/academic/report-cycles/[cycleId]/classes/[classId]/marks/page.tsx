@@ -65,7 +65,7 @@ export default function MarksEntryPage() {
   );
   const [saving, setSaving] = useState(false);
 
-  /** Committed marks per subject — seeds the tab badges and updates on save. */
+  /** Committed marks per subject: seeds the tab badges and updates on save. */
   const [savedBySubject, setSavedBySubject] = useState<Record<string, Record<string, number | null>>>(
     () => Object.fromEntries(subjects.map((s) => [s.id, { ...getMarks(cls.id, s.id) }])),
   );
@@ -185,7 +185,7 @@ export default function MarksEntryPage() {
       setSaving(false);
       toast({
         title: "Marks saved",
-        description: `Saved ${changed} marks for ${subject.name} — ${cls.name}.`,
+        description: `Saved ${changed} marks for ${subject.name}: ${cls.name}.`,
       });
     }, 700);
   };
@@ -193,7 +193,7 @@ export default function MarksEntryPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={`Marks entry — ${cls.name}`}
+        title={`Marks entry: ${cls.name}`}
         description={`${cycle.name} · keyboard-friendly sheet: Arrow keys move between cells · Enter saves and moves down · Esc clears.`}
         actions={
           <>
@@ -224,13 +224,13 @@ export default function MarksEntryPage() {
         />
         <StatCard
           label="Class average"
-          value={entered.length > 0 ? formatAvg(classAverage) : "—"}
+          value={entered.length > 0 ? formatAvg(classAverage) : "-"}
           icon={Percent}
           hint={`${subject.name} · entered marks only`}
         />
         <StatCard
           label="Highest subject so far"
-          value={topSubjectStat ? formatAvg(topSubjectStat.avg) : "—"}
+          value={topSubjectStat ? formatAvg(topSubjectStat.avg) : "-"}
           icon={TrendingUp}
           tone="success"
           hint={topSubject ? `${topSubject.name} · class mean` : "No marks yet"}
@@ -255,7 +255,7 @@ export default function MarksEntryPage() {
                       {s.name}
                       <Badge
                         variant="outline"
-                        className="h-4.5 rounded-full px-1.5 text-[10px] font-medium tabular text-muted-foreground"
+                        className="h-4.5 rounded-full px-1.5 text-3xs font-medium tabular text-muted-foreground"
                       >
                         {done}/{students.length}
                       </Badge>
@@ -273,14 +273,14 @@ export default function MarksEntryPage() {
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="sticky left-0 z-30 w-10 bg-muted/40 text-center">#</TableHead>
-                <TableHead className="sticky left-10 z-30 min-w-[200px] border-r border-border/60 bg-muted/40 pl-3">
+                <TableHead className="sticky left-10 z-30 min-w-50 border-r border-border/60 bg-muted/40 pl-3">
                   Student
                 </TableHead>
                 <TableHead>Adm. no</TableHead>
                 <TableHead className="text-center">Mark /100</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead className="text-center">Points</TableHead>
-                <TableHead className="min-w-[220px]">Remark</TableHead>
+                <TableHead className="min-w-55">Remark</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -293,7 +293,7 @@ export default function MarksEntryPage() {
                       {i + 1}
                     </TableCell>
                     <TableCell className="sticky left-10 border-r border-border/40 bg-card pl-3">
-                      <p className="whitespace-nowrap text-[13px] font-medium text-foreground">{student.name}</p>
+                      <p className="whitespace-nowrap text-compact font-medium text-foreground">{student.name}</p>
                     </TableCell>
                     <TableCell className="text-xs tabular text-muted-foreground">{student.admissionNo}</TableCell>
                     <TableCell className="text-center">
@@ -313,25 +313,25 @@ export default function MarksEntryPage() {
                         inputMode="numeric"
                         aria-invalid={invalid}
                         aria-label={`Mark for ${student.name}`}
-                        placeholder="—"
+                        placeholder="-"
                         className={cn(
-                          "mx-auto h-8 w-16 text-center text-[13px] tabular",
+                          "mx-auto h-8 w-16 text-center text-compact tabular",
                           invalid && "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
                         )}
                       />
                     </TableCell>
                     <TableCell className="text-center">
-                      {g ? <GradePill grade={g.grade} /> : <span className="text-[13px] text-muted-foreground">—</span>}
+                      {g ? <GradePill grade={g.grade} /> : <span className="text-compact text-muted-foreground">-</span>}
                     </TableCell>
-                    <TableCell className="text-center text-[13px] tabular">
+                    <TableCell className="text-center text-compact tabular">
                       {g ? (
                         <span className="text-foreground">{g.points}</span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {g?.remark ?? "—"}
+                    <TableCell className="text-compact text-muted-foreground">
+                      {g?.remark ?? "-"}
                     </TableCell>
                   </TableRow>
                 );
@@ -341,14 +341,14 @@ export default function MarksEntryPage() {
         </div>
 
         {/* Footer strip */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-[13px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-compact text-muted-foreground">
           <span className="tabular">
             Entered <span className="font-medium text-foreground">{entered.length}/{students.length}</span>
           </span>
           <span className="tabular">
             Class average{" "}
             <span className="font-medium text-foreground">
-              {entered.length > 0 ? formatAvg(classAverage) : "—"}
+              {entered.length > 0 ? formatAvg(classAverage) : "-"}
             </span>{" "}
             (entered marks)
           </span>
@@ -358,8 +358,8 @@ export default function MarksEntryPage() {
             </span>
           ) : null}
           {dirtyCount > 0 ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 font-medium text-[#c47a16]">
-              <span className="size-1.5 rounded-full bg-[#c47a16]" />
+            <span className="ml-auto inline-flex items-center gap-1.5 font-medium text-warning">
+              <span className="size-1.5 rounded-full bg-warning" />
               Unsaved changes · {dirtyCount}
             </span>
           ) : (

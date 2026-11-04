@@ -118,10 +118,10 @@ export default function CommentsPage() {
 
   const dotClass = (rec: CommentRecord | undefined) =>
     !rec || rec.classTeacher === null
-      ? "bg-[#dc2626] ring-2 ring-[#dc2626]/25"
+      ? "bg-destructive ring-2 ring-destructive/25"
       : rec.status === "draft"
-        ? "bg-[#c47a16]"
-        : "bg-[#16834a]";
+        ? "bg-warning"
+        : "bg-success";
 
   const statusLabel = (rec: CommentRecord | undefined) =>
     !rec || rec.classTeacher === null ? "Missing" : rec.status === "draft" ? "Draft" : "Submitted";
@@ -129,7 +129,7 @@ export default function CommentsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={`Comments — ${cls.name}`}
+        title={`Comments: ${cls.name}`}
         description={`${cycle.name} · write the class teacher's remark per student, insert templates and submit for report generation.`}
       />
 
@@ -143,7 +143,7 @@ export default function CommentsPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search students…"
-                className="h-8 pl-8 text-[13px]"
+                className="h-8 pl-8 text-compact"
               />
             </div>
             <Button
@@ -160,7 +160,7 @@ export default function CommentsPage() {
               ) : null}
             </Button>
           </div>
-          <div className="max-h-[52vh] overflow-y-auto lg:max-h-[calc(100vh-320px)]">
+          <div className="max-h-[52vh] overflow-y-auto lg:max-h-[calc(100vh-(var(--spacing)*80))]">
             {filtered.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">No students match “{query}”.</p>
             ) : (
@@ -179,18 +179,18 @@ export default function CommentsPage() {
                   >
                     <span className={cn("size-2 shrink-0 rounded-full", dotClass(rec))} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-foreground">{s.name}</span>
-                      <span className="block text-[11px] tabular text-muted-foreground">{s.admissionNo}</span>
+                      <span className="block truncate text-compact font-medium text-foreground">{s.name}</span>
+                      <span className="block text-2xs tabular text-muted-foreground">{s.admissionNo}</span>
                     </span>
                     {edited.has(s.id) ? <PenLine className="size-3 shrink-0 text-muted-foreground" /> : null}
                     <span
                       className={cn(
-                        "shrink-0 text-[11px] font-medium",
+                        "shrink-0 text-2xs font-medium",
                         !rec || rec.classTeacher === null
                           ? "text-destructive"
                           : rec.status === "draft"
-                            ? "text-[#c47a16]"
-                            : "text-[#16834a]",
+                            ? "text-warning"
+                            : "text-success",
                       )}
                     >
                       {statusLabel(rec)}
@@ -225,7 +225,7 @@ export default function CommentsPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
-                    Progress — {doneCount} of {students.length} comments complete
+                    Progress: {doneCount} of {students.length} comments complete
                   </span>
                   <span className="tabular">
                     {students.length ? Math.round((doneCount / students.length) * 100) : 0}%
@@ -270,6 +270,7 @@ export default function CommentsPage() {
 
               <div className="grid gap-1.5">
                 <Label>Insert template</Label>
+                {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
                 <Select value={templateKey} onValueChange={insertTemplate}>
                   <SelectTrigger className="w-full sm:w-80">
                     <SelectValue placeholder="Insert template…" />

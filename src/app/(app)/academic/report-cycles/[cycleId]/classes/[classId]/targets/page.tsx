@@ -91,7 +91,7 @@ export default function ClassTargetsPage() {
     if (lowestSubject && lowestSubjectStat) {
       list.push({
         icon: Lightbulb,
-        text: `Prioritise ${lowestSubject.name} remedials — class mean ${formatAvg(lowestSubjectStat.avg)} is the weakest subject against a ${defaultScheme.passMark} pass mark.`,
+        text: `Prioritise ${lowestSubject.name} remedials. Class mean ${formatAvg(lowestSubjectStat.avg)} is the weakest subject against a ${defaultScheme.passMark} pass mark.`,
       });
     }
     const needsPush = rows.length - onTrack.length;
@@ -99,13 +99,13 @@ export default function ClassTargetsPage() {
       icon: Target,
       text:
         needsPush === 0
-          ? `Every student is within 8 points of their target — maintain momentum with enrichment tasks.`
-          : `${needsPush} of ${rows.length} students sit more than 8 points below their target — schedule one-on-one target reviews this week.`,
+          ? `Every student is within 8 points of their target. Maintain momentum with enrichment tasks.`
+          : `${needsPush} of ${rows.length} students sit more than 8 points below their target. Schedule one-on-one target reviews this week.`,
     });
     if (focusCount) {
       list.push({
         icon: TrendingUp,
-        text: `Closing the ${formatAvg(Math.abs(meanTarget - currentAvg))}-point gap to the mean target starts with "${focusCount[0]}" — flagged by ${focusCount[1]} student${focusCount[1] === 1 ? "" : "s"}.`,
+        text: `Closing the ${formatAvg(Math.abs(meanTarget - currentAvg))}-point gap to the mean target starts with "${focusCount[0]}". Flagged by ${focusCount[1]} student${focusCount[1] === 1 ? "" : "s"}.`,
       });
     }
     return list;
@@ -121,7 +121,7 @@ export default function ClassTargetsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={`Next-term targets — ${cls.name}`}
+        title={`Next-term targets: ${cls.name}`}
         description={`${cycle.name} · set a target average and focus area per student to guide next term's support.`}
         actions={
           <Button size="sm" className="gap-1.5" onClick={save}>
@@ -133,7 +133,7 @@ export default function ClassTargetsPage() {
       <SectionCard title="Class summary" description="Where the class stands against its collective ambition.">
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-[13px] font-medium text-muted-foreground">Current class average</p>
+            <p className="text-compact font-medium text-muted-foreground">Current class average</p>
             <div className="mt-1.5 flex items-center gap-2">
               <span className="text-2xl font-semibold tabular tracking-tight text-foreground">
                 {formatAvg(currentAvg)}
@@ -142,7 +142,7 @@ export default function ClassTargetsPage() {
             </div>
           </div>
           <div>
-            <p className="text-[13px] font-medium text-muted-foreground">Mean target</p>
+            <p className="text-compact font-medium text-muted-foreground">Mean target</p>
             <div className="mt-1.5 flex items-baseline gap-2">
               <span className="text-2xl font-semibold tabular tracking-tight text-primary">
                 {formatAvg(meanTarget)}
@@ -150,7 +150,7 @@ export default function ClassTargetsPage() {
               <span
                 className={cn(
                   "inline-flex items-center gap-0.5 text-xs font-medium",
-                  meanTarget >= currentAvg ? "text-[#16834a]" : "text-[#dc2626]",
+                  meanTarget >= currentAvg ? "text-success" : "text-destructive",
                 )}
               >
                 {meanTarget >= currentAvg ? (
@@ -163,7 +163,7 @@ export default function ClassTargetsPage() {
             </div>
           </div>
           <div>
-            <p className="text-[13px] font-medium text-muted-foreground">On track</p>
+            <p className="text-compact font-medium text-muted-foreground">On track</p>
             <p className="mt-1.5 text-2xl font-semibold tabular tracking-tight text-foreground">
               {onTrack.length}
               <span className="text-base font-normal text-muted-foreground"> of {rows.length}</span>
@@ -188,13 +188,13 @@ export default function ClassTargetsPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="sticky left-0 z-10 min-w-[190px] border-r border-border/60 bg-muted/40 pl-4">
+                <TableHead className="sticky left-0 z-10 min-w-48 border-r border-border/60 bg-muted/40 pl-4">
                   Student
                 </TableHead>
                 <TableHead className="text-center">Current avg</TableHead>
                 <TableHead className="w-24 text-center">Target</TableHead>
                 <TableHead className="text-center">Gap</TableHead>
-                <TableHead className="min-w-[180px]">Focus area</TableHead>
+                <TableHead className="min-w-45">Focus area</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="w-32 pr-4">Progress</TableHead>
               </TableRow>
@@ -207,10 +207,10 @@ export default function ClassTargetsPage() {
                 return (
                   <TableRow key={r.studentId}>
                     <TableCell className="sticky left-0 z-10 border-r border-border/40 bg-card pl-4">
-                      <p className="whitespace-nowrap text-[13px] font-medium text-foreground">{r.name}</p>
+                      <p className="whitespace-nowrap text-compact font-medium text-foreground">{r.name}</p>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1.5 text-[13px] tabular">
+                      <span className="inline-flex items-center gap-1.5 text-compact tabular">
                         {formatAvg(r.current)}
                         <GradePill grade={r.grade} />
                       </span>
@@ -225,15 +225,15 @@ export default function ClassTargetsPage() {
                           const n = Number.parseInt(e.target.value, 10);
                           if (!Number.isNaN(n)) update(r.studentId, { target: clampTarget(n) });
                         }}
-                        className="mx-auto h-8 w-16 text-center text-[13px] tabular"
+                        className="mx-auto h-8 w-16 text-center text-compact tabular"
                         aria-label={`Target average for ${r.name}`}
                       />
                     </TableCell>
                     <TableCell className="text-center">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 text-[13px] font-medium tabular",
-                          gap >= 0 ? "text-[#16834a]" : "text-[#dc2626]",
+                          "inline-flex items-center gap-1 text-compact font-medium tabular",
+                          gap >= 0 ? "text-success" : "text-destructive",
                         )}
                       >
                         {gap >= 0 ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
@@ -245,7 +245,7 @@ export default function ClassTargetsPage() {
                       <Input
                         value={r.focus}
                         onChange={(e) => update(r.studentId, { focus: e.target.value })}
-                        className="h-8 min-w-40 text-[13px]"
+                        className="h-8 min-w-40 text-compact"
                         aria-label={`Focus area for ${r.name}`}
                       />
                     </TableCell>
@@ -276,7 +276,7 @@ export default function ClassTargetsPage() {
               <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary">
                 <rec.icon className="size-4" />
               </span>
-              <p className="text-[13px] leading-relaxed text-foreground">{rec.text}</p>
+              <p className="text-compact leading-relaxed text-foreground">{rec.text}</p>
             </li>
           ))}
         </ul>

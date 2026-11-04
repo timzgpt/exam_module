@@ -183,7 +183,7 @@ export interface ClassRelease {
 export interface BookingSlot {
   id: string;
   teacherId: string;
-  slot: string; // "09:00 – 09:15"
+  slot: string; // "09:00-09:15"
   bookedByStudentId: string | null;
 }
 

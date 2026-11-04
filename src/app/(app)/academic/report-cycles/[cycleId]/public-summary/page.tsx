@@ -22,11 +22,11 @@ import { cycleById, currentCycle, cycleStatsFor } from "@/lib/demo-data";
 import { formatAvg } from "@/lib/grading";
 
 const gradeChartConfig = {
-  count: { label: "Marks", color: "#650f12" },
+  count: { label: "Marks", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 const classChartConfig = {
-  avg: { label: "Average", color: "#650f12" },
+  avg: { label: "Average", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 interface SwitchRowProps {
@@ -40,7 +40,7 @@ function SwitchRow({ label, description, checked, onChange }: SwitchRowProps) {
   return (
     <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-[13px] font-medium text-foreground">{label}</p>
+        <p className="text-compact font-medium text-foreground">{label}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} className="mt-0.5" />
@@ -84,7 +84,7 @@ export default function PublicSummaryPage() {
       toast({
         variant: "destructive",
         title: "Copy failed",
-        description: "Your browser blocked clipboard access — copy the address bar URL instead.",
+        description: "Your browser blocked clipboard access. Copy the address bar URL instead.",
       });
     }
   };
@@ -96,9 +96,9 @@ export default function PublicSummaryPage() {
         description={`Controlled, public-facing results summary for ${cycle.name}. Publish aggregated statistics only.`}
       />
 
-      <div className="flex items-start gap-2.5 rounded-lg border border-[#c47a16]/30 bg-[#c47a16]/8 p-3 text-sm">
-        <Lock className="mt-0.5 size-4 shrink-0 text-[#9a5f11]" />
-        <p className="text-[13px] leading-relaxed text-[#9a5f11]">
+      <div className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/8 p-3 text-sm">
+        <Lock className="mt-0.5 size-4 shrink-0 text-warning-strong" />
+        <p className="text-compact leading-relaxed text-warning-strong">
           Only aggregated statistics are published. Student names, admission numbers and individual
           marks never appear on the public page.
         </p>
@@ -119,7 +119,7 @@ export default function PublicSummaryPage() {
         <div className="divide-y divide-border/70">
           <SwitchRow
             label="Show grade distribution"
-            description="Counts of A–F grades across all submitted marks."
+            description="Counts of A-F grades across all submitted marks."
             checked={settings.grades}
             onChange={(v) => setSettings((s) => ({ ...s, grades: v }))}
           />
@@ -139,7 +139,7 @@ export default function PublicSummaryPage() {
       </SectionCard>
 
       <SectionCard
-        title="Public preview — what visitors see"
+        title="Public preview. What visitors see"
         description="Exactly what the public page renders with the current settings."
       >
         {nothingPublished ? (
@@ -172,13 +172,13 @@ export default function PublicSummaryPage() {
 
             {settings.grades ? (
               <div className="mt-5">
-                <h4 className="text-[13px] font-medium text-foreground">Grade distribution</h4>
+                <h4 className="text-compact font-medium text-foreground">Grade distribution</h4>
                 <ChartContainer config={gradeChartConfig} className="mt-2 h-[170px] w-full">
                   <BarChart data={gradeData}>
                     <XAxis dataKey="grade" tickLine={false} axisLine={false} allowDecimals={false} />
                     <YAxis width={28} tickLine={false} axisLine={false} allowDecimals={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="count" fill="#650f12" radius={[4, 4, 0, 0]} barSize={26} />
+                    <Bar dataKey="count" className="fill-primary" radius={[4, 4, 0, 0]} barSize={26} />
                   </BarChart>
                 </ChartContainer>
               </div>
@@ -186,18 +186,18 @@ export default function PublicSummaryPage() {
 
             {settings.subjects ? (
               <div className="mt-5">
-                <h4 className="text-[13px] font-medium text-foreground">Subject averages</h4>
+                <h4 className="text-compact font-medium text-foreground">Subject averages</h4>
                 <div className="mt-2 space-y-2">
                   {stats.subjectAverages.map((s) => (
                     <div key={s.subjectId} className="flex items-center gap-3">
-                      <span className="w-36 shrink-0 truncate text-[13px] text-foreground">{s.name}</span>
+                      <span className="w-36 shrink-0 truncate text-compact text-foreground">{s.name}</span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-[#650f12]"
+                          className="h-full rounded-full bg-primary"
                           style={{ width: `${Math.round(s.avg)}%` }}
                         />
                       </div>
-                      <span className="w-9 text-right text-[13px] tabular text-muted-foreground">
+                      <span className="w-9 text-right text-compact tabular text-muted-foreground">
                         {formatAvg(s.avg)}
                       </span>
                     </div>
@@ -208,13 +208,13 @@ export default function PublicSummaryPage() {
 
             {settings.classes ? (
               <div className="mt-5">
-                <h4 className="text-[13px] font-medium text-foreground">Class comparison</h4>
+                <h4 className="text-compact font-medium text-foreground">Class comparison</h4>
                 <ChartContainer config={classChartConfig} className="mt-2 h-[170px] w-full">
                   <BarChart data={classData} layout="vertical" margin={{ right: 16 }}>
                     <XAxis type="number" domain={[0, 100]} tickLine={false} axisLine={false} />
                     <YAxis type="category" dataKey="name" width={64} tickLine={false} axisLine={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="avg" fill="#650f12" radius={[0, 4, 4, 0]} barSize={13} />
+                    <Bar dataKey="avg" className="fill-primary" radius={[0, 4, 4, 0]} barSize={13} />
                   </BarChart>
                 </ChartContainer>
               </div>

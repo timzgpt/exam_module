@@ -58,7 +58,7 @@ export default function ReviewPage() {
   const params = useParams<{ cycleId?: string; studentId?: string }>();
   const { toast } = useToast();
 
-  // Param resolution — never crash on unknown ids.
+  // Param resolution: never crash on unknown ids.
   const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
 
   const [rows, setRows] = useState<ClassApproval[]>(() =>
@@ -172,7 +172,7 @@ export default function ReviewPage() {
       <SectionCard noPadding title="Classes" description="Approve or return each class submission. Every action is recorded in the audit trail.">
         <div className="border-b border-border/70 px-4 py-3">
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="h-8">
+            <TabsList className="min-h-8 max-w-full flex-wrap">
               {STATUS_TABS.map((t) => (
                 <TabsTrigger key={t} value={t} className="h-7 px-2.5 text-xs capitalize">
                   {t === "all" ? "All" : labelForStatus(t)}
@@ -193,7 +193,7 @@ export default function ReviewPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[140px] pl-4">Class</TableHead>
+                  <TableHead className="min-w-35 pl-4">Class</TableHead>
                   <TableHead>Class teacher</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Status</TableHead>
@@ -208,18 +208,18 @@ export default function ReviewPage() {
                   return (
                     <TableRow key={a.classId}>
                       <TableCell className="pl-4">
-                        <p className="text-[13.5px] font-medium text-foreground">{cls?.name ?? "Class"}</p>
-                        <p className="text-xs text-muted-foreground">{cls ? `${cls.level} · Room ${cls.room}` : "—"}</p>
+                        <p className="text-compact font-medium text-foreground">{cls?.name ?? "Class"}</p>
+                        <p className="text-xs text-muted-foreground">{cls ? `${cls.level} · Room ${cls.room}` : "-"}</p>
                       </TableCell>
-                      <TableCell className="text-[13px] text-muted-foreground">{teacher?.name ?? "—"}</TableCell>
+                      <TableCell className="text-compact text-muted-foreground">{teacher?.name ?? "-"}</TableCell>
                       <TableCell>
                         {a.submittedAt ? (
                           <>
-                            <p className="text-[13px] tabular">{a.submittedAt}</p>
-                            <p className="text-xs text-muted-foreground">by {a.submittedBy ?? "—"}</p>
+                            <p className="text-compact tabular">{a.submittedAt}</p>
+                            <p className="text-xs text-muted-foreground">by {a.submittedBy ?? "-"}</p>
                           </>
                         ) : (
-                          <span className="text-[13px] text-muted-foreground">—</span>
+                          <span className="text-compact text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -228,11 +228,11 @@ export default function ReviewPage() {
                       <TableCell>
                         {a.reviewedBy ? (
                           <>
-                            <p className="text-[13px]">{a.reviewedBy}</p>
+                            <p className="text-compact">{a.reviewedBy}</p>
                             <p className="text-xs text-muted-foreground tabular">{a.reviewedAt}</p>
                           </>
                         ) : (
-                          <span className="text-[13px] text-muted-foreground">—</span>
+                          <span className="text-compact text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="pr-4">
@@ -292,7 +292,7 @@ export default function ReviewPage() {
       </SectionCard>
 
       <SectionCard title="Review policy" description="How the approval workflow gates report generation.">
-        <div className="space-y-2 text-[13px] leading-relaxed text-muted-foreground">
+        <div className="space-y-2 text-compact leading-relaxed text-muted-foreground">
           <p>
             Approvals gate batch generation: only classes with an <span className="font-medium text-foreground">approved</span> status are included when report cards are generated. A class that is merely submitted still needs an explicit decision here.
           </p>
@@ -306,7 +306,7 @@ export default function ReviewPage() {
       <Dialog open={!!changesFor} onOpenChange={(open) => !open && setChangesFor(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Request changes — {changesFor ? classById(changesFor.classId)?.name : ""}</DialogTitle>
+            <DialogTitle>Request changes: {changesFor ? classById(changesFor.classId)?.name : ""}</DialogTitle>
             <DialogDescription>
               The class teacher is notified and the class returns for revision before it can be approved.
             </DialogDescription>
@@ -316,7 +316,7 @@ export default function ReviewPage() {
             <Textarea
               id="changes-note"
               rows={4}
-              placeholder="e.g. Mathematics marks for 3 students look inconsistent with coursework — please verify."
+              placeholder="e.g. Mathematics marks for 3 students look inconsistent with coursework. Please verify."
               value={changesNote}
               onChange={(e) => setChangesNote(e.target.value)}
             />
@@ -336,19 +336,19 @@ export default function ReviewPage() {
       <Dialog open={!!auditFor} onOpenChange={(open) => !open && setAuditFor(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Audit trail — {auditFor ? classById(auditFor.classId)?.name : ""}</DialogTitle>
+            <DialogTitle>Audit trail: {auditFor ? classById(auditFor.classId)?.name : ""}</DialogTitle>
             <DialogDescription>Chronological record of submissions and decisions.</DialogDescription>
           </DialogHeader>
           {auditFor && auditFor.audit.length > 0 ? (
             <div className="max-h-[50vh] space-y-4 overflow-y-auto border-l border-border py-1 pl-5">
               {auditFor.audit.map((entry, i) => (
                 <div key={`${entry.at}-${i}`} className="relative">
-                  <span className="absolute -left-[25px] top-1 flex size-2.5 items-center justify-center rounded-full bg-primary" />
+                  <span className="absolute -left-6 top-1 flex size-2.5 items-center justify-center rounded-full bg-primary" />
                   <p className="text-xs text-muted-foreground tabular">{entry.at}</p>
-                  <p className="text-[13.5px] font-medium text-foreground">{entry.action}</p>
+                  <p className="text-compact font-medium text-foreground">{entry.action}</p>
                   <p className="text-xs text-muted-foreground">
                     by {entry.actor}
-                    {entry.detail ? ` — ${entry.detail}` : ""}
+                    {entry.detail ? `: ${entry.detail}` : ""}
                   </p>
                 </div>
               ))}

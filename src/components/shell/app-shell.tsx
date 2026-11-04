@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AppSidebar />
       <SidebarInset className="min-w-0 bg-background">
         <AppHeader />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-3 py-5 sm:px-6 sm:py-6">
+        <main className="mx-auto w-full max-w-page flex-1 px-3 py-5 sm:px-6 sm:py-6">
           {children}
         </main>
       </SidebarInset>

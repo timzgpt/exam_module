@@ -63,7 +63,7 @@ const STEP_LABELS: Record<CycleStatus, string> = {
   released: "Released",
 };
 
-/** Fixed demo "today" — the March 2026 review period. */
+/** Fixed demo "today": the March 2026 review period. */
 const DEMO_TODAY = "2026-03-11";
 
 function daysUntil(dateStr: string): number {
@@ -141,7 +141,7 @@ export default function ReportCyclesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Report cycles"
-        description="Term reporting windows — prepare, collect marks, review, approve and release report cards."
+        description="Term reporting windows. Prepare, collect marks, review, approve and release report cards."
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
@@ -168,6 +168,7 @@ export default function ReportCyclesPage() {
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Term</Label>
+                  {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
                   <Select value={form.term} onValueChange={(v) => setForm({ ...form, term: v })}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -258,7 +259,7 @@ export default function ReportCyclesPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="min-w-[220px] pl-4">Cycle</TableHead>
+                <TableHead className="min-w-55 pl-4">Cycle</TableHead>
                 <TableHead>Window</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Progress</TableHead>
@@ -279,14 +280,14 @@ export default function ReportCyclesPage() {
                   >
                     <TableCell className="pl-4">
                       <div className="flex items-center gap-2">
-                        <p className="text-[13.5px] font-medium text-foreground">{cycle.name}</p>
+                        <p className="text-compact font-medium text-foreground">{cycle.name}</p>
                         {isActive ? <StatusBadge tone="primary" label="Current" /> : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {cycle.term} · {cycle.academicYear}
                       </p>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-[13px] tabular text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
                       {cycle.startDate} → {cycle.endDate}
                     </TableCell>
                     <TableCell>

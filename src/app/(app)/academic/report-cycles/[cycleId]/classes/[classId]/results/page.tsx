@@ -34,7 +34,7 @@ import { ArrowDownRight, Award, CheckCircle2, Download, Percent } from "lucide-r
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 
-const BRAND_COLOR = "#650f12";
+const BRAND_COLOR = "var(--primary)";
 
 export default function ClassResultsPage() {
   const { toast } = useToast();
@@ -111,7 +111,7 @@ export default function ClassResultsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={`Results — ${cls.name}`}
+        title={`Results: ${cls.name}`}
         description={`${cycle.name} · class-wide analysis of subject marks, ranks and grade distribution.`}
         actions={
           <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv}>
@@ -137,13 +137,13 @@ export default function ClassResultsPage() {
         />
         <StatCard
           label="Highest average"
-          value={topStudent ? formatAvg(topStudent.average) : "—"}
+          value={topStudent ? formatAvg(topStudent.average) : "-"}
           icon={Award}
           hint={topStudent ? `${topStudent.student.name} · Pos ${topStudent.rank}` : "No results"}
         />
         <StatCard
           label="Lowest subject"
-          value={lowestSubjectStat ? formatAvg(lowestSubjectStat.avg) : "—"}
+          value={lowestSubjectStat ? formatAvg(lowestSubjectStat.avg) : "-"}
           icon={ArrowDownRight}
           tone="warning"
           hint={lowestSubject ? `${lowestSubject.name} class mean` : "No results"}
@@ -160,7 +160,7 @@ export default function ClassResultsPage() {
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="w-12 text-center">Pos</TableHead>
-                <TableHead className="sticky left-0 z-30 min-w-[190px] border-r border-border/60 bg-muted/40 pl-3">
+                <TableHead className="sticky left-0 z-30 min-w-48 border-r border-border/60 bg-muted/40 pl-3">
                   Student
                 </TableHead>
                 <TableHead>Adm. no</TableHead>
@@ -177,20 +177,20 @@ export default function ClassResultsPage() {
             <TableBody>
               {results.map((r) => (
                 <TableRow key={r.student.id}>
-                  <TableCell className="text-center text-[13px] tabular font-medium text-muted-foreground">
+                  <TableCell className="text-center text-compact tabular font-medium text-muted-foreground">
                     {r.rank}
                   </TableCell>
                   <TableCell className="sticky left-0 border-r border-border/40 bg-card pl-3">
-                    <p className="whitespace-nowrap text-[13px] font-medium text-foreground">{r.student.name}</p>
+                    <p className="whitespace-nowrap text-compact font-medium text-foreground">{r.student.name}</p>
                   </TableCell>
                   <TableCell className="text-xs tabular text-muted-foreground">{r.student.admissionNo}</TableCell>
                   {subjects.map((s) => {
                     const m = r.marks[s.id];
                     const g = m !== null && m !== undefined ? gradeFor(m, defaultScheme) : undefined;
                     return (
-                      <TableCell key={s.id} className="text-center text-[13px] tabular">
+                      <TableCell key={s.id} className="text-center text-compact tabular">
                         {m === null || m === undefined ? (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         ) : (
                           <span className={cn("rounded px-1.5 py-0.5 font-medium", gradeToneClass(g?.grade ?? "F"))}>
                             {m}
@@ -199,14 +199,14 @@ export default function ClassResultsPage() {
                       </TableCell>
                     );
                   })}
-                  <TableCell className="text-center text-[13px] tabular">
-                    {r.count > 0 ? r.total : <span className="text-muted-foreground">—</span>}
+                  <TableCell className="text-center text-compact tabular">
+                    {r.count > 0 ? r.total : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="text-center text-[13px] tabular font-medium">
-                    {r.count > 0 ? formatAvg(r.average) : <span className="text-muted-foreground">—</span>}
+                  <TableCell className="text-center text-compact tabular font-medium">
+                    {r.count > 0 ? formatAvg(r.average) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell className="pr-4 text-center">
-                    {r.count > 0 ? <GradePill grade={r.grade} /> : <span className="text-muted-foreground">—</span>}
+                    {r.count > 0 ? <GradePill grade={r.grade} /> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -221,7 +221,7 @@ export default function ClassResultsPage() {
             <span key={b.grade} className="inline-flex items-center gap-1.5">
               <span className={cn("size-2.5 rounded-full border", gradeToneClass(b.grade))} />
               <span className="tabular">
-                {b.grade} · {b.min}–{b.max}
+                {b.grade} · {b.min}-{b.max}
               </span>
             </span>
           ))}
@@ -242,7 +242,7 @@ export default function ClassResultsPage() {
           </ChartContainer>
         </SectionCard>
 
-        <SectionCard title="Subject averages" description="Class mean per subject against the 0–100 scale.">
+        <SectionCard title="Subject averages" description="Class mean per subject against the 0-100 scale.">
           <ChartContainer config={avgConfig} className="h-[380px] w-full">
             <BarChart
               data={subjectChartData}

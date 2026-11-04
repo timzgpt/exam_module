@@ -54,9 +54,9 @@ import {
 } from "@/lib/demo-data";
 import type { BookingSlot } from "@/lib/types";
 
-/** "09:00 – 09:20" → "09:00" (start of the slot window). */
+/** "09:00 - 09:20" → "09:00" (start of the slot window). */
 function slotStart(label: string): string {
-  return label.split(/–|-/)[0].trim();
+  return label.split("-")[0].trim();
 }
 
 interface BookingTarget {
@@ -157,7 +157,7 @@ export default function ParentsDayPage() {
   const addSession = () => {
     toast({
       title: "Extra session slots added",
-      description: "An afternoon block was requested — the timetable team confirms extended times.",
+      description: "An afternoon block was requested. The timetable team confirms extended times.",
     });
   };
 
@@ -194,9 +194,9 @@ export default function ParentsDayPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="min-w-[200px] pl-4">Teacher</TableHead>
+                <TableHead className="min-w-50 pl-4">Teacher</TableHead>
                 <TableHead>Class</TableHead>
-                <TableHead className="min-w-[150px]">Slots booked</TableHead>
+                <TableHead className="min-w-38">Slots booked</TableHead>
                 <TableHead>Next free slot</TableHead>
                 <TableHead className="pr-4 text-right">Actions</TableHead>
               </TableRow>
@@ -210,28 +210,28 @@ export default function ParentsDayPage() {
                   <TableRow key={teacher.id}>
                     <TableCell className="pl-4">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xs font-semibold text-primary">
                           {teacher.initials}
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-[13.5px] font-medium text-foreground">{teacher.name}</p>
+                          <p className="truncate text-compact font-medium text-foreground">{teacher.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{teacher.role}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-[13px]">
+                    <TableCell className="whitespace-nowrap text-compact">
                       {cls.name}
                       <span className="text-muted-foreground"> · {cls.room}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Progress value={(booked / teacherSlotList.length) * 100} className="h-1.5 w-24" />
-                        <span className="text-[12px] tabular text-muted-foreground">
+                        <span className="text-xs tabular text-muted-foreground">
                           {booked}/{teacherSlotList.length}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-[13px] tabular">
+                    <TableCell className="whitespace-nowrap text-compact tabular">
                       {nextFree ? nextFree.slot : <span className="text-muted-foreground">Fully booked</span>}
                     </TableCell>
                     <TableCell className="pr-4 text-right">
@@ -256,7 +256,7 @@ export default function ParentsDayPage() {
       <Dialog open={!!manageId} onOpenChange={(open) => !open && setManageId(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Slots — {manageTeacher?.name ?? "Teacher"}</DialogTitle>
+            <DialogTitle>Slots: {manageTeacher?.name ?? "Teacher"}</DialogTitle>
             <DialogDescription>
               {manageClass?.name} · {cycle.parentsDayDate} · {parentsDayEvent.window}. Tap an open slot
               to book a meeting; tap the X to release one.
@@ -269,7 +269,7 @@ export default function ParentsDayPage() {
                 return (
                   <div key={slot.id} className="rounded-md border bg-muted/50 px-2 py-1.5">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="truncate text-[12px] font-medium text-foreground">{student.name}</span>
+                      <span className="truncate text-xs font-medium text-foreground">{student.name}</span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -280,7 +280,7 @@ export default function ParentsDayPage() {
                         <X className="size-3.5" />
                       </Button>
                     </div>
-                    <p className="mt-0.5 text-[11px] tabular text-muted-foreground">{slot.slot}</p>
+                    <p className="mt-0.5 text-2xs tabular text-muted-foreground">{slot.slot}</p>
                   </div>
                 );
               }
@@ -291,8 +291,8 @@ export default function ParentsDayPage() {
                   onClick={() => openBooking(slot)}
                   className="rounded-md border border-dashed px-2 py-1.5 text-left transition-colors hover:bg-muted/60"
                 >
-                  <span className="text-[12px] font-medium text-muted-foreground">Open</span>
-                  <p className="mt-0.5 text-[11px] tabular text-muted-foreground">{slot.slot}</p>
+                  <span className="text-xs font-medium text-muted-foreground">Open</span>
+                  <p className="mt-0.5 text-2xs tabular text-muted-foreground">{slot.slot}</p>
                 </button>
               );
             })}
@@ -319,6 +319,7 @@ export default function ParentsDayPage() {
           </DialogHeader>
           <div className="grid gap-1.5">
             <Label htmlFor="booking-student">Student</Label>
+            {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
             <Select value={studentId} onValueChange={setStudentId}>
               <SelectTrigger id="booking-student" className="w-full">
                 <SelectValue placeholder="Select student" />

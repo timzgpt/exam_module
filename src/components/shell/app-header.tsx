@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+
 import { Logo } from "@/components/shell/logo";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -45,9 +47,9 @@ export function AppHeader() {
       <SidebarTrigger className="-ml-1 size-8 text-muted-foreground hover:text-foreground" />
       <Separator orientation="vertical" className="!h-5" />
 
-      <Breadcrumb>
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
+      <Breadcrumb className="min-w-0">
+        <BreadcrumbList className="text-compact">
+          <BreadcrumbItem className="hidden sm:block">
             <button
               onClick={() => router.push("/")}
               className="font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -56,7 +58,10 @@ export function AppHeader() {
             </button>
           </BreadcrumbItem>
           {trail.map((item, i) => (
-            <span key={`${item.label}-${i}`} className="flex items-center gap-1.5">
+            <span
+              key={`${item.label}-${i}`}
+              className={cn("flex items-center gap-1.5", i < trail.length - 1 && "hidden sm:flex")}
+            >
               <BreadcrumbSeparator className="[&>svg]:size-3.5" />
               <BreadcrumbItem>
                 {i === trail.length - 1 ? (
@@ -76,10 +81,10 @@ export function AppHeader() {
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
         {/* Cycle context */}
-        <Select value={cycleId} onValueChange={setCycle}>
+        <Select value={cycleId} onValueChange={setCycle}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger
             size="sm"
-            className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-[12.5px] font-medium text-foreground shadow-none md:flex"
+            className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-none md:flex"
             aria-label="Report cycle context"
           >
             <SelectValue />
@@ -89,7 +94,7 @@ export function AppHeader() {
               Report cycle context
             </DropdownMenuLabel>
             {cycles.map((c) => (
-              <SelectItem key={c.id} value={c.id} className="text-[13px]">
+              <SelectItem key={c.id} value={c.id} className="text-compact">
                 {c.name}
               </SelectItem>
             ))}
@@ -97,10 +102,10 @@ export function AppHeader() {
         </Select>
 
         {/* Class context */}
-        <Select value={classId} onValueChange={setClass}>
+        <Select value={classId} onValueChange={setClass}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger
             size="sm"
-            className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-[12.5px] font-medium text-foreground shadow-none md:flex"
+            className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-none md:flex"
             aria-label="Class context"
           >
             <SelectValue />
@@ -110,7 +115,7 @@ export function AppHeader() {
               Class context
             </DropdownMenuLabel>
             {classes.map((c) => (
-              <SelectItem key={c.id} value={c.id} className="text-[13px]">
+              <SelectItem key={c.id} value={c.id} className="text-compact">
                 {c.name}
               </SelectItem>
             ))}
@@ -141,7 +146,7 @@ export function AppHeader() {
               aria-label="Notifications"
             >
               <Bell className="size-4" />
-              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#dc2626]" />
+              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-destructive" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
@@ -152,7 +157,7 @@ export function AppHeader() {
               className="flex cursor-pointer flex-col items-start gap-0.5"
               onClick={() => router.push(`/academic/report-cycles/${cycleId}/deadlines`)}
             >
-              <span className="text-[13px] font-medium">
+              <span className="text-compact font-medium">
                 {overdue} marks submissions need attention
               </span>
               <span className="text-xs text-muted-foreground">Deadline tracker · due 06 Mar 2026</span>
@@ -162,7 +167,7 @@ export function AppHeader() {
               className="flex cursor-pointer flex-col items-start gap-0.5"
               onClick={() => router.push(`/academic/report-cycles/${cycleId}/review`)}
             >
-              <span className="text-[13px] font-medium">2 classes awaiting approval</span>
+              <span className="text-compact font-medium">2 classes awaiting approval</span>
               <span className="text-xs text-muted-foreground">Review &amp; approval</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -170,7 +175,7 @@ export function AppHeader() {
               className="flex cursor-pointer flex-col items-start gap-0.5"
               onClick={() => router.push(`/academic/report-cycles/${cycleId}/release`)}
             >
-              <span className="text-[13px] font-medium">
+              <span className="text-compact font-medium">
                 Release date: {cycleById(cycleId)?.releaseDate ?? "06 Apr 2026"}
               </span>
               <span className="text-xs text-muted-foreground">Release management</span>
@@ -179,14 +184,14 @@ export function AppHeader() {
         </DropdownMenu>
 
         <span className="mx-0.5 hidden items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2.5 lg:flex">
-          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10.5px] font-semibold text-primary-foreground">
+          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-3xs font-semibold text-primary-foreground">
             DN
           </span>
           <span className="leading-tight">
-            <span className="block text-[11.5px] font-medium leading-none text-foreground">
+            <span className="block text-2xs font-medium leading-none text-foreground">
               Deo Nsubuga
             </span>
-            <span className="block text-[10px] leading-none text-muted-foreground">
+            <span className="block text-3xs leading-none text-muted-foreground">
               Academic Master
             </span>
           </span>

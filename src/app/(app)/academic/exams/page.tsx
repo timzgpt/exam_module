@@ -118,7 +118,7 @@ export default function ExamsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Exams"
-        description={`Exam administration for ${SCHOOL.academicYear} — schedule sittings, track status and manage invigilation.`}
+        description={`Exam administration for ${SCHOOL.academicYear}. Schedule sittings, track status and manage invigilation.`}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv}>
@@ -149,6 +149,7 @@ export default function ExamsPage() {
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Type</Label>
+                    {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
                     <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -213,7 +214,7 @@ export default function ExamsPage() {
         <StatCard label="Ongoing" value={counts.ongoing} icon={CalendarDays} tone="warning" hint="In progress" />
         <StatCard
           label="Next exam"
-          value={nextExam ? nextExam.startDate.slice(5) : "—"}
+          value={nextExam ? nextExam.startDate.slice(5) : "-"}
           icon={CalendarDays}
           tone="success"
           hint={nextExam?.name ?? "Nothing scheduled"}
@@ -223,7 +224,7 @@ export default function ExamsPage() {
       <SectionCard noPadding title="Exam calendar" description="All examinations registered for the academic year.">
         <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="h-8">
+            <TabsList className="min-h-8 max-w-full flex-wrap">
               {STATUS_TABS.map((t) => (
                 <TabsTrigger key={t} value={t} className="h-7 px-2.5 text-xs capitalize">
                   {t}
@@ -237,7 +238,7 @@ export default function ExamsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search exams…"
-              className="h-8 pl-8 text-[13px]"
+              className="h-8 pl-8 text-compact"
             />
           </div>
         </div>
@@ -253,7 +254,7 @@ export default function ExamsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="min-w-[220px] pl-4">Exam</TableHead>
+                  <TableHead className="min-w-55 pl-4">Exam</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Window</TableHead>
                   <TableHead className="text-center">Sittings</TableHead>
@@ -265,7 +266,7 @@ export default function ExamsPage() {
                 {filtered.map((exam) => (
                   <TableRow key={exam.id}>
                     <TableCell className="pl-4">
-                      <p className="text-[13.5px] font-medium text-foreground">{exam.name}</p>
+                      <p className="text-compact font-medium text-foreground">{exam.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {exam.term} · {exam.academicYear}
                       </p>
@@ -275,10 +276,10 @@ export default function ExamsPage() {
                         {exam.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-[13px] tabular text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
                       {exam.startDate} → {exam.endDate}
                     </TableCell>
-                    <TableCell className="text-center text-[13px] tabular">{exam.sittings.length}</TableCell>
+                    <TableCell className="text-center text-compact tabular">{exam.sittings.length}</TableCell>
                     <TableCell>
                       <StatusBadge tone={toneForStatus(exam.status)} label={labelForStatus(exam.status)} />
                     </TableCell>
@@ -331,10 +332,10 @@ export default function ExamsPage() {
                       <TableCell className="whitespace-nowrap tabular">
                         {s.startTime} · {s.durationMin}min
                       </TableCell>
-                      <TableCell className="text-[13px] font-medium">
+                      <TableCell className="text-compact font-medium">
                         {subjectById(s.subjectId)?.name}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">—</TableCell>
+                      <TableCell className="text-muted-foreground">-</TableCell>
                       <TableCell className="text-muted-foreground">{s.venue}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {teacherById(s.invigilatorId)?.name ?? "TBA"}

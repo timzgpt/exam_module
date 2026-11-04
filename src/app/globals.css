@@ -3,6 +3,38 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Josephian design tokens: raw values. Components never reference these
+   directly; they use the semantic utilities Tailwind generates from them. */
+@theme {
+  /* Compact data-app type scale (marks entry, tables, shell chrome). */
+  --text-3xs: 0.625rem; /* 10px report-card print labels */
+  --text-3xs--line-height: 1.4;
+  --text-2xs: 0.6875rem; /* 11px overline and badge text */
+  --text-2xs--line-height: 1.4545;
+  --text-compact: 0.8125rem; /* 13px body of dense data screens */
+  --text-compact--line-height: 1.5385;
+
+  /* Shell page and overlay measures. */
+  --container-page: 1400px;
+  --container-toast: 420px;
+
+  /* Grade band ramp: the A to F reporting scale. A rides success,
+     C rides warning and F rides destructive; only the in-between hues
+     need their own primitives. */
+  --color-grade-b: #3d7d2f;
+  --color-grade-b-strong: #35682a;
+  --color-grade-d: #b05c1c;
+  --color-grade-d-strong: #96491a;
+  --color-grade-e: #b3352e;
+  --color-grade-e-strong: #a02a25;
+
+  /* Status strong variants: readable text on tinted surfaces. */
+  --color-success-strong: #116b3c;
+  --color-warning-strong: #9a5f11;
+  --color-destructive-strong: #b91c1c;
+  --color-info-strong: #5a3f8a;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -72,7 +104,7 @@
   --secondary: #f4ece8;
   --secondary-foreground: #4b0b0e;
   --muted: #f4f1ec;
-  --muted-foreground: #64748b;
+  --muted-foreground: #617081;
   --accent: #f4ece8;
   --accent-foreground: #4b0b0e;
   --destructive: #dc2626;
@@ -138,6 +170,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* A card must never push a grid track wider than the viewport; wide tables
+     and charts scroll inside their own container instead. */
+  [data-slot="card"] {
+    min-width: 0;
+  }
   ::selection {
     background-color: rgb(101 15 18 / 0.14);
   }
@@ -146,7 +183,7 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #d6d0c8 transparent;
+    scrollbar-color: var(--input) transparent;
   }
   .tabular {
     font-variant-numeric: tabular-nums;

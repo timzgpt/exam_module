@@ -41,10 +41,10 @@ export function AppSidebar() {
         <div className="flex items-center gap-2.5 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <Logo />
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-[13px] font-semibold leading-tight text-sidebar-foreground">
+            <p className="truncate text-compact font-semibold leading-tight text-sidebar-foreground">
               {SCHOOL.name}
             </p>
-            <p className="truncate text-[11px] leading-tight text-sidebar-foreground/60">
+            <p className="truncate text-2xs leading-tight text-sidebar-foreground/60">
               {SCHOOL.reportsBrand}
             </p>
           </div>
@@ -57,7 +57,7 @@ export function AppSidebar() {
               className="border border-sidebar-border/70 bg-white/5 text-sidebar-foreground/70 hover:bg-white/10 hover:text-sidebar-foreground"
             >
               <Search className="size-4" />
-              <span className="text-[13px]">Search navigation…</span>
+              <span className="text-compact">Search navigation…</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -66,7 +66,7 @@ export function AppSidebar() {
       <SidebarContent className="scrollbar-thin gap-1 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
           <SidebarGroup key={group.label} className="py-1.5">
-            <SidebarGroupLabel className="text-[10.5px] font-semibold uppercase tracking-widest text-sidebar-foreground/45">
+            <SidebarGroupLabel className="text-3xs font-semibold uppercase tracking-widest text-sidebar-foreground/45">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -80,7 +80,7 @@ export function AppSidebar() {
                         isActive={item.key === activeKey}
                         tooltip={{ children: item.label, side: "right", align: "center" }}
                         onClick={() => router.push(href)}
-                        className="h-8 text-[13px] font-medium text-sidebar-foreground/85 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:hover:bg-sidebar-primary"
+                        className="h-8 text-compact font-medium text-sidebar-foreground/85 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:hover:bg-sidebar-primary"
                       >
                         <Icon className="size-4 shrink-0" />
                         <span className="truncate">{item.label}</span>
@@ -101,12 +101,12 @@ export function AppSidebar() {
               tooltip={{ children: `${USER.name} · ${USER.role}`, side: "right" }}
               className="h-auto items-center gap-2.5 py-1.5 text-sidebar-foreground/85 hover:bg-sidebar-accent"
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-sidebar-foreground">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-2xs font-semibold text-sidebar-foreground">
                 {USER.initials}
               </span>
               <span className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="block truncate text-[12.5px] font-medium">{USER.name}</span>
-                <span className="block truncate text-[11px] text-sidebar-foreground/55">
+                <span className="block truncate text-xs font-medium">{USER.name}</span>
+                <span className="block truncate text-2xs text-sidebar-foreground/55">
                   {USER.role}
                 </span>
               </span>

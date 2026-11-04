@@ -35,16 +35,16 @@ import { cycleById, currentCycle, cycleStatsFor, defaultScheme, marksDeadlines }
 import { deltaLabel, formatAvg, gradeFor } from "@/lib/grading";
 
 const averageChartConfig = {
-  avg: { label: "Average", color: "#650f12" },
+  avg: { label: "Average", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 const gradeChartConfig = {
-  count: { label: "Marks", color: "#650f12" },
+  count: { label: "Marks", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 const donutChartConfig = {
-  complete: { label: "Marks entered", color: "#16834a" },
-  outstanding: { label: "Outstanding", color: "#c47a16" },
+  complete: { label: "Marks entered", color: "var(--success)" },
+  outstanding: { label: "Outstanding", color: "var(--warning)" },
 } satisfies ChartConfig;
 
 type CompletionTone = "success" | "warning" | "destructive";
@@ -74,8 +74,8 @@ export default function CycleDashboardPage() {
   const doneEntries = marksDeadlines.reduce((a, d) => a + d.entriesDone, 0);
   const outstandingEntries = totalEntries - doneEntries;
   const donutData = [
-    { name: "complete", value: doneEntries, fill: "#16834a" },
-    { name: "outstanding", value: outstandingEntries, fill: "#c47a16" },
+    { name: "complete", value: doneEntries, fill: "var(--success)" },
+    { name: "outstanding", value: outstandingEntries, fill: "var(--warning)" },
   ];
   const enteredPct = totalEntries ? Math.round((doneEntries / totalEntries) * 100) : 0;
 
@@ -118,7 +118,7 @@ export default function CycleDashboardPage() {
     <div className="space-y-5">
       <PageHeader
         title="Cycle dashboard"
-        description={`Executive overview of ${cycle.name} — averages, grades and completion across every class.`}
+        description={`Executive overview of ${cycle.name}. Averages, grades and completion across every class.`}
         actions={
           <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv}>
             <Download className="size-4" /> Export snapshot (CSV)
@@ -158,14 +158,14 @@ export default function CycleDashboardPage() {
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <SectionCard title="Grade distribution" description="Every submitted mark graded A–F across the cycle.">
+        <SectionCard title="Grade distribution" description="Every submitted mark graded A-F across the cycle.">
           <ChartContainer config={gradeChartConfig} className="h-[220px] w-full">
             <BarChart data={gradeData}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="grade" tickLine={false} axisLine={false} allowDecimals={false} />
               <YAxis width={28} tickLine={false} axisLine={false} allowDecimals={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" fill="#650f12" radius={[4, 4, 0, 0]} barSize={32} />
+              <Bar dataKey="count" className="fill-primary" radius={[4, 4, 0, 0]} barSize={32} />
             </BarChart>
           </ChartContainer>
         </SectionCard>
@@ -177,7 +177,7 @@ export default function CycleDashboardPage() {
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis domain={[0, 100]} width={28} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="avg" fill="#650f12" radius={[4, 4, 0, 0]} barSize={26} />
+              <Bar dataKey="avg" className="fill-primary" radius={[4, 4, 0, 0]} barSize={26} />
             </BarChart>
           </ChartContainer>
         </SectionCard>
@@ -189,12 +189,12 @@ export default function CycleDashboardPage() {
               <XAxis type="number" domain={[0, 100]} tickLine={false} axisLine={false} />
               <YAxis type="category" dataKey="name" width={118} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="avg" fill="#650f12" radius={[0, 4, 4, 0]} barSize={13} />
+              <Bar dataKey="avg" className="fill-primary" radius={[0, 4, 4, 0]} barSize={13} />
             </BarChart>
           </ChartContainer>
         </SectionCard>
 
-        <SectionCard title="Submissions" description="Marks entered vs still outstanding across all class–subject deadlines.">
+        <SectionCard title="Submissions" description="Marks entered vs still outstanding across all class-subject deadlines.">
           <div className="relative">
             <ChartContainer config={donutChartConfig} className="mx-auto h-[210px] w-full">
               <PieChart>
@@ -216,16 +216,16 @@ export default function CycleDashboardPage() {
             </ChartContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-2xl font-semibold tabular text-foreground">{enteredPct}%</span>
-              <span className="text-[11px] text-muted-foreground">entered</span>
+              <span className="text-2xs text-muted-foreground">entered</span>
             </div>
           </div>
           <div className="mt-1 flex items-center justify-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[2px] bg-[#16834a]" />
+              <span className="size-2 rounded-xs bg-success" />
               {doneEntries} entered
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[2px] bg-[#c47a16]" />
+              <span className="size-2 rounded-xs bg-warning" />
               {outstandingEntries} outstanding
             </span>
           </div>
@@ -251,13 +251,13 @@ export default function CycleDashboardPage() {
               <TableBody>
                 {stats.topStudents.map((s, i) => (
                   <TableRow key={`${s.name}-${i}`}>
-                    <TableCell className="pl-4 text-[13px] tabular text-muted-foreground">{i + 1}</TableCell>
-                    <TableCell className="text-[13.5px] font-medium text-foreground">{s.name}</TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">{s.className}</TableCell>
+                    <TableCell className="pl-4 text-compact tabular text-muted-foreground">{i + 1}</TableCell>
+                    <TableCell className="text-compact font-medium text-foreground">{s.name}</TableCell>
+                    <TableCell className="text-compact text-muted-foreground">{s.className}</TableCell>
                     <TableCell className="pr-4">
                       <div className="flex items-center justify-end gap-2">
-                        <span className="text-[13px] tabular">{formatAvg(s.avg)}</span>
-                        <GradePill grade={gradeFor(s.avg, defaultScheme)?.grade ?? "—"} />
+                        <span className="text-compact tabular">{formatAvg(s.avg)}</span>
+                        <GradePill grade={gradeFor(s.avg, defaultScheme)?.grade ?? "-"} />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -280,7 +280,7 @@ export default function CycleDashboardPage() {
                 className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
               >
                 <div className="min-w-0">
-                  <p className="text-[13.5px] font-medium text-foreground">{row.name}</p>
+                  <p className="text-compact font-medium text-foreground">{row.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Mean {formatAvg(row.avg)} · {row.incomplete} incomplete submission
                     {row.incomplete === 1 ? "" : "s"}
@@ -288,12 +288,12 @@ export default function CycleDashboardPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {row.incomplete > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#dc2626]/25 bg-[#dc2626]/10 px-2 py-0.5 text-xs font-medium text-[#b91c1c]">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-destructive/25 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-strong">
                       <AlertTriangle className="size-3" />
                       {row.incomplete}
                     </span>
                   ) : (
-                    <CheckCircle2 className="size-4 text-[#16834a]" />
+                    <CheckCircle2 className="size-4 text-success" />
                   )}
                   <ChevronRight className="size-4 text-muted-foreground" />
                 </div>

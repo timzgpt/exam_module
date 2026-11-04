@@ -35,7 +35,7 @@ const RESULTS: Record<
   },
   tampered: {
     tone: "destructive",
-    title: "Verification failed — document may be altered",
+    title: "Verification failed. Document may be altered",
     detail:
       "The checksum of this document does not match the school record. Do not accept it.",
     icon: ShieldAlert,
@@ -93,13 +93,13 @@ export default function VerifyPage() {
       : undefined;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#faf8f5]">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-2.5 px-4">
           <Logo inverted />
           <div className="leading-tight">
-            <p className="text-[13px] font-semibold text-foreground">{SCHOOL.name}</p>
-            <p className="text-[11px] text-muted-foreground">Report card verification</p>
+            <p className="text-compact font-semibold text-foreground">{SCHOOL.name}</p>
+            <p className="text-2xs text-muted-foreground">Report card verification</p>
           </div>
         </div>
       </header>
@@ -118,7 +118,7 @@ export default function VerifyPage() {
         <div className="mx-auto mt-6 max-w-xl rounded-xl border border-border bg-card p-5 shadow-sm">
           <label
             htmlFor="verify-code"
-            className="text-[13px] font-medium text-foreground"
+            className="text-compact font-medium text-foreground"
           >
             Verification code
           </label>
@@ -156,10 +156,10 @@ export default function VerifyPage() {
               <meta.icon
                 className={
                   meta.tone === "success"
-                    ? "mt-0.5 size-5 shrink-0 text-[#16834a]"
+                    ? "mt-0.5 size-5 shrink-0 text-success"
                     : meta.tone === "warning"
-                      ? "mt-0.5 size-5 shrink-0 text-[#c47a16]"
-                      : "mt-0.5 size-5 shrink-0 text-[#dc2626]"
+                      ? "mt-0.5 size-5 shrink-0 text-warning"
+                      : "mt-0.5 size-5 shrink-0 text-destructive"
                 }
               />
               <div className="min-w-0 flex-1">
@@ -170,7 +170,7 @@ export default function VerifyPage() {
                 <p className="mt-1 text-sm text-muted-foreground">{meta.detail}</p>
 
                 {result.kind === "valid" && student ? (
-                  <dl className="mt-4 grid gap-x-6 gap-y-3 rounded-lg border border-border/70 bg-[#faf8f5] p-4 sm:grid-cols-2">
+                  <dl className="mt-4 grid gap-x-6 gap-y-3 rounded-lg border border-border/70 bg-background p-4 sm:grid-cols-2">
                     <div>
                       <dt className="text-xs text-muted-foreground">Student</dt>
                       <dd className="text-sm font-medium text-foreground">{student.name}</dd>
@@ -186,7 +186,7 @@ export default function VerifyPage() {
                     <div>
                       <dt className="text-xs text-muted-foreground">Term average</dt>
                       <dd className="text-sm font-medium text-foreground">
-                        {rank ? `${rank.average.toFixed(1)}  ·  Position ${rank.rank}` : "—"}
+                        {rank ? `${rank.average.toFixed(1)}  ·  Position ${rank.rank}` : "-"}
                       </dd>
                     </div>
                     <div>
