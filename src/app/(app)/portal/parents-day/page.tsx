@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
+import { ChildChips } from "@/components/portal/child-chips";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,35 +15,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useParentChildren } from "@/hooks/use-parent-children";
+import { hasBookingConflict, appointmentsFor } from "@/lib/booking";
 import { DEMO_IDS } from "@/lib/demo-config";
 import {
   bookingSlots,
   classes,
   parentsDayEvent,
-  studentById,
   teacherById,
 } from "@/lib/demo-data";
-import type { BookingSlot, Student } from "@/lib/types";
+import { fmtLongDate, slotStart, firstName } from "@/lib/format";
+import type { BookingSlot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
 import { useState } from "react";
-
-/* ---- Demo parent context ------------------------------------------------ */
-
-const children: Student[] = [
-  studentById(DEMO_IDS.studentId),
-  studentById("f1b-04"),
-].filter((s): s is Student => Boolean(s));
-
-const firstName = (name: string) => name.split(" ")[0];
-
-const initialsOf = (name: string) =>
-  name
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("")
-    .toUpperCase();
 
 /** The six class teachers, with the class they lead. */
 const teacherOptions = classes.flatMap((cls) => {
@@ -50,76 +36,11 @@ const teacherOptions = classes.flatMap((cls) => {
   return teacher ? [{ teacher, className: cls.name }] : [];
 });
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-/** "2026-03-27" -> "27 March 2026" */
-function fmtLongDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
-
-/** "09:00 - 09:20" → "09:00" (start of the slot window). */
-function slotStart(label: string): string {
-  return label.split("-")[0].trim();
-}
-
-/* ---- Child selector chips (mobile: horizontal scroll) ------------------- */
-
-function ChildChips({
-  kids,
-  selectedId,
-  onSelect,
-}: {
-  kids: Student[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin" role="group" aria-label="Select a child">
-      {kids.map((kid) => {
-        const active = kid.id === selectedId;
-        return (
-          <button
-            key={kid.id}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onSelect(kid.id)}
-            className={cn(
-              "flex min-h-11 shrink-0 items-center gap-2.5 rounded-full border px-3 py-1.5 text-left transition-colors",
-              active ? "border-primary bg-primary/8" : "border-border bg-card hover:bg-accent",
-            )}
-          >
-            <span
-              className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold",
-                active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-              )}
-            >
-              {initialsOf(kid.name)}
-            </span>
-            <span className="flex flex-col leading-tight">
-              <span className={cn("text-compact font-medium", active ? "text-primary" : "text-foreground")}>
-                {firstName(kid.name)}
-              </span>
-              <span className="text-2xs text-muted-foreground">
-                Bookings for {firstName(kid.name)}
-              </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /* ---- Page ---------------------------------------------------------------- */
 
 export default function PortalParentsDayPage() {
   const { toast } = useToast();
+  const children = useParentChildren();
   const [selectedId, setSelectedId] = useState<string>(DEMO_IDS.studentId);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(
     teacherOptions[0]?.teacher.id ?? "",
@@ -134,20 +55,11 @@ export default function PortalParentsDayPage() {
   if (!child || !selectedOption) return null;
 
   const teacherSlots = slots.filter((s) => s.teacherId === selectedOption.teacher.id);
-  const appointments = slots
-    .filter((s) => s.bookedByStudentId === child.id)
-    .slice()
-    .sort((a, b) => a.slot.localeCompare(b.slot));
+  const appointments = appointmentsFor(slots, child.id);
 
   const confirmBooking = (slot: BookingSlot) => {
     const start = slotStart(slot.slot);
-    const conflict = slots.some(
-      (s) =>
-        s.bookedByStudentId === child.id &&
-        s.teacherId !== slot.teacherId &&
-        slotStart(s.slot) === start,
-    );
-    if (conflict) {
+    if (hasBookingConflict(slots, child.id, slot)) {
       toast({
         variant: "destructive",
         title: "Booking conflict",
@@ -181,7 +93,12 @@ export default function PortalParentsDayPage() {
         description="Book a 20-minute meeting with your child's class teacher."
       />
 
-      <ChildChips kids={children} selectedId={selectedId} onSelect={setSelectedId} />
+      <ChildChips
+        kids={children}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        subtitleFor={(kid) => `Bookings for ${firstName(kid.name)}`}
+      />
 
       {/* Event info strip */}
       <div className="flex flex-col gap-2.5 rounded-lg border border-border/80 bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">

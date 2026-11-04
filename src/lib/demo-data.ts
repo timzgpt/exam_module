@@ -1,5 +1,5 @@
 import { DEFAULT_SCHEME_ID, gradeFor } from "./grading";
-import { DEMO_IDS } from "./demo-config";
+import { ACADEMIC_APPROVER, DEMO_IDS } from "./demo-config";
 import type {
   BookingSlot,
   BatchRun,
@@ -442,7 +442,7 @@ export const approvals: ClassApproval[] = classes.map((cls) => {
   if (status === "changes-requested") {
     audit.push({
       at: "2026-03-10 09:05",
-      actor: "Mrs. Agnes Nyoni",
+      actor: ACADEMIC_APPROVER,
       action: "Changes requested",
       detail: "Mathematics marks for 3 students look inconsistent with coursework. Please verify.",
     });
@@ -450,7 +450,7 @@ export const approvals: ClassApproval[] = classes.map((cls) => {
   if (status === "approved") {
     audit.push({
       at: "2026-03-10 11:40",
-      actor: "Mrs. Agnes Nyoni",
+      actor: ACADEMIC_APPROVER,
       action: "Approved for report generation",
     });
   }
@@ -460,7 +460,7 @@ export const approvals: ClassApproval[] = classes.map((cls) => {
     submittedAt: status === "not-submitted" ? null : "2026-03-09",
     submittedBy: teacherById(cls.classTeacherId)?.name ?? null,
     reviewedAt: status === "approved" ? "2026-03-10" : status === "changes-requested" ? "2026-03-10" : null,
-    reviewedBy: status === "approved" || status === "changes-requested" ? "Mrs. Agnes Nyoni" : null,
+    reviewedBy: status === "approved" || status === "changes-requested" ? ACADEMIC_APPROVER : null,
     note:
       status === "changes-requested"
         ? "Mathematics marks for 3 students look inconsistent with coursework. Please verify."
@@ -494,7 +494,7 @@ export const batchRuns: BatchRun[] = [
     status: "completed",
     generated: 12,
     failed: [],
-    startedBy: "Mrs. Agnes Nyoni",
+    startedBy: ACADEMIC_APPROVER,
   },
   {
     id: "batch-002",
@@ -504,7 +504,7 @@ export const batchRuns: BatchRun[] = [
     status: "partial",
     generated: 22,
     failed: [{ classId: "cls-1b", reason: "3 class-teacher comments missing" }],
-    startedBy: "Mrs. Agnes Nyoni",
+    startedBy: ACADEMIC_APPROVER,
   },
 ];
 
@@ -516,7 +516,7 @@ export const releases: ClassRelease[] = [
   {
     classId: "cls-1a",
     releasedAt: "2026-01-24 08:00",
-    releasedBy: "Mrs. Agnes Nyoni",
+    releasedBy: ACADEMIC_APPROVER,
     hold: null,
   },
   {
@@ -894,8 +894,12 @@ export function subjectRemark(mark: number): string {
   return "Must put in more effort next term.";
 }
 
-/** Convenience accessor for the demo parent (used across the portal). */
+/**
+ * Convenience accessor for the demo parent, consumed by useParentChildren()
+ * across the portal. Two children so hold/release states are visible (Form 1B
+ * has a fees hold; the demo student's class does not).
+ */
 export const demoParent = {
   name: "Mr. Joseph Mwakalinga",
-  children: [studentById(DEMO_IDS.studentId)!],
+  children: [studentById(DEMO_IDS.studentId)!, studentById("f1b-04")!],
 };

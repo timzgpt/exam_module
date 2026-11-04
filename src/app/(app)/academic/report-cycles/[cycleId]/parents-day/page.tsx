@@ -39,25 +39,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { useParams } from "next/navigation";
+import { useCycleContext } from "@/hooks/use-academic-context";
 import { CalendarCheck, CalendarPlus, CalendarRange, Clock, Pencil, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   bookingSlots,
   classes,
-  cycleById,
-  currentCycle,
   parentsDayEvent,
   studentById,
   studentsInClass,
   teacherById,
 } from "@/lib/demo-data";
+import { findBookingConflict } from "@/lib/booking";
+import { slotStart } from "@/lib/format";
 import type { BookingSlot } from "@/lib/types";
-
-/** "09:00 - 09:20" → "09:00" (start of the slot window). */
-function slotStart(label: string): string {
-  return label.split("-")[0].trim();
-}
 
 interface BookingTarget {
   teacherId: string;
@@ -66,8 +61,7 @@ interface BookingTarget {
 
 export default function ParentsDayPage() {
   const { toast } = useToast();
-  const params = useParams<{ cycleId?: string }>();
-  const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
+  const { cycle } = useCycleContext();
 
   const [slots, setSlots] = useState<BookingSlot[]>(bookingSlots);
   const [manageId, setManageId] = useState<string | null>(null);
@@ -116,12 +110,10 @@ export default function ParentsDayPage() {
     if (!slot || !teacher || !student) return;
 
     const start = slotStart(slot.slot);
-    const conflict = slots.find(
-      (s) =>
-        s.bookedByStudentId === studentId &&
-        s.teacherId !== booking.teacherId &&
-        slotStart(s.slot) === start,
-    );
+    const conflict = findBookingConflict(slots, studentId, {
+      teacherId: booking.teacherId,
+      slot: slot.slot,
+    });
     if (conflict) {
       const other = teacherById(conflict.teacherId);
       toast({

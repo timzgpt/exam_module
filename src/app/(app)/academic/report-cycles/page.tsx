@@ -53,6 +53,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import type { CycleStatus, ReportCycle } from "@/lib/types";
+import { ACADEMIC_APPROVER, DEMO_TODAY } from "@/lib/demo-config";
 
 const CYCLE_STEPS: CycleStatus[] = ["preparation", "marks-entry", "review", "approved", "released"];
 const STEP_LABELS: Record<CycleStatus, string> = {
@@ -62,9 +63,6 @@ const STEP_LABELS: Record<CycleStatus, string> = {
   approved: "Approved",
   released: "Released",
 };
-
-/** Fixed demo "today": the March 2026 review period. */
-const DEMO_TODAY = "2026-03-11";
 
 function daysUntil(dateStr: string): number {
   const ms =
@@ -386,7 +384,7 @@ export default function ReportCyclesPage() {
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ShieldCheck className="size-3.5" /> Approver
             </p>
-            <p className="mt-1.5 text-sm font-semibold text-foreground">Mrs. Agnes Nyoni</p>
+            <p className="mt-1.5 text-sm font-semibold text-foreground">{ACADEMIC_APPROVER}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Deputy Head · Academics</p>
           </div>
         </div>

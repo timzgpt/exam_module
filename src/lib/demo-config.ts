@@ -27,6 +27,26 @@ export const SCHOOL = {
 } as const;
 
 /**
+ * Bursary contact details shown to parents on the card-on-hold page. Kept
+ * here (not hardcoded in the page) so a real contact change happens in one
+ * place. Note the bursary email intentionally differs from SCHOOL.email.
+ */
+export const BURSARY = {
+  phoneDisplay: "+255 754 000 210",
+  phoneHref: "tel:+255754000210",
+  email: "accounts@josephian.ac.tz",
+} as const;
+
+/** Fixed demo "today" used for relative-date calculations in demo data. */
+export const DEMO_TODAY = "2026-03-11";
+
+/** Staff member who reviews, approves and releases report cards in the demo data. */
+export const ACADEMIC_APPROVER = "Mrs. Agnes Nyoni";
+
+/** Previous-term baseline the management dashboard compares the cycle average against. */
+export const PREV_TERM_BASELINE_AVERAGE = 62.4;
+
+/**
  * Build a contextual route from a template such as
  * `/academic/report-cycles/{cycleId}/classes/{classId}/marks`.
  */

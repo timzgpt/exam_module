@@ -9,18 +9,18 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { useCycleContext } from "@/hooks/use-academic-context";
 import {
   approvalFor,
   batchRuns,
   classes,
   classNameOf,
   commentProgress,
-  cycleById,
-  currentCycle,
   marksDeadlines,
   studentsInClass,
   subjectById,
 } from "@/lib/demo-data";
+import { downloadCsv } from "@/lib/csv";
 import {
   ArrowLeft,
   CircleAlert,
@@ -31,9 +31,8 @@ import {
   RotateCcw,
   XCircle,
 } from "lucide-react";
-import { useParams } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import type { ReportCycle, Student } from "@/lib/types";
+import type { Student } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STEPS = ["Scope", "Validation", "Generate"] as const;
@@ -79,11 +78,8 @@ function validationFor(classId: string): ValidationCheck[] {
 }
 
 export default function BatchesPage() {
-  const params = useParams<{ cycleId?: string; studentId?: string }>();
   const { toast } = useToast();
-
-  // Param resolution: never crash on unknown ids.
-  const cycle: ReportCycle = cycleById(params.cycleId ?? "") ?? currentCycle;
+  const { cycle } = useCycleContext();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -184,15 +180,7 @@ export default function BatchesPage() {
       ["Student", "Admission No", "Class", "Status"],
       ...runList.map((s) => [s.name, s.admissionNo, classNameOf(s.classId), "Generated"]),
     ];
-    const blob = new Blob([rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n")], {
-      type: "text/csv",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${runId}-manifest.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(rows, `${runId}-manifest.csv`);
     toast({
       title: "Manifest downloaded",
       description: `${runList.length} generated report cards listed in the CSV.`,

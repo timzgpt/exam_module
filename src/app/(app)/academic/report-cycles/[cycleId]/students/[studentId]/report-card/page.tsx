@@ -9,13 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { usePrintDownload } from "@/hooks/use-print-download";
+import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
 import {
   classNameOf,
   commentFor,
-  cycleById,
-  currentCycle,
   defaultScheme,
   studentAttendance,
   studentById,
@@ -27,30 +26,16 @@ import {
   verificationRecords,
 } from "@/lib/demo-data";
 import { gradeFor } from "@/lib/grading";
+import { fmtLongDate } from "@/lib/format";
 import { Download, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-/** "2026-03-27" -> "27 March 2026" */
-function fmtLongDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
 
 const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
 
 export default function ReportCardPage() {
-  const params = useParams<{ cycleId?: string; studentId?: string }>();
+  const params = useParams<{ studentId?: string }>();
   const router = useRouter();
-  const { toast } = useToast();
-
-  // Param resolution: never crash on unknown ids.
-  const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
+  const { cycle } = useCycleContext();
   const student = studentById(params.studentId ?? "") ?? studentById(DEMO_IDS.studentId)!;
 
   const result = studentResultOf(student.id);
@@ -74,13 +59,9 @@ export default function ReportCardPage() {
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
   };
 
-  const downloadPdf = () => {
-    toast({
-      title: "Opening print dialog",
-      description: "Use 'Save as PDF' in the print dialog to download the report card.",
-    });
-    window.print();
-  };
+  const downloadPdf = usePrintDownload(
+    "Use 'Save as PDF' in the print dialog to download the report card.",
+  );
 
   return (
     <div className="space-y-5">

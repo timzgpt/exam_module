@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { downloadCsv } from "@/lib/csv";
 import { SCHOOL } from "@/lib/demo-config";
 import { exams as demoExams, subjectById, teacherById } from "@/lib/demo-data";
 import { CalendarDays, ClipboardList, Download, Plus, Search } from "lucide-react";
@@ -102,15 +103,7 @@ export default function ExamsPage() {
       ["Exam", "Type", "Term", "Start", "End", "Status", "Sittings"],
       ...exams.map((e) => [e.name, e.type, e.term, e.startDate, e.endDate, e.status, String(e.sittings.length)]),
     ];
-    const blob = new Blob([rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n")], {
-      type: "text/csv",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "exams-2026-term1.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(rows, "exams-2026-term1.csv");
     toast({ title: "Exported", description: "Exam calendar downloaded as CSV." });
   };
 

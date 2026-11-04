@@ -2,14 +2,11 @@ import {
   BadgeCheck,
   BarChart3,
   BookOpen,
-  Building2,
   CalendarCheck,
   CalendarPlus,
   CalendarRange,
-  CirclePause,
   ClipboardList,
   FileText,
-  Globe,
   IdCard,
   Layers,
   LayoutDashboard,
@@ -17,11 +14,7 @@ import {
   MessageSquareText,
   PenLine,
   ScanSearch,
-  Send,
   SlidersHorizontal,
-  Target,
-  Timer,
-  TrendingUp,
 } from "lucide-react";
 import type { NavItemDef } from "./types";
 
@@ -64,20 +57,15 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         description: "Academic cycle management",
       },
       {
-        key: "readiness",
-        label: "Readiness check",
+        key: "readiness-deadlines",
+        label: "Readiness & deadlines",
         group: "Report cards",
-        hrefTemplate: "/academic/report-cycles/{cycleId}/readiness",
-        icon: ListChecks,
-        description: "Blocking issues and eligibility",
-      },
-      {
-        key: "deadlines",
-        label: "Marks deadline tracker",
-        group: "Report cards",
+        // Primary route opens the deadline tracker; the readiness gate keeps
+        // its original route as a thin wrapper on the same host.
         hrefTemplate: "/academic/report-cycles/{cycleId}/deadlines",
-        icon: Timer,
-        description: "Teacher submissions and overdue marks",
+        matchTemplates: ["/academic/report-cycles/{cycleId}/readiness"],
+        icon: ListChecks,
+        description: "Mark-sheet tracker and batch readiness gate",
       },
       {
         key: "marks",
@@ -104,12 +92,15 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         description: "Printable report card with PDF export",
       },
       {
-        key: "review",
-        label: "Review & approval",
+        key: "approvals-release",
+        label: "Approvals & release",
         group: "Report cards",
+        // Primary route opens the approvals pipeline; release management keeps
+        // its original route as a thin wrapper on the same host.
         hrefTemplate: "/academic/report-cycles/{cycleId}/review",
+        matchTemplates: ["/academic/report-cycles/{cycleId}/release"],
         icon: BadgeCheck,
-        description: "Approval workflow and audit history",
+        description: "Approval workflow, publication and holds",
       },
       {
         key: "batches",
@@ -120,36 +111,19 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         description: "Guided batch report generation",
       },
       {
-        key: "release",
-        label: "Release management",
+        key: "cycle-analytics",
+        label: "Cycle analytics",
         group: "Report cards",
-        hrefTemplate: "/academic/report-cycles/{cycleId}/release",
-        icon: Send,
-        description: "Publication, holds and history",
-      },
-      {
-        key: "departments",
-        label: "HOD department summary",
-        group: "Report cards",
-        hrefTemplate: "/academic/report-cycles/{cycleId}/departments",
-        icon: Building2,
-        description: "Departmental performance overview",
-      },
-      {
-        key: "dashboard",
-        label: "Management dashboard",
-        group: "Report cards",
+        // Primary route opens the executive overview; the HOD department view
+        // and the public summary keep their original routes as thin wrappers
+        // on the same host.
         hrefTemplate: "/academic/report-cycles/{cycleId}/dashboard",
+        matchTemplates: [
+          "/academic/report-cycles/{cycleId}/departments",
+          "/academic/report-cycles/{cycleId}/public-summary",
+        ],
         icon: LayoutDashboard,
-        description: "Executive academic analytics",
-      },
-      {
-        key: "public-summary",
-        label: "Public summary",
-        group: "Report cards",
-        hrefTemplate: "/academic/report-cycles/{cycleId}/public-summary",
-        icon: Globe,
-        description: "Controlled public academic summary",
+        description: "Executive overview, departments and public summary",
       },
       {
         key: "parents-day",
@@ -173,20 +147,15 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         description: "Subject allocation and teachers",
       },
       {
-        key: "class-results",
-        label: "Class results",
+        key: "class-results-targets",
+        label: "Results & targets",
         group: "Classes",
+        // Primary route opens the results analysis; the next-term targets
+        // editor keeps its original route as a thin wrapper on the same host.
         hrefTemplate: "/academic/report-cycles/{cycleId}/classes/{classId}/results",
+        matchTemplates: ["/academic/report-cycles/{cycleId}/classes/{classId}/targets"],
         icon: BarChart3,
-        description: "Performance, grades and averages",
-      },
-      {
-        key: "class-targets",
-        label: "Next-term targets",
-        group: "Classes",
-        hrefTemplate: "/academic/report-cycles/{cycleId}/classes/{classId}/targets",
-        icon: Target,
-        description: "Improvement goals per student",
+        description: "Marks analysis and next-term goals per student",
       },
     ],
   },
@@ -194,28 +163,15 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
     label: "Parent portal",
     items: [
       {
-        key: "portal-report-cards",
-        label: "Report card (parent view)",
+        key: "portal-reports",
+        label: "Report cards (parent)",
         group: "Parent portal",
+        // One parent hub; the on-hold explanation and progress views keep
+        // their original routes as thin wrappers on the same host.
         hrefTemplate: "/portal/report-cards",
+        matchTemplates: ["/portal/report-cards/on-hold", "/portal/progress"],
         icon: IdCard,
-        description: "Mobile-friendly report card viewing",
-      },
-      {
-        key: "portal-on-hold",
-        label: "Card on hold (parent)",
-        group: "Parent portal",
-        hrefTemplate: "/portal/report-cards/on-hold",
-        icon: CirclePause,
-        description: "Why a card is unavailable and next steps",
-      },
-      {
-        key: "portal-progress",
-        label: "Progress & targets (parent)",
-        group: "Parent portal",
-        hrefTemplate: "/portal/progress",
-        icon: TrendingUp,
-        description: "Progress, goals and recommendations",
+        description: "Card, hold status and progress for your children",
       },
       {
         key: "portal-parents-day",

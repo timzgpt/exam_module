@@ -43,9 +43,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { DEMO_IDS } from "@/lib/demo-config";
+import { useClassContext } from "@/hooks/use-academic-context";
 import {
-  classById,
   subjectById,
   subjectTeacherOf,
   subjects,
@@ -53,7 +52,6 @@ import {
   teachers,
 } from "@/lib/demo-data";
 import { AlertTriangle, BookOpen, Clock, MapPin, Plus, Save, Trash2, Users } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 interface Allocation {
@@ -69,8 +67,7 @@ const MAX_PERIODS = 40;
 
 export default function ClassSubjectsPage() {
   const { toast } = useToast();
-  const params = useParams<{ classId?: string }>();
-  const cls = classById(params.classId ?? "") ?? classById(DEMO_IDS.classId)!;
+  const { klass: cls } = useClassContext();
   const classTeacher = teacherById(cls.classTeacherId);
 
   const [allocations, setAllocations] = useState<Allocation[]>(() =>

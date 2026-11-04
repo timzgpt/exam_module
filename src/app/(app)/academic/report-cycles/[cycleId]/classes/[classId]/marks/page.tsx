@@ -17,11 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { DEMO_IDS } from "@/lib/demo-config";
+import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
-  classById,
-  cycleById,
-  currentCycle,
   defaultScheme,
   getMarks,
   studentsInClass,
@@ -32,7 +29,6 @@ import {
 import { averageOf, formatAvg, gradeFor } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import { ClipboardList, Keyboard, Loader2, Percent, RotateCcw, Save, TrendingUp } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 type ParsedMark = { state: "empty" } | { state: "valid"; value: number } | { state: "invalid" };
@@ -51,9 +47,8 @@ const toWorking = (baseline: Record<string, number | null>): Record<string, stri
 
 export default function MarksEntryPage() {
   const { toast } = useToast();
-  const params = useParams<{ cycleId?: string; classId?: string }>();
-  const cls = classById(params.classId ?? "") ?? classById(DEMO_IDS.classId)!;
-  const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
+  const { klass: cls } = useClassContext();
+  const { cycle } = useCycleContext();
   const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
 
   const [subjectId, setSubjectId] = useState<string>(subjects[0].id);

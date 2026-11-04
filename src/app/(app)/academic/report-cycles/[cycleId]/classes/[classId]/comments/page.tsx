@@ -16,28 +16,23 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { DEMO_IDS } from "@/lib/demo-config";
+import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
-  classById,
   commentFor,
   commentTemplates,
-  cycleById,
-  currentCycle,
   studentsInClass,
 } from "@/lib/demo-data";
 import type { CommentRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ChevronRight, MessageSquareText, PenLine, Search, Send } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 const REMARK_MAX = 240;
 
 export default function CommentsPage() {
   const { toast } = useToast();
-  const params = useParams<{ cycleId?: string; classId?: string }>();
-  const cls = classById(params.classId ?? "") ?? classById(DEMO_IDS.classId)!;
-  const cycle = cycleById(params.cycleId ?? "") ?? currentCycle;
+  const { klass: cls } = useClassContext();
+  const { cycle } = useCycleContext();
   const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
 
   const [comments, setComments] = useState<Record<string, CommentRecord>>(() =>

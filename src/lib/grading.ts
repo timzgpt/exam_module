@@ -42,11 +42,6 @@ export function passRateOf(
   return Math.round((passed / values.length) * 100);
 }
 
-export function rankOf(value: number, all: number[]): number {
-  const sorted = [...all].sort((a, b) => b - a);
-  return sorted.indexOf(value) + 1;
-}
-
 /** Arrow + delta label vs previous value. */
 export function deltaLabel(
   current: number,

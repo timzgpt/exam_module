@@ -107,11 +107,6 @@ export interface ReportCycle {
 
 /* ---------------- Marks / comments / results ---------------- */
 
-export interface MarkEntry {
-  studentId: string;
-  mark: number | null;
-}
-
 export type DeadlineState = "complete" | "partial" | "pending" | "overdue";
 
 export interface MarksDeadline {
@@ -213,6 +208,12 @@ export interface NavItemDef {
   label: string;
   group: string;
   hrefTemplate: string; // may contain {cycleId} {classId} {studentId}
+  /**
+   * Additional href templates that resolve to the SAME host page (merged
+   * features keep their original routes as thin wrappers). Used for active
+   * highlighting and breadcrumbs; never rendered in the sidebar.
+   */
+  matchTemplates?: string[];
   icon: LucideIcon;
   description: string;
 }
