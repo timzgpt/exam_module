@@ -2,6 +2,7 @@
 
 import { Logo } from "@/components/shell/logo";
 import { StatusBadge, type BadgeTone } from "@/components/shared/status-badge";
+import { DocumentTitle } from "@/components/shared/document-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { verifyCode, studentById, cycleById, classResults, classNameOf } from "@/lib/demo-data";
@@ -94,6 +95,7 @@ export default function VerifyPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <DocumentTitle title="Verify a report card" />
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-2.5 px-4">
           <Logo inverted />

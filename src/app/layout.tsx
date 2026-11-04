@@ -14,7 +14,6 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Josephian Schools. School Reports",
   description:
     "Exams & Report Cards module for Josephian Schools: exam administration, marks entry, report generation, release and parent portal.",
   keywords: ["Josephian Schools", "School Reports", "Exams", "Report Cards", "School Management"],

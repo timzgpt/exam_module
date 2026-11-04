@@ -37,10 +37,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
       <SidebarStateSync />
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       <AppSidebar />
       <SidebarInset className="min-w-0 bg-background">
         <AppHeader />
-        <main className="mx-auto w-full max-w-page flex-1 px-3 py-5 sm:px-6 sm:py-6">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-page flex-1 px-3 py-5 outline-none sm:px-6 sm:py-6"
+        >
           {children}
         </main>
       </SidebarInset>

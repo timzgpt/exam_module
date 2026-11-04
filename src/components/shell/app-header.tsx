@@ -43,13 +43,13 @@ export function AppHeader() {
   ).length;
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-5">
-      <SidebarTrigger className="-ml-1 size-8 text-muted-foreground hover:text-foreground" />
-      <Separator orientation="vertical" className="!h-5" />
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 flex-nowrap items-center gap-2 overflow-hidden border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-5">
+      <SidebarTrigger className="-ml-1 size-8 shrink-0 text-muted-foreground hover:text-foreground" />
+      <Separator orientation="vertical" className="!h-5 shrink-0" />
 
-      <Breadcrumb className="min-w-0">
-        <BreadcrumbList className="text-compact">
-          <BreadcrumbItem className="hidden sm:block">
+      <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
+        <BreadcrumbList className="flex-nowrap text-compact">
+          <BreadcrumbItem className="hidden lg:block">
             <button
               onClick={() => router.push("/")}
               className="font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -60,16 +60,16 @@ export function AppHeader() {
           {trail.map((item, i) => (
             <span
               key={`${item.label}-${i}`}
-              className={cn("flex items-center gap-1.5", i < trail.length - 1 && "hidden sm:flex")}
+              className={cn("flex items-center gap-1.5", i < trail.length - 1 && "hidden lg:flex")}
             >
               <BreadcrumbSeparator className="[&>svg]:size-3.5" />
               <BreadcrumbItem>
                 {i === trail.length - 1 ? (
-                  <BreadcrumbPage className="max-w-[46vw] truncate font-medium sm:max-w-none">
+                  <BreadcrumbPage className="max-w-[46vw] truncate font-medium md:max-w-[130px] lg:max-w-[280px] xl:max-w-none">
                     {item.label}
                   </BreadcrumbPage>
                 ) : (
-                  <span className="max-w-[38vw] truncate text-muted-foreground sm:max-w-none">
+                  <span className="max-w-[38vw] truncate text-muted-foreground lg:max-w-[220px] xl:max-w-[300px]">
                     {item.label}
                   </span>
                 )}
@@ -79,7 +79,7 @@ export function AppHeader() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Cycle context */}
         <Select value={cycleId} onValueChange={setCycle}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger

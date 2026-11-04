@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
+import { DocumentTitle } from "@/components/shared/document-title";
+
 interface PageHeaderProps {
   title: string;
   description?: string;
@@ -22,6 +24,7 @@ export function PageHeader({
         className,
       )}
     >
+      <DocumentTitle title={title} />
       <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
           {title}
