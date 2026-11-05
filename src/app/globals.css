@@ -198,6 +198,9 @@
   .print-area,
   .print-area * {
     visibility: visible;
+    /* The maroon table header and cream bands must print as coloured. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .print-area {
     position: absolute;

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +32,6 @@ import {
   prevCaOf,
   schemeForClass,
   studentById,
-  studentEffort,
   studentResultOf,
   studentsInClass,
   subjectById,
@@ -48,7 +48,7 @@ import {
 } from "@/lib/grading";
 import { fmtDateRange, fmtLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Download, Printer, TrendingUp } from "lucide-react";
+import { AlertTriangle, Download, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
@@ -179,13 +179,18 @@ export default function ReportCardPage() {
   const classSubjects = classSubjectsFor(student.classId);
   const scheme = schemeForClass(student.classId);
   const isPrimary = isPrimaryClass(student.classId);
+  // Assessment split shown in the table header (25 % monthly / 75 % terminal).
+  const caPct = classSubjects[0]?.caMarks ?? 25;
+  const examPct = classSubjects[0]?.examMarks ?? 75;
+  // Top band of the class scheme — rendered as the filled grade badge.
+  const topGrade = scheme.boundaries[0]?.grade;
   const allRows = classSubjects.map((cs) => {
     const subject = subjectById(cs.subjectId)!;
     const comp = getComponents(student.classId, cs.subjectId)[student.id];
     const enrolled = comp?.enrolled ?? true;
     const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
     const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
-    return { subject, enrolled, mark, grade };
+    return { subject, enrolled, mark, grade, ca: comp?.ca ?? null, exam: comp?.exam ?? null };
   });
   // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
   // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
@@ -379,76 +384,161 @@ export default function ReportCardPage() {
           </div>
         </div>
 
-        {/* Subjects table */}
-        <table className="mt-6 w-full table-fixed border-collapse text-compact">
-          <thead>
-            <tr className="border-y border-input text-left">
-              <th className="w-6 py-1.5 pr-1 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                #
-              </th>
-              <th className="py-1.5 pr-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Subject
-              </th>
-              <th className="py-1.5 pr-2 text-right text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Mark
-              </th>
-              <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Grade
-              </th>
-              {showPoints ? (
-                <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Points
+        {/* Subjects table — the school's maroon ledger design: monthly and
+            terminal components with their assessment weights, weighted total,
+            grade badge and exam-vs-CA progress, with the subject teacher's
+            remark quoted beneath each subject row. */}
+        <div className="mt-6 overflow-hidden rounded-lg bg-[#F7F2E9] font-sans">
+          <table className="w-full table-fixed border-collapse">
+            <colgroup>
+              <col className="w-[5%]" />
+              <col className="w-[29%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[16.5%]" />
+              <col className="w-[11.5%]" />
+              <col className="w-[12%]" />
+            </colgroup>
+            <thead>
+              <tr className="bg-gradient-to-r from-[#5B1117] to-[#3D0B10] text-white">
+                <th className="py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  #
                 </th>
-              ) : null}
-              <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Effort
-              </th>
-              <th className="py-1.5 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Teacher&apos;s Remark
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ subject, enrolled, mark, grade }, rowIndex) => {
-              const improved = mostImproved?.subjectId === subject.id;
-              return (
-                <tr
-                  key={subject.id}
-                  className={cn("border-b border-border", improved && "bg-success/8")}
-                >
-                  <td className="py-1.5 pr-1 text-center tabular text-muted-foreground">
-                    {rowIndex + 1}
-                  </td>
-                  <td className="py-1.5 pr-2 font-medium">
-                    {subject.name}
-                    {improved ? (
-                      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 align-middle text-2xs font-semibold text-success-strong">
-                        <TrendingUp className="size-2.5" /> Most improved +{mostImproved?.delta}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="py-1.5 pr-2 text-right tabular">
-                    {enrolled && mark !== null ? fmtTotalMark(mark) : "—"}
-                  </td>
-                  <td className="py-1.5 pr-2 text-center font-semibold">
-                    {enrolled && grade?.grade ? grade.grade : "—"}
-                  </td>
-                  {showPoints ? (
-                    <td className="py-1.5 pr-2 text-center tabular">
-                      {enrolled && grade ? grade.points : "—"}
-                    </td>
-                  ) : null}
-                  <td className="py-1.5 pr-2 text-center">
-                    {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
-                  </td>
-                  <td className="py-1.5 text-muted-foreground">
-                    {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark, scheme) : "Not assessed"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                <th className="py-3 pl-6 text-left text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Subject
+                </th>
+                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Monthly
+                  <span className="block text-[10px] font-semibold tracking-[0.08em] text-white/70">
+                    {caPct} %
+                  </span>
+                </th>
+                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Terminal
+                  <span className="block text-[10px] font-semibold tracking-[0.08em] text-white/70">
+                    {examPct} %
+                  </span>
+                </th>
+                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Total
+                </th>
+                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Grade
+                </th>
+                <th className="border-l border-white/10 py-3 pr-2 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Progress
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => {
+                const { subject, enrolled, mark, grade, ca, exam } = row;
+                // Progress = terminal − monthly, shown only when both
+                // components exist (single-assessment subjects carry their
+                // mark at 100 % and have no progress to report).
+                const delta = ca !== null && exam !== null ? exam - ca : null;
+                return (
+                  <Fragment key={subject.id}>
+                    <tr>
+                      <td className="bg-[#F3ECDD] pb-2 pl-0.5 pr-0.5 pt-2 text-center align-top text-2xs tabular text-[#9D8E7D]">
+                        {rowIndex + 1}
+                      </td>
+                      <td className="bg-[#F3ECDD] px-5 py-4">
+                        <p className="text-[15px] font-semibold leading-tight text-[#5C1217]">
+                          {subject.name}
+                        </p>
+                        {mark !== null ? (
+                          <div className="mt-2 h-1.5 w-[210px] max-w-full overflow-hidden rounded-full bg-[#ECE3D1]">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.min(100, Math.max(0, mark))}%`,
+                                background: "linear-gradient(90deg, #5E1519, #C8A64C)",
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                      </td>
+                      <td
+                        className={cn(
+                          "bg-[#F3ECDD] text-center text-[15px] tabular text-[#3B291A]",
+                          ca === null && "text-[#9D8E7D]",
+                        )}
+                      >
+                        {ca ?? "—"}
+                      </td>
+                      <td
+                        className={cn(
+                          "bg-[#F3ECDD] text-center text-[15px] tabular text-[#3B291A]",
+                          exam === null && "text-[#9D8E7D]",
+                        )}
+                      >
+                        {exam ?? "—"}
+                      </td>
+                      <td className="bg-[#F3ECDD] text-center text-[15px] font-bold tabular text-[#1B0F08]">
+                        {enrolled && mark !== null ? mark.toFixed(2) : "—"}
+                      </td>
+                      <td className="bg-[#F3ECDD] text-center">
+                        {enrolled && grade?.grade ? (
+                          <span
+                            className={cn(
+                              "inline-flex size-8 items-center justify-center rounded-full text-sm font-bold",
+                              grade.grade === topGrade
+                                ? "bg-[#5C1217] text-[#DFC775]"
+                                : "border border-[#5C1217]/30 bg-[#ECE3D1] text-[#5C1217]",
+                            )}
+                          >
+                            {grade.grade}
+                          </span>
+                        ) : (
+                          <span className="text-[15px] text-[#9D8E7D]">—</span>
+                        )}
+                      </td>
+                      <td className="bg-[#F3ECDD] pr-2 text-center">
+                        {delta !== null ? (
+                          <span
+                            className={cn(
+                              "text-[15px] font-bold tabular",
+                              delta > 0
+                                ? "text-[#2D6A4E]"
+                                : delta < 0
+                                  ? "text-[#C0392B]"
+                                  : "text-[#9D8E7D]",
+                            )}
+                          >
+                            {delta > 0 ? "+" : delta < 0 ? "-" : ""}
+                            {Math.abs(delta).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-[15px] text-[#9D8E7D]">—</span>
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={7} className="p-0">
+                        <div className="mx-4 my-2.5 flex items-start gap-2.5 border-l-4 border-[#C8A74B] bg-[#F2EAD9] py-3 pl-4 pr-5">
+                          <span
+                            aria-hidden
+                            className="font-serif text-[22px] leading-none text-[#C0A66E]"
+                          >
+                            “
+                          </span>
+                          <p className="text-compact italic leading-relaxed text-[#3B291A]">
+                            {!enrolled
+                              ? "Not taking this subject."
+                              : mark !== null
+                                ? subjectRemark(mark, scheme)
+                                : "Not assessed."}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
         {assessed.length > 0 ? (
           <PerformanceChartSection
@@ -470,9 +560,8 @@ export default function ReportCardPage() {
           </p>
         ) : null}
         <p className="mt-1.5 text-2xs text-muted-foreground">
-          Subject totals weight Monthly CA at {classSubjects[0]?.caMarks ?? 25}% and the exam at{" "}
-          {classSubjects[0]?.examMarks ?? 75}%. A subject with only one assessment sat carries that mark at 100%; a
-          subject with no marks at all is omitted and the remaining rows renumber continuously.
+          A subject with only one assessment sat carries that mark at 100%; a subject with no marks at all is omitted
+          and the remaining rows renumber continuously.
         </p>
 
         {/* Summary strip */}
