@@ -5,8 +5,10 @@
  * with the authoritative "REPORT CARD CHART SYSTEM" prompt:
  *
  *  - ONE chart per card: a grouped bar chart with exactly 3 series per
- *    subject — Achieved Marks (red), Class Avg (blue), Class Topper (green).
- *  - The strongest subject's achieved bar is drawn in darker red.
+ *    subject — Achieved Marks (red), Class Avg (blue), Class Topper (green),
+ *    all in uniform colours. The strongest subject is called out by the
+ *    ★ badge above the chart, NOT by a darker bar (per the school's
+ *    reference chart of Nov 2025, which colours every achieved bar alike).
  *  - Every non-zero bar carries its value label above it.
  *  - Subjects without a total are excluded (same rule as the table).
  *  - Class stats are recomputed from every classmate's weighted score; the
@@ -21,9 +23,13 @@
  *    This is the stack-native equivalent of the legacy base64 PNG at 150 dpi;
  *    being vector it stays crisp at any print resolution.
  *
- * Geometry, colours, font scaling, label rotation, y-axis ceilings and the
- * Mid-Term/Terminal differences below mirror Sections 1, 2, 5, 6 and 9 of
- * the chart prompt exactly.
+ * Visual style (2025-11 reference chart): y-axis fixed 0–100 with light
+ * horizontal gridlines, light left/bottom spines only (no top/right box),
+ * bold warm-dark axis titles, regular dark tick text, x labels slanting UP
+ * toward their tick (matplotlib rotation/ha='right' look) and the legend
+ * centred under the plot. Geometry, colours, font scaling and the
+ * Mid-Term/Terminal differences below otherwise mirror Sections 1, 2, 5,
+ * 6 and 9 of the chart prompt.
  */
 
 /* ================================================================
@@ -38,17 +44,19 @@ const PT = 150 / 72;
 const COLORS = {
   achieved: "#E74C3C",
   achievedEdge: "#C0392B",
-  achievedStrong: "#C0392B",
-  achievedStrongEdgeMid: "#7B241C",
   avg: "#3498DB",
   avgEdge: "#2980B9",
   top: "#2ECC71",
   topEdge: "#27AE60",
-  label: "#1C1008",
-  spine: "#000000",
+  label: "#1C1008", // value labels + bold axis titles (warm near-black)
+  tickText: "#262626", // tick labels, legend text
+  spine: "#CFCFCF", // light left/bottom spines (reference style)
+  grid: "#E9E9E9", // horizontal gridlines behind the bars
 } as const;
 
-export const CHART_TITLE = "Result Analysis in Percentage";
+// NOTE: deliberately no in-image title — the reference chart carries none
+// and the card's own section heading ("Performance Charts" / "Subject
+// Score Analysis") already names the chart for the reader.
 export const Y_AXIS_LABEL = "% Percentage";
 export const X_AXIS_LABEL = "Subjects";
 /** Printed above the chart image when the series is empty (prompt §7). */
@@ -245,17 +253,18 @@ function midTermLayout(n: number): Layout {
   // cards taller than 12-subject cards because the figure grew squarer.
   const figW = Math.max(12.0, n * 1.5);
   const figH = figW / 3.0;
-  const rotation = n <= 6 ? 0 : n <= 9 ? 12 : 15;
+  // Reference chart: 7 subjects slant at ~15°, so every rotated row uses 15°.
+  const rotation = n <= 6 ? 0 : 15;
   return {
     W: figW * 150,
     H: figH * 150,
     left: 0.07,
     right: 0.98,
-    top: 0.91,
+    top: 0.95, // no in-image title — the plot starts near the top edge
     bottom: rotation === 0 ? 0.2 : 0.26,
     barW: 0.22, // fixed for all subject counts
     xPad: 0.55,
-    ymax: 120,
+    ymax: 100, // reference chart: axis ends at 100, not 120
     rotation,
     tickFs: n <= 7 ? 10 : n <= 10 ? 9 : 8,
     achievedFs: n <= 8 ? 8.5 : 7.5,
@@ -272,11 +281,11 @@ function terminalLayout(n: number): Layout {
     H: figH * 150,
     left: 0.07,
     right: 0.99,
-    top: 0.9,
+    top: 0.95,
     bottom: 0.36,
     barW: Math.min(0.22, Math.max(0.12, 0.65 / n)), // adaptive
     xPad: 0.55,
-    ymax: 115,
+    ymax: 100, // reference chart: axis ends at 100, not 115
     rotation: n > 6 ? 40 : 28,
     tickFs: n > 10 ? 6 : n > 7 ? 7 : 8,
     achievedFs: 7,
@@ -311,7 +320,7 @@ const FONT_STACK = "DejaVu Sans, Helvetica Neue, Helvetica, Arial, sans-serif";
  * the template then shows the fallback paragraph instead of a broken image.
  */
 export function generateChartImage(series: ChartSeries, variant: ChartVariant): string | null {
-  const { labels, achieved, avg, top, strongestIdx } = series;
+  const { labels, achieved, avg, top } = series;
   if (labels.length === 0) return null; // empty series → fallback paragraph
   const n = labels.length;
   const L = variant === "mid-term" ? midTermLayout(n) : terminalLayout(n);
@@ -335,7 +344,6 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
   const tickW = 0.8 * PT; // spine/tick line width
   const barEdgeW = 1.0 * PT; // patch edge width
   const tickFsPx = L.tickFs * PT;
-  const titleFsPx = 12 * PT; // matplotlib default title size
 
   const p: string[] = [];
   p.push(
@@ -344,25 +352,27 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
   );
   p.push(`<rect x="0" y="0" width="${W.toFixed(1)}" height="${H.toFixed(1)}" fill="#FFFFFF"/>`);
 
-  // Chart title (hardcoded in both legacy trees).
-  p.push(
-    `<text x="${((plotL + plotR) / 2).toFixed(1)}" y="${(plotT - 0.55 * titleFsPx).toFixed(1)}" ` +
-      `font-size="${titleFsPx.toFixed(1)}" fill="#000000" text-anchor="middle">${esc(CHART_TITLE)}</text>`,
-  );
+  // Horizontal gridlines behind the bars (reference style: light, at every
+  // y tick except 0 — the baseline IS the bottom spine).
+  for (const v of [25, 50, 75, 100]) {
+    if (v > L.ymax) continue;
+    const gy = Y(v).toFixed(1);
+    p.push(
+      `<line x1="${plotL.toFixed(1)}" y1="${gy}" x2="${plotR.toFixed(1)}" y2="${gy}" ` +
+        `stroke="${COLORS.grid}" stroke-width="${tickW.toFixed(1)}"/>`,
+    );
+  }
 
   // ---- Bars + value labels (3 grouped series per subject, prompt §2) ----
   for (let i = 0; i < n; i++) {
-    const isStrongest = i === strongestIdx;
+    // Uniform red for EVERY achieved bar — the strongest subject is called
+    // out by the ★ badge above the chart, not by a darker bar (reference).
     const bars: { cx: number; v: number; fill: string; edge: string; fs: number; bold: boolean }[] = [
       {
         cx: i - L.barW,
         v: achieved[i],
-        fill: isStrongest ? COLORS.achievedStrong : COLORS.achieved,
-        edge: isStrongest
-          ? variant === "mid-term"
-            ? COLORS.achievedStrongEdgeMid
-            : COLORS.achievedStrong
-          : COLORS.achievedEdge,
+        fill: COLORS.achieved,
+        edge: COLORS.achievedEdge,
         fs: L.achievedFs,
         bold: true,
       },
@@ -390,10 +400,15 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
     }
   }
 
-  // ---- Axes box (matplotlib draws all four spines) ----
+  // ---- Axes: light left + bottom spines only (reference style — no
+  //      top/right box) ----
   p.push(
-    `<rect x="${plotL.toFixed(1)}" y="${plotT.toFixed(1)}" width="${plotW.toFixed(1)}" ` +
-      `height="${plotH.toFixed(1)}" fill="none" stroke="${COLORS.spine}" stroke-width="${tickW.toFixed(1)}"/>`,
+    `<line x1="${plotL.toFixed(1)}" y1="${plotT.toFixed(1)}" x2="${plotL.toFixed(1)}" ` +
+      `y2="${plotB.toFixed(1)}" stroke="${COLORS.spine}" stroke-width="${tickW.toFixed(1)}"/>`,
+  );
+  p.push(
+    `<line x1="${plotL.toFixed(1)}" y1="${plotB.toFixed(1)}" x2="${plotR.toFixed(1)}" ` +
+      `y2="${plotB.toFixed(1)}" stroke="${COLORS.spine}" stroke-width="${tickW.toFixed(1)}"/>`,
   );
 
   // ---- Y axis: ticks 0/25/50/75/100, tick labels, axis label ----
@@ -401,18 +416,18 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
     const y = Y(v);
     p.push(
       `<line x1="${plotL.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(plotL - tickLen).toFixed(1)}" ` +
-        `y2="${y.toFixed(1)}" stroke="${COLORS.spine}" stroke-width="${tickW.toFixed(1)}"/>`,
+        `y2="${y.toFixed(1)}" stroke="${COLORS.tickText}" stroke-width="${tickW.toFixed(1)}"/>`,
     );
     p.push(
       `<text x="${(plotL - tickLen - 4).toFixed(1)}" y="${(y + 0.35 * tickFsPx).toFixed(1)}" ` +
-        `font-size="${tickFsPx.toFixed(1)}" fill="#000000" text-anchor="end">${v}</text>`,
+        `font-size="${tickFsPx.toFixed(1)}" fill="${COLORS.tickText}" text-anchor="end">${v}</text>`,
     );
   }
   const yLabelX = plotL - tickLen - 6 - 1.8 * tickFsPx;
   const yLabelY = (plotT + plotB) / 2;
   p.push(
     `<text x="${yLabelX.toFixed(1)}" y="${yLabelY.toFixed(1)}" font-size="${tickFsPx.toFixed(1)}" ` +
-      `fill="#000000" text-anchor="middle" transform="rotate(-90 ${yLabelX.toFixed(1)} ${yLabelY.toFixed(1)})">${esc(Y_AXIS_LABEL)}</text>`,
+      `fill="${COLORS.label}" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${yLabelX.toFixed(1)} ${yLabelY.toFixed(1)})">${esc(Y_AXIS_LABEL)}</text>`,
   );
 
   // ---- X axis: subject ticks, shortened labels (adaptive rotation), axis label ----
@@ -423,27 +438,29 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
     const x = X(i);
     p.push(
       `<line x1="${x.toFixed(1)}" y1="${plotB.toFixed(1)}" x2="${x.toFixed(1)}" ` +
-        `y2="${(plotB + tickLen).toFixed(1)}" stroke="${COLORS.spine}" stroke-width="${tickW.toFixed(1)}"/>`,
+        `y2="${(plotB + tickLen).toFixed(1)}" stroke="${COLORS.tickText}" stroke-width="${tickW.toFixed(1)}"/>`,
     );
     if (L.rotation === 0) {
       p.push(
         `<text x="${x.toFixed(1)}" y="${(plotB + tickLen + 4 + 0.85 * tickFsPx).toFixed(1)}" ` +
-          `font-size="${tickFsPx.toFixed(1)}" fill="#000000" text-anchor="middle">${esc(labels[i])}</text>`,
+          `font-size="${tickFsPx.toFixed(1)}" fill="${COLORS.tickText}" text-anchor="middle">${esc(labels[i])}</text>`,
       );
     } else {
-      // Right-aligned slanted labels, anchored just below the tick.
+      // Right-aligned slanted labels rising toward the tick — SVG's y-down
+      // coords need a NEGATIVE angle for the matplotlib rotation/ha='right'
+      // look (text ascends left-to-right, right end at the tick).
       const ax = x + 0.35 * tickFsPx;
-      const ay = plotB + tickLen + 4 + 0.4 * tickFsPx;
+      const ay = plotB + tickLen + 3 + 0.3 * tickFsPx;
       p.push(
         `<text x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" font-size="${tickFsPx.toFixed(1)}" ` +
-          `fill="#000000" text-anchor="end" transform="rotate(${L.rotation} ${ax.toFixed(1)} ${ay.toFixed(1)})">${esc(labels[i])}</text>`,
+          `fill="${COLORS.tickText}" text-anchor="end" transform="rotate(${-L.rotation} ${ax.toFixed(1)} ${ay.toFixed(1)})">${esc(labels[i])}</text>`,
       );
     }
   }
   const xLabelY = plotB + tickLen + 4 + 0.4 * tickFsPx + labelDrop + 1.4 * tickFsPx;
   p.push(
     `<text x="${((plotL + plotR) / 2).toFixed(1)}" y="${xLabelY.toFixed(1)}" ` +
-      `font-size="${tickFsPx.toFixed(1)}" fill="#000000" text-anchor="middle">${esc(X_AXIS_LABEL)}</text>`,
+      `font-size="${tickFsPx.toFixed(1)}" fill="${COLORS.label}" font-weight="bold" text-anchor="middle">${esc(X_AXIS_LABEL)}</text>`,
   );
 
   // ---- Legend (Mid-Term only: below the chart, centred, 3 columns, no
@@ -456,7 +473,7 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
       { text: "Class Topper", fill: COLORS.top, edge: COLORS.topEdge },
     ];
     const swatchW = 1.6 * tickFsPx;
-    const swatchH = 0.7 * tickFsPx;
+    const swatchH = 0.85 * tickFsPx;
     const inGap = 0.5 * tickFsPx;
     const entryGap = 1.6 * tickFsPx;
     const rowH = 1.5 * tickFsPx;
@@ -473,7 +490,7 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
       );
       p.push(
         `<text x="${(cx + swatchW + inGap).toFixed(1)}" y="${(legendTop + rowH * 0.76).toFixed(1)}" ` +
-          `font-size="${tickFsPx.toFixed(1)}" fill="#000000" text-anchor="start">${e.text}</text>`,
+          `font-size="${tickFsPx.toFixed(1)}" fill="${COLORS.tickText}" text-anchor="start">${e.text}</text>`,
       );
       cx += swatchW + inGap + e.text.length * 0.6 * tickFsPx + entryGap;
     }
