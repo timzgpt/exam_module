@@ -13,6 +13,7 @@ import { usePrintDownload } from "@/hooks/use-print-download";
 import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
 import {
+  classById,
   classSubjectsFor,
   classNameOf,
   commentFor,
@@ -31,7 +32,7 @@ import {
 import { divisionFor, fmtTotalMark, gradeFor, mostImprovedSubject, subjectsPassed } from "@/lib/grading";
 import { fmtLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Download, Printer, TrendingUp } from "lucide-react";
+import { AlertTriangle, Download, Printer, TrendingUp } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
@@ -61,6 +62,8 @@ export default function ReportCardPage() {
   });
   // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
   // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
+  // Remaining rows renumber continuously after any omitted subject (the #
+  // column below).
   const rows = allRows.filter((r) => !r.enrolled || r.mark !== null);
   const assessed = allRows.filter((r) => r.mark !== null);
   const pointsTotal = assessed.reduce((a, r) => a + (r.grade?.points ?? 0), 0);
@@ -73,6 +76,11 @@ export default function ReportCardPage() {
     assessed.length > 0
       ? assessed.reduce((best, r) => ((r.mark as number) > (best.mark as number) ? r : best))
       : undefined;
+  // Points and division are hidden on primary cards (Primary A–E bands carry
+  // no points) and on any secondary class whose teacher set the Report
+  // Overview "No Division" flag to Yes.
+  const noDivision = !isPrimary && (classById(student.classId)?.noDivision ?? false);
+  const showPoints = !isPrimary && !noDivision;
   // Most improved (primary only): largest CA delta C2 − C1 per subject; a
   // single recorded term counts as 0. Ties go to the first subject in order.
   const mostImproved = (() => {
@@ -133,6 +141,15 @@ export default function ReportCardPage() {
         </div>
       </div>
 
+      {/* Legacy rule 7: a student with no marks at all renders an empty
+          subject table — warn before printing instead of generating. */}
+      {assessed.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-compact text-destructive print:hidden">
+          <AlertTriangle className="size-4 shrink-0" />
+          No marks have been entered for this student yet — report cards are generated only after marks exist.
+        </div>
+      ) : null}
+
       {/* The printable card: scrollable on a phone, exact A4 sheet in print */}
       <div className="overflow-x-auto print:overflow-visible">
         <div
@@ -191,6 +208,9 @@ export default function ReportCardPage() {
         <table className="mt-6 w-full table-fixed border-collapse text-compact">
           <thead>
             <tr className="border-y border-input text-left">
+              <th className="w-6 py-1.5 pr-1 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                #
+              </th>
               <th className="py-1.5 pr-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Subject
               </th>
@@ -200,9 +220,11 @@ export default function ReportCardPage() {
               <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Grade
               </th>
-              <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Points
-              </th>
+              {showPoints ? (
+                <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Points
+                </th>
+              ) : null}
               <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Effort
               </th>
@@ -212,13 +234,16 @@ export default function ReportCardPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ subject, enrolled, mark, grade }) => {
+            {rows.map(({ subject, enrolled, mark, grade }, rowIndex) => {
               const improved = mostImproved?.subjectId === subject.id;
               return (
                 <tr
                   key={subject.id}
                   className={cn("border-b border-border", improved && "bg-success/8")}
                 >
+                  <td className="py-1.5 pr-1 text-center tabular text-muted-foreground">
+                    {rowIndex + 1}
+                  </td>
                   <td className="py-1.5 pr-2 font-medium">
                     {subject.name}
                     {improved ? (
@@ -233,9 +258,11 @@ export default function ReportCardPage() {
                   <td className="py-1.5 pr-2 text-center font-semibold">
                     {enrolled && grade?.grade ? grade.grade : "—"}
                   </td>
-                  <td className="py-1.5 pr-2 text-center tabular">
-                    {enrolled && grade ? grade.points : "—"}
-                  </td>
+                  {showPoints ? (
+                    <td className="py-1.5 pr-2 text-center tabular">
+                      {enrolled && grade ? grade.points : "—"}
+                    </td>
+                  ) : null}
                   <td className="py-1.5 pr-2 text-center">
                     {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
                   </td>
@@ -261,6 +288,11 @@ export default function ReportCardPage() {
             counts as 0)
           </p>
         ) : null}
+        <p className="mt-1.5 text-2xs text-muted-foreground">
+          Subject totals weight Monthly CA at {classSubjects[0]?.caMarks ?? 25}% and the exam at{" "}
+          {classSubjects[0]?.examMarks ?? 75}%. A subject with only one assessment sat carries that mark at 100%; a
+          subject with no marks at all is omitted and the remaining rows renumber continuously.
+        </p>
 
         {/* Summary strip */}
         <div className="mt-4 grid grid-cols-2 gap-px border border-border bg-muted sm:grid-cols-4">
@@ -268,9 +300,13 @@ export default function ReportCardPage() {
             { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-" },
             { label: "Average", value: result ? result.average.toFixed(1) : "-" },
             { label: "Overall grade", value: result && result.count > 0 ? result.grade : "-" },
-            { label: "Points total", value: assessed.length > 0 ? String(pointsTotal) : "-" },
+            ...(showPoints
+              ? [{ label: "Points total", value: assessed.length > 0 ? String(pointsTotal) : "-" }]
+              : []),
             { label: "Subjects passed", value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-" },
-            { label: "Division", value: division ? `Div ${division.division}` : "—" },
+            ...(showPoints
+              ? [{ label: "Division", value: division ? `Div ${division.division}` : "—" }]
+              : []),
             { label: "Class size", value: String(classSize) },
           ].map((cell) => (
             <div key={cell.label} className="bg-white px-3 py-2 text-center">
@@ -282,14 +318,16 @@ export default function ReportCardPage() {
 
         <p className="mt-2 text-center text-2xs text-muted-foreground">
           {isPrimary
-            ? "Divisions are not computed for primary classes — performance is reported with the Primary A–E bands and the most-improved subject."
-            : division
-              ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
-                  division.gapToDivisionI <= 0
-                    ? "Highest division achieved"
-                    : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
-                }`
-              : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
+            ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
+            : noDivision
+              ? "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."
+              : division
+                ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
+                    division.gapToDivisionI <= 0
+                      ? "Highest division achieved"
+                      : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
+                  }`
+                : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
         </p>
 
         {/* Remarks */}

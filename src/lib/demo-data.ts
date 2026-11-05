@@ -80,14 +80,20 @@ export const teachers: Teacher[] = [
 export const teacherById = (id: string | null | undefined): Teacher | undefined =>
   teachers.find((t) => t.id === id);
 
+/**
+ * The 12 real class streams span Primary Grades 1–6 and Secondary Forms 1–2;
+ * the demo ships a representative subset (one primary, six secondary).
+ * `noDivision` mirrors the Report Overview "No Division" row: Form 2A's
+ * teacher has set it to Yes, so Points/Division are hidden on those cards.
+ */
 export const classes: ClassRoom[] = [
-  { id: "cls-p5", name: "Standard 5A", level: "Standard 5", classTeacherId: "t7", room: "A2" },
-  { id: "cls-1a", name: "Form 1A", level: "Form 1", classTeacherId: "t3", room: "B2" },
-  { id: "cls-1b", name: "Form 1B", level: "Form 1", classTeacherId: "t8", room: "B4" },
-  { id: "cls-2a", name: "Form 2A", level: "Form 2", classTeacherId: "t6", room: "B7" },
-  { id: DEMO_IDS.classId, name: "Form 3A", level: "Form 3", classTeacherId: "t2", room: "C1" },
-  { id: "cls-3b", name: "Form 3B", level: "Form 3", classTeacherId: "t5", room: "C3" },
-  { id: "cls-4a", name: "Form 4A", level: "Form 4", classTeacherId: "t1", room: "A5" },
+  { id: "cls-p5", name: "Standard 5A", level: "Standard 5", classTeacherId: "t7", room: "A2", noDivision: false },
+  { id: "cls-1a", name: "Form 1A", level: "Form 1", classTeacherId: "t3", room: "B2", noDivision: false },
+  { id: "cls-1b", name: "Form 1B", level: "Form 1", classTeacherId: "t8", room: "B4", noDivision: false },
+  { id: "cls-2a", name: "Form 2A", level: "Form 2", classTeacherId: "t6", room: "B7", noDivision: true },
+  { id: DEMO_IDS.classId, name: "Form 3A", level: "Form 3", classTeacherId: "t2", room: "C1", noDivision: false },
+  { id: "cls-3b", name: "Form 3B", level: "Form 3", classTeacherId: "t5", room: "C3", noDivision: false },
+  { id: "cls-4a", name: "Form 4A", level: "Form 4", classTeacherId: "t1", room: "A5", noDivision: false },
 ];
 
 /** Level strings starting with "Form" are secondary (NECTA CSEE); the rest are primary. */
@@ -383,8 +389,10 @@ export function getMarks(
     const jitter = rnd() * 18 - 9;
     const ca = Math.max(0, Math.min(100, Math.round(ability + classOffset + jitter)));
     const exam = Math.max(0, Math.min(100, ca + Math.round(rnd() * 16 - 8)));
-    // Subject total via the 30/70 weighting so components round-trip exactly.
-    result[s.id] = subjectTotal(ca, exam, 30, 70);
+    // Subject total via the class subject's own 25/75 split so components
+    // round-trip exactly (Monthly CA 25% + Exam 75% for every demo subject).
+    const cs = classSubjectsFor(classId).find((c) => c.subjectId === subjectId);
+    result[s.id] = subjectTotal(ca, exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75);
   }
   const patch = NULL_PATCHES[key];
   if (patch === "ALL") {
@@ -425,9 +433,9 @@ export function markStatusOf(
 
 export interface MarkComponents {
   enrolled: boolean;
-  /** Continuous assessment, entered out of 100 (weighted 30%). */
+  /** Monthly / continuous assessment, entered out of 100 (weighted 25%). */
   ca: number | null;
-  /** End-of-term written exam, entered out of 100 (weighted 70%). */
+  /** End-of-term written exam, entered out of 100 (weighted 75%). */
   exam: number | null;
   status: MarkStatusCode | null;
 }
@@ -436,7 +444,8 @@ const componentsCache = new Map<string, Record<string, MarkComponents>>();
 
 /**
  * CA / Exam components per student. Components round-trip exactly to the
- * stored subject total via subjectTotal(ca, exam, 30, 70).
+ * stored subject total via subjectTotal(ca, exam, w1, w2) using the class
+ * subject's own 25/75 assessment split.
  */
 export function getComponents(
   classId: string,
@@ -446,6 +455,9 @@ export function getComponents(
   const cached = componentsCache.get(key);
   if (cached) return cached;
   const marks = getMarks(classId, subjectId);
+  const cs = classSubjectsFor(classId).find((c) => c.subjectId === subjectId);
+  const w1 = (cs?.caMarks ?? 25) / 100;
+  const w2 = (cs?.examMarks ?? 75) / 100;
   const result: Record<string, MarkComponents> = {};
   for (const [studentId, total] of Object.entries(marks)) {
     const enrolled = isEnrolledIn(classId, subjectId, studentId);
@@ -455,13 +467,13 @@ export function getComponents(
       continue;
     }
     // Invert the weighting exactly: search integer CA/Exam pairs near the
-    // total until round(CA x 0.3 + Exam x 0.7, 2) reproduces the total.
+    // total until round(CA x w1 + Exam x w2, 2) reproduces the total.
     let ca = Math.max(0, Math.min(100, Math.round(total)));
-    let exam = Math.max(0, Math.min(100, Math.round((total - 0.3 * ca) / 0.7)));
+    let exam = Math.max(0, Math.min(100, Math.round((total - w1 * ca) / w2)));
     for (let c = Math.max(0, Math.round(total) - 10); c <= Math.min(100, Math.round(total) + 10); c++) {
-      const e = Math.round((total - 0.3 * c) / 0.7);
+      const e = Math.round((total - w1 * c) / w2);
       if (e < 0 || e > 100) continue;
-      if (Math.round((0.3 * c + 0.7 * e) * 100) / 100 === total) {
+      if (Math.round((w1 * c + w2 * e) * 100) / 100 === total) {
         ca = c;
         exam = e;
         break;
@@ -544,8 +556,9 @@ export function classSubjectsFor(classId: string): ClassSubject[] {
       teachers[0].id,
     periodsPerWeek: PERIODS_BY_SUBJECT[i % PERIODS_BY_SUBJECT.length],
     examPapers: sub.department === "Sciences" ? 2 : 1,
-    caMarks: 30,
-    examMarks: 70,
+    // The fixed Josephian assessment split: Monthly CA 25% + Exam 75%.
+    caMarks: 25,
+    examMarks: 75,
     fullMarks: 100,
   }));
   classSubjectsCache.set(classId, list);

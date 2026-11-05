@@ -70,6 +70,13 @@ export interface ClassRoom {
   level: string;
   classTeacherId: string;
   room: string;
+  /**
+   * Report Overview "No Division" flag. When true the Points column and the
+   * Division strip are hidden on this class's report cards — even for
+   * secondary (NECTA CSEE) classes. Primary cards never show points or
+   * division in the first place.
+   */
+  noDivision: boolean;
 }
 
 export interface Student {

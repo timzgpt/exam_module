@@ -47,6 +47,7 @@ import { useClassContext } from "@/hooks/use-academic-context";
 import {
   classSubjectsFor,
   eligibleStudentsFor,
+  isPrimaryClass,
   studentsInClass,
   subjectById,
   subjects,
@@ -66,6 +67,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 
 const MAX_PERIODS = 40;
 
@@ -78,6 +80,9 @@ export default function ClassSubjectsPage() {
   const [rows, setRows] = useState<ClassSubject[]>(() => classSubjectsFor(cls.id));
   const [addOpen, setAddOpen] = useState(false);
   const [newSubjectId, setNewSubjectId] = useState("");
+  // Report Overview "No Division" row (secondary classes only): hides the
+  // Points column and Division strip on this class's report cards.
+  const [noDivision, setNoDivision] = useState<boolean>(cls.noDivision);
 
   const totalPeriods = rows.reduce((a, r) => a + r.periodsPerWeek, 0);
   const allocatedIds = useMemo(() => new Set(rows.map((r) => r.subjectId)), [rows]);
@@ -130,8 +135,8 @@ export default function ClassSubjectsPage() {
         teacherId: cls.classTeacherId,
         periodsPerWeek: 2,
         examPapers: 1,
-        caMarks: 30,
-        examMarks: 70,
+        caMarks: 25,
+        examMarks: 75,
         fullMarks: 100,
       },
     ]);
@@ -146,7 +151,13 @@ export default function ClassSubjectsPage() {
   const save = () => {
     toast({
       title: "Class subjects saved",
-      description: `${rows.length} subjects · ${coreCount} core · ${totalPeriods} periods per week recorded for ${cls.name}. The order below drives the report card and marks grids.`,
+      description: `${rows.length} subjects · ${coreCount} core · ${totalPeriods} periods per week recorded for ${cls.name}. The order below drives the report card and marks grids.${
+        !isPrimaryClass(cls.id)
+          ? noDivision
+            ? " Points and division are hidden on this class's cards (No Division = Yes)."
+            : ""
+          : ""
+      }`,
     });
   };
 
@@ -473,6 +484,46 @@ export default function ClassSubjectsPage() {
           </span>
         </div>
       </SectionCard>
+
+      {/* Report Overview: the per-class switches carried onto every report card */}
+      {isPrimaryClass(cls.id) ? (
+        <SectionCard
+          title="Report overview"
+          description="Primary cards never show points or division — performance is reported with the Primary A–E bands only."
+        >
+          <p className="text-compact text-muted-foreground">
+            No Division is permanently on for primary classes; the switch below applies to secondary (Form) classes.
+          </p>
+        </SectionCard>
+      ) : (
+        <SectionCard
+          title="Report overview"
+          description="Carried onto every report card for this class. Mirrors the Report Overview sheet the class teacher fills in."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-compact font-medium text-foreground">No Division</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Set to Yes to hide the Points column and the Division strip on {cls.name} report cards. Marks, grades
+                and remarks still print — {noDivision ? "currently hidden for this class" : "currently shown for this class"}.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2.5">
+              <span
+                className="text-xs font-medium tabular text-muted-foreground"
+                aria-hidden="true"
+              >
+                {noDivision ? "Yes" : "No"}
+              </span>
+              <Switch
+                checked={noDivision}
+                onCheckedChange={setNoDivision}
+                aria-label={`No Division for ${cls.name}`}
+              />
+            </div>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 }

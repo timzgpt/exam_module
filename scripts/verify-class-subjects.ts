@@ -50,12 +50,12 @@ function section(title: string) {
 }
 
 /* ---- F1: subject total ---- */
-section("F1 · subject total (double component, 100% rule, null on double missing)");
-check("24 CA + 58 Exam @ 30/70 = 47.8", subjectTotal(24, 58, 30, 70), 47.8);
-check("one missing (CA) → exam counts 100%", subjectTotal(null, 58, 30, 70), 58);
-check("one missing (Exam) → CA counts 100%", subjectTotal(24, null, 30, 70), 24);
-check("both missing → null (subject omitted)", subjectTotal(null, null, 30, 70), null);
-check("formatting keeps 2dp trimmed", fmtTotalMark(47.8), "47.8");
+section("F1 · subject total (25/75 split, 100% rule, null on double missing)");
+check("24 CA + 58 Exam @ 25/75 = 49.5", subjectTotal(24, 58, 25, 75), 49.5);
+check("one missing (CA) → exam counts 100%", subjectTotal(null, 58, 25, 75), 58);
+check("one missing (Exam) → CA counts 100%", subjectTotal(24, null, 25, 75), 24);
+check("both missing → null (subject omitted)", subjectTotal(null, null, 25, 75), null);
+check("formatting keeps 2dp trimmed", fmtTotalMark(49.5), "49.5");
 
 /* ---- F2: component averages ---- */
 section("F2 · component averages (blanks doubly excluded)");
@@ -65,11 +65,11 @@ check("single entered value", componentAverage([null, 66]), 66);
 
 /* ---- F3: class total ---- */
 section("F3 · class total = avg(CA)×w1 + avg(Exam)×w2");
-// CA entered [40, 60] → avg 50; Exam entered [70] → avg 70 → 50×0.3 + 70×0.7 = 64
-check("weighted component averages", overallClassScore([40, 60], [70], 30, 70), 64);
-check("no Exam entries → CA counts 100%", overallClassScore([40, 60], [], 30, 70), 50);
-check("no CA entries → Exam counts 100%", overallClassScore([], [70, 80], 30, 70), 75);
-check("nothing entered → null", overallClassScore([], [], 30, 70), null);
+// CA entered [40, 60] → avg 50; Exam entered [70] → avg 70 → 50×0.25 + 70×0.75 = 65
+check("weighted component averages", overallClassScore([40, 60], [70], 25, 75), 65);
+check("no Exam entries → CA counts 100%", overallClassScore([40, 60], [], 25, 75), 50);
+check("no CA entries → Exam counts 100%", overallClassScore([], [70, 80], 25, 75), 75);
+check("nothing entered → null", overallClassScore([], [], 25, 75), null);
 
 /* ---- F4: primary bands (lower bound inclusive) ---- */
 section("F4 · primary A–E bands");
@@ -141,6 +141,40 @@ section("Integration · ordering & component seams");
 const csOrder = classSubjectsFor("cls-p5").map((cs) => cs.subjectId);
 check("subjectAveragesFor follows class-subject order", subjectAveragesFor("cls-p5").map((s) => s.subjectId), csOrder);
 check("every class-subject has a teacher + full marks = CA + Exam", classSubjectsFor("cls-p5").every((cs) => cs.teacherId && cs.fullMarks === cs.caMarks + cs.examMarks), true);
+
+/* ---- Integration: the fixed 25/75 assessment split ---- */
+section("Integration · Monthly CA 25% + Exam 75% on every class subject");
+check(
+  "all class subjects carry caMarks 25 / examMarks 75 / fullMarks 100",
+  classes.every((c) =>
+    classSubjectsFor(c.id).every((cs) => cs.caMarks === 25 && cs.examMarks === 75 && cs.fullMarks === 100),
+  ),
+  true,
+);
+// Components must round-trip exactly to the stored total under 25/75.
+const rtClass = "cls-1a";
+const rtSubject = "s2";
+const rtCs = classSubjectsFor(rtClass).find((c) => c.subjectId === rtSubject)!;
+const rtComps = getComponents(rtClass, rtSubject);
+const rtMarks = getMarks(rtClass, rtSubject);
+check(
+  "CA/Exam components round-trip to the stored subject total",
+  Object.keys(rtMarks).every((sid) => {
+    const comp = rtComps[sid];
+    if (!comp?.enrolled || rtMarks[sid] === null) return true;
+    return subjectTotal(comp.ca, comp.exam, rtCs.caMarks, rtCs.examMarks) === rtMarks[sid];
+  }),
+  true,
+);
+
+/* ---- Integration: Report Overview No Division flag ---- */
+section("Integration · Report Overview No Division flag");
+check("Form 2A has No Division = Yes", classes.find((c) => c.id === "cls-2a")?.noDivision, true);
+check(
+  "every other class has No Division = No",
+  classes.filter((c) => c.id !== "cls-2a").every((c) => !c.noDivision),
+  true,
+);
 
 const p5Student = studentsInClass("cls-p5")[0];
 const deltas = classSubjectsFor("cls-p5").map((cs) => {
