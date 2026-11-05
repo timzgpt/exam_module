@@ -84,7 +84,7 @@ export const teacherById = (id: string | null | undefined): Teacher | undefined 
   teachers.find((t) => t.id === id);
 
 /**
- * The 12 real class streams span Primary Grades 1–6 and Secondary Forms 1–2;
+ * The 12 real class streams span Primary Grades 1–7 and Secondary Forms 1–4;
  * the demo ships a representative subset (one primary, six secondary).
  * `noDivision` mirrors the Report Overview "No Division" row: Form 2A's
  * teacher has set it to Yes, so Points/Division are hidden on those cards.
@@ -185,8 +185,9 @@ const boundaries: GradeBoundary[] = [
 ];
 
 /**
- * Primary scheme (Standards 1-6). Points mirror the band scale for editor
- * compatibility only — primary division is never computed from points.
+ * Primary scheme (Grades 1-7). Primary reports never show points — the
+ * `points` values below exist only so GradeBoundary stays uniform for the
+ * editor; every points UI is gated off via `usesPoints: false`.
  */
 const primaryBoundaries: GradeBoundary[] = [
   { grade: "A", min: 81, max: 100, points: 1, remark: "Outstanding" },
@@ -203,13 +204,17 @@ export const gradingSchemes: GradingScheme[] = [
     academicYear: "2026",
     passMark: 30,
     boundaries,
+    // Forms 1-4: subject points feed the best-7 division calculation.
+    usesPoints: true,
   },
   {
     id: "gs-primary-2026",
-    name: "Primary Scheme · Standards 1-6 · 2026",
+    name: "Primary Scheme · Grades 1-7 · 2026",
     academicYear: "2026",
     passMark: 21,
     boundaries: primaryBoundaries,
+    // Grades 1-7: no points, no points total and no division on reports.
+    usesPoints: false,
   },
 ];
 

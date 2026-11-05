@@ -128,6 +128,13 @@ export interface GradingScheme {
   academicYear: string;
   passMark: number;
   boundaries: GradeBoundary[];
+  /**
+   * Whether this scheme uses NECTA-style subject points. Secondary (Form
+   * 1-4) schemes do — points feed the best-7 division calculation. Primary
+   * (Grades 1-7) schemes do not: primary reports show no points column, no
+   * points total and no division.
+   */
+  usesPoints: boolean;
 }
 
 /* ---------------- Attendance (report cards, knowledge base A3.8) ---------------- */

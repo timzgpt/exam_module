@@ -23,6 +23,7 @@ import {
   eligibleStudentsFor,
   getComponents,
   getMarks,
+  isPrimaryClass,
   markStatusOf,
   schemeForClass,
   studentsInClass,
@@ -128,6 +129,8 @@ export default function MarksEntryPage() {
   const classSubject = classSubjects.find((c) => c.subjectId === subjectId) ?? first;
   const subject = subjectById(classSubject.subjectId)!;
   const scheme = schemeForClass(cls.id);
+  // Primary (Grades 1-7) uses no points — the grid hides the Points column.
+  const isPrimary = isPrimaryClass(cls.id);
   const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
 
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -357,7 +360,7 @@ export default function MarksEntryPage() {
                 <TableHead className="text-center">Exam /100</TableHead>
                 <TableHead className="text-center">Total /100</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
-                <TableHead className="text-center">Points</TableHead>
+                {!isPrimary ? <TableHead className="text-center">Points</TableHead> : null}
                 <TableHead className="min-w-55">Status / remark</TableHead>
               </TableRow>
             </TableHeader>
@@ -436,13 +439,15 @@ export default function MarksEntryPage() {
                     <TableCell className="text-center">
                       {g ? <GradePill grade={g.grade} /> : <span className="text-compact text-muted-foreground">-</span>}
                     </TableCell>
-                    <TableCell className="text-center text-compact tabular">
-                      {g ? (
-                        <span className="text-foreground">{g.points}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
+                    {!isPrimary ? (
+                      <TableCell className="text-center text-compact tabular">
+                        {g ? (
+                          <span className="text-foreground">{g.points}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="text-compact">
                       {mark.status ? (
                         <span
