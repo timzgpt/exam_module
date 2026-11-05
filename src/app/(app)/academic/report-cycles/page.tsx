@@ -5,6 +5,16 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge, toneForStatus, labelForStatus } from "@/components/shared/status-badge";
 import { CreateCycleDialog } from "@/components/features/report-cycles/create-cycle-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -15,8 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
-import { cycles as demoCycles, currentCycle, parentsDayEvent } from "@/lib/demo-data";
-import { useAppContext } from "@/lib/store";
+import { currentCycle, parentsDayEvent } from "@/lib/demo-data";
+import { selectCycles, useAppContext } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   CalendarCheck,
@@ -28,15 +38,18 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  Pencil,
   Plus,
   Send,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { CycleStatus } from "@/lib/types";
+import type { CycleStatus, ReportCycle } from "@/lib/types";
 import { ACADEMIC_APPROVER, DEMO_TODAY } from "@/lib/demo-config";
+import { useToast } from "@/hooks/use-toast";
 
 const CYCLE_STEPS: CycleStatus[] = ["preparation", "marks-entry", "review", "approved", "released"];
 const STEP_LABELS: Record<CycleStatus, string> = {
@@ -80,16 +93,52 @@ function CycleSteps({ status }: { status: CycleStatus }) {
 
 export default function ReportCyclesPage() {
   const createdCycles = useAppContext((s) => s.createdCycles);
+  const cycleOverrides = useAppContext((s) => s.cycleOverrides);
+  const deletedCycleIds = useAppContext((s) => s.deletedCycleIds);
+  const removeCycle = useAppContext((s) => s.removeCycle);
+  const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<string>(DEMO_IDS.reportCycleId);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<ReportCycle | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ReportCycle | null>(null);
 
-  // Built-in demo cycles plus every cycle created through the dialog —
-  // created cycles persist in the context store, so they survive reloads.
-  const cycles = useMemo(() => [...demoCycles, ...createdCycles], [createdCycles]);
+  // Built-in demo cycles (with edits applied and deletions removed) plus
+  // every cycle created through the dialog — the store persists both, so
+  // they survive reloads.
+  const cycles = useMemo(
+    () => selectCycles({ createdCycles, cycleOverrides, deletedCycleIds }),
+    [createdCycles, cycleOverrides, deletedCycleIds],
+  );
 
-  const active = cycles.find((c) => c.id === DEMO_IDS.reportCycleId) ?? currentCycle;
+  // The active cycle falls back to the first remaining cycle when the demo
+  // anchor itself was deleted through "Delete cycle".
+  const active =
+    cycles.find((c) => c.id === DEMO_IDS.reportCycleId) ?? cycles[0] ?? currentCycle;
   const selected = cycles.find((c) => c.id === selectedId) ?? active;
   const daysToClose = daysUntil(active.closingDate);
+
+  const openEdit = (cycle: ReportCycle) => {
+    setEditing(cycle);
+    setEditOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    removeCycle(target.id);
+    setDeleteTarget(null);
+    // Selection falls to the first remaining cycle when the selected one
+    // goes, so the configuration panel never shows a deleted row.
+    if (target.id === selectedId) {
+      const rest = cycles.filter((c) => c.id !== target.id);
+      if (rest[0]) setSelectedId(rest[0].id);
+    }
+    toast({
+      title: "Cycle deleted",
+      description: `${target.name} was removed from the reporting calendar.`,
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -103,7 +152,8 @@ export default function ReportCyclesPage() {
             </Button>
             {/* Redesigned creation flow: a cycle combines exams into one
                 report card (components with labels + weights; the Annual
-                Exam always runs on its own). */}
+                Exam always runs on its own). The same dialog, seeded from a
+                row, also serves "Edit cycle". */}
             <CreateCycleDialog open={createOpen} onOpenChange={setCreateOpen} />
           </>
         }
@@ -243,6 +293,29 @@ export default function ReportCyclesPage() {
                             <Eye className="size-3.5" /> Details
                           </Button>
                         )}
+                        {/* Every row — created or built-in — can be edited
+                            and deleted (built-in rows are overridden or
+                            tombstoned in the context store). */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="size-7 p-0"
+                          aria-label={`Edit ${cycle.name}`}
+                          title="Edit cycle"
+                          onClick={() => openEdit(cycle)}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="size-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Delete ${cycle.name}`}
+                          title="Delete cycle"
+                          onClick={() => setDeleteTarget(cycle)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -307,6 +380,37 @@ export default function ReportCyclesPage() {
           before the closing date; Mrs. Nyoni reviews and approves each class before release.
         </p>
       </SectionCard>
+
+      {/* Edit cycle — the creation dialog seeded from the row. */}
+      <CreateCycleDialog open={editOpen} onOpenChange={setEditOpen} cycle={editing} />
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete report cycle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `"${deleteTarget.name}" (${deleteTarget.term} · ${deleteTarget.academicYear}) will be removed from the reporting calendar, including its marks entry, dashboard and report card routes. This action cannot be undone.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Delete cycle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -19,20 +19,32 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SCHOOL } from "@/lib/demo-config";
 import { breadcrumbFor } from "@/lib/nav";
-import { classes, cycles, marksDeadlines, cycleById, studentsInClass } from "@/lib/demo-data";
-import { useAppContext } from "@/lib/store";
+import { classes, marksDeadlines, cycleById, studentsInClass } from "@/lib/demo-data";
+import { selectCycles, useAppContext } from "@/lib/store";
 import { useUiStore } from "@/lib/ui-store";
 import { Bell, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { useMemo } from "react";
 
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { cycleId, classId, setCycle, setClass, setStudent, createdCycles } = useAppContext();
+  const { cycleId, classId, setCycle, setClass, setStudent, createdCycles, cycleOverrides, deletedCycleIds } =
+    useAppContext();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
-  // The cycle picker also lists cycles created through the "New report
-  // cycle" dialog, so a combined cycle is selectable app-wide.
-  const allCycles = [...cycles, ...createdCycles];
+  // The cycle picker renders the merged list — built-in demo cycles (with
+  // edits applied and deletions removed) plus cycles created through the
+  // "New report cycle" dialog — so a combined cycle is selectable app-wide
+  // and a deleted cycle disappears from the context picker too.
+  const allCycles = useMemo(
+    () => selectCycles({ createdCycles, cycleOverrides, deletedCycleIds }),
+    [createdCycles, cycleOverrides, deletedCycleIds],
+  );
+  // If the browsing context points at a deleted cycle, display the first
+  // remaining one (the selection only becomes persistent when changed).
+  const pickerCycleId = allCycles.some((c) => c.id === cycleId)
+    ? cycleId
+    : (allCycles[0]?.id ?? cycleId);
 
   // The cycle/class pickers define the browsing context. Pages under a
   // [cycleId], [classId] or [studentId] route segment are URL-driven, so a
@@ -123,7 +135,7 @@ export function AppHeader() {
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Cycle context */}
-        <Select value={cycleId} onValueChange={onCycleChange}> {/* ds-allow-native-select: Radix listbox trigger */}
+        <Select value={pickerCycleId} onValueChange={onCycleChange}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger
             size="sm"
             className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-none md:flex"

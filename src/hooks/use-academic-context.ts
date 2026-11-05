@@ -2,8 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { DEMO_IDS } from "@/lib/demo-config";
-import { classById, cycleById, currentCycle } from "@/lib/demo-data";
-import { useAppContext } from "@/lib/store";
+import { classById, currentCycle } from "@/lib/demo-data";
+import { resolveCycle, useAppContext } from "@/lib/store";
 import type { ClassRoom, ReportCycle } from "@/lib/types";
 
 /**
@@ -20,10 +20,13 @@ export function useCycleContext(): { cycleId: string; cycle: ReportCycle } {
   const cycleId = params?.cycleId ?? DEMO_IDS.reportCycleId;
   // Cycles created through the "New report cycle" dialog live in the
   // context store (persisted), so their marks / dashboard / card routes
-  // resolve exactly like the built-in demo cycles.
+  // resolve exactly like the built-in demo cycles — and Edit/Delete on the
+  // cycles page applies here too (overridden rows, tombstoned deletions).
   const createdCycles = useAppContext((s) => s.createdCycles);
+  const cycleOverrides = useAppContext((s) => s.cycleOverrides);
+  const deletedCycleIds = useAppContext((s) => s.deletedCycleIds);
   const cycle =
-    cycleById(cycleId) ?? createdCycles.find((c) => c.id === cycleId) ?? currentCycle;
+    resolveCycle(cycleId, { createdCycles, cycleOverrides, deletedCycleIds }) ?? currentCycle;
   return { cycleId, cycle };
 }
 
