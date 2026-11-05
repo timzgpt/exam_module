@@ -1,0 +1,925 @@
+# Josephian Report Cards — Knowledge Base & UI Generation Prompts
+
+> **Owner:** Joshua Selestine (techlamp-TZ) · **Written:** 2026-10-24 · **Lives on the Desktop only — never commit this file.**
+> **Source studied:** `C:\Users\seles\Desktop\JOSEPHIAN REPORT CARDS\` (972 files: the MID-TERM and TERMINAL Python generators, class workbooks, Jinja templates, CSS, the analytics pack, two "MAIN SYSTEM EXPORT" packages and the Digital Devices Policy).
+> **Target:** the Exams module + a new Report Cards feature inside **Josephian ERP** (`erp.josephian.co.tz` repo, Laravel 12 + React 18).
+> **Privacy:** the source folder holds REAL children's names, marks and staff signatures. This document holds rules and structure only. All example values are invented. Never paste real learner data into a prompt, a test, a seeder or a commit (repo rule 4: fake data only outside production).
+
+---
+
+## How to use this file
+
+1. **Part A** is the knowledge base: what the current report-card system does, its exact business rules, and how it maps onto the ERP.
+2. **Part B** holds the report-card prompts. To generate anything, always paste **B0 (Master context)** first, then the one prompt for the screen or component you want (B1–B4).
+3. **Part D** holds the prompts for redesigning the existing **Exams module** screens (exam list, exam detail and workflow, marksheet, question bank, essay grading, gradebook, transcript, student exam portal and exam runner). Paste B0, then D0, then one D prompt.
+4. Every prompt ends with acceptance criteria. Check the generated UI against them before you accept it.
+5. Open decisions are in **Part C**. Settle them with Deo or Joshua before building the parts they block.
+6. **Decided 2026-10-24 (Joshua):** report cards **include attendance**. See A3.8.
+
+---
+
+# PART A — KNOWLEDGE BASE
+
+## A1. What exists today (the legacy system)
+
+| Aspect | Detail |
+|---|---|
+| Stack | Python 3.12, Streamlit portal (`app.py`), openpyxl, Jinja2, matplotlib, **Playwright + headless Chromium** (HTML → PDF), SQLite |
+| Source of truth | **One Excel workbook per class/stream**, filled by class teachers (Google Sheets → download .xlsx) |
+| Output | One **A4 PDF per student**, `ReportCard_{no:02d}_{Name}.pdf`; the portal zips a class as `MidTerm_ReportCards_{Class}_{date}.zip` |
+| Database | `report_system.db` holds **only a batch run log** (`batches` table). No students, marks or comments are stored |
+| Two generators | **MID-TERM** (the newer, more mature design, about 2 s per student) and **TERMINAL** (older, about 16 s per student, has a few extra features) |
+| Analytics | The MID-TERM tree also produces a management analytics pack: a 22-section report, an HOD summary, 13 one-page class summaries and an anonymised public summary |
+| Hand-off packages | `MAIN SYSTEM EXPORT/*.zip` (exported 2026-10-02) were made **explicitly for integrating into the ERP**. They contain the README data contract, `grading.json`, `class_subjects.json`, per-student JSON contexts and self-contained HTML sample cards. **Use them as golden fixtures** for the port, after replacing real names with fake ones |
+
+**Verdict:** build on the **MID-TERM** design and engine. Offer TERMINAL's extras (per-subject comments, parent comment, Progress column) as per-cycle toggles.
+
+### Portal screens that exist today (useful to copy, then improve)
+1. **Dashboard & KPIs**: total batches, PDFs generated, formula warnings, average generation time, the last 5 runs, a run-time chart.
+2. **Generate Report Cards**: upload a workbook; see school, class, teacher, date and detected subjects; choose All or Single student; see pre-flight warnings and a progress bar; download a PDF or ZIP.
+3. **Workbook Validation**: level, roster size, subject → column mapping, and a "cached formula audit" (missing overall/grade/points/division).
+4. **Batch Archives & Logs**: the run history.
+
+---
+
+## A2. School structure
+
+### Levels and classes (the legacy folders)
+| Level | Classes / streams | Subjects |
+|---|---|---|
+| Primary (lower) | Grade 1 Mwinyi, Grade 1 Nyerere, Grade 2 Kikwete, Grade 2 Mkapa | 7 |
+| Primary (upper) | Grade 3 Karume, Grade 3 Magufili*, Grade 4 Asha Rose*, Grade 4 Bibi Titi*, Grade 5 Kawawa, Grade 6 Warioba | 9 (8 in TERMINAL) |
+| Secondary | Form 1, Form 2 (single stream) | 12 |
+| Vocational | Form 2 Vocational | 7, **no division** |
+
+\* **Spelling mismatch with the ERP.** The ERP's `AcademicStructureSeeder` uses **Magufuli**, **Asha-Rose Migiro** and **Bibi Titi Mohamed**. The ERP also places Grade 1–2 under the **Early Years** unit, and has Grade 7 Sokoine, Forms 3–4, Kindergarten and Baby Class, which the legacy system never covered. **Use the ERP names.** Keep a display-alias map only if the printed card must match old wording.
+
+- **Display rule:** if a class name starts with "Form", print it as-is; otherwise print `"Grade " + label`. In the ERP, print `class.name + ' ' + section.name` (e.g. "Grade 1 Nyerere"), or just "Form 1".
+- Up to 40 students per class workbook.
+
+### Subjects per class (column order = print order)
+| Class | Subjects |
+|---|---|
+| Grade 1 | Arithmetic · English Language Skills · Kiswahili · Reading · Writing · Culture, Arts & Sports · Health & Environment |
+| Grade 2 | Arithmetic · English Language Skills · Kiswahili · Reading · Writing · Health & Environment · Culture, Art & Sports |
+| Grade 3 | Mathematics · Science & Technology · English · Kiswahili · Historia ya Tanzania na Maadili · Geography & Environment · Music · Arts and Sports · ICT |
+| Grade 4 | Mathematics · Science & Technology · English · Kiswahili · Historia ya Tanzania na Maadili · Geography · Arts and Sports · Music · ICT |
+| Grade 5 | Mathematics · Science & Technology · English · Kiswahili · Arts and Sports · Historia ya Tanzania na Maadili · Music · Geography · ICT |
+| Grade 6 | Mathematics · Science & Technology · English · Kiswahili · Vocational Skills · Social Studies (SST) · Music · ICT · Civic and Moral Education |
+| Form 1–2 | **Core:** Mathematics · English · Kiswahili · Historia na Maadili · Geography · Business Studies — **Subsidiary (optional):** History · Physics · Chemistry · Biology · Bookkeeping · Computer Science |
+| Form 2 Vocational | English · Mathematics · Kiswahili · Business Studies · ICT · Food Production · Life Skills |
+
+- The same subject is spelled several ways across grades (Na/na, Art/Arts). The ERP needs **one canonical subject catalogue**, plus an optional per-class display label.
+- In the legacy system a blank mark meant "not taken" for secondary. The ERP should record subject enrolment explicitly per student.
+- **Short chart labels:** Mathematics→"Math", English Language Skills→"English", Culture, Arts & Sports→"Culture & Arts", Health & Environment→"Health & Env.", Historia…→"Hist. & Maadili", Science & Technology→"Science & Tech", Computer Science→"Comp. Sci.", Social Studies (SST)→"Social Studies", Civic and Moral Education→"Civic & Moral", Business Studies→"Business", Vocational Skills→"Vocational". Any other name longer than 14 characters is cut to 12 characters + ".".
+- **Departments (for analytics):** Mathematics · Languages · Sciences · Social Sciences & Humanities · Creative Arts & Vocational · ICT & Business. **Core subjects tracked:** Mathematics, English, Kiswahili, Science.
+
+---
+
+## A3. Business rules (port these exactly)
+
+### A3.1 Assessment cycle and weighting
+- A report cycle combines **two components**: **Component 1 = 25%** (Monthly test) and **Component 2 = 75%** (Mid-Term exam, or Terminal exam).
+- **Component names come from data.** Form 2 used "Opening Test" (25%) and "Monthly Test" (75%). Model components as named items with weights, not as fixed columns.
+- **Subject total ("the 100% rule"):**
+
+| Component 1 | Component 2 | Subject total | Shown |
+|---|---|---|---|
+| present | present | `round(c1×0.25 + c2×0.75, 2)` | c1, c2, total |
+| present | blank | c1 (counts 100%) | c1, "–", total |
+| blank | present | c2 (counts 100%) | "–", c2, total |
+| blank | blank | **subject left off the card** (no row, no chart bar, not counted in "Subjects taken") | — |
+
+- **Component average** = sum of the marks entered ÷ **the number of marks actually entered**, not the number of subjects. The TERMINAL Excel divided by all subjects; that was a bug.
+- **Overall score** = `avg(c1)×0.25 + avg(c2)×0.75` when both exist. If only one component exists, its average counts 100%. Round to 2 dp.
+  - This can differ slightly from the mean of the per-subject totals when the student sat different subjects in each component. This is a **known quirk; confirm the rule** (Part C).
+- **Layout switch:** if **nobody** in the class has any component-2 mark, hide the component-2 column, label component 1 as "100%", and hide Best Improvement.
+- Display marks as integers. Display totals and averages with 2 decimals (e.g. "75.00").
+
+### A3.2 Grading scales
+**Primary (Grades 1–6): letter grade only, no points, no division**
+
+| Grade | Range | Descriptor |
+|---|---|---|
+| A | 81–100 | Outstanding |
+| B | 61–80 | Very Good |
+| C | 41–60 | Good |
+| D | 21–40 | Satisfactory |
+| E | 0–20 | Can do better |
+
+**Secondary (Forms, including Vocational), NECTA CSEE style**
+
+| Grade | Range | Descriptor | Points |
+|---|---|---|---|
+| A | 75–100 | Outstanding | 1 |
+| B | 65–74 | Very Good | 2 |
+| C | 45–64 | Good | 3 |
+| D | 30–44 | Satisfactory | 4 |
+| F | 0–29 | Can do better | 5 |
+
+- Thresholds apply to decimal values, so 80.99 is a B for primary.
+- Each subject's grade comes from its **weighted total**, not from the exam mark alone.
+- **Use "Outstanding" for A everywhere.** Some legacy templates said "Excellent"; that was a bug.
+
+### A3.3 Division (secondary only; fewer points is better)
+- Points = the sum of the **best 7 (lowest) subject points**, computed from the combined subject grades. There is **no core-subject rule**.
+
+| Division | Points | Label |
+|---|---|---|
+| I | 7–17 | Distinction |
+| II | 18–21 | Credit |
+| III | 22–25 | Merit |
+| IV | 26–33 | Pass |
+| 0 | 34–35 | Fail |
+
+- **Per-class "No Division" flag:** Form 2 Vocational uses the secondary scale but shows no points and no division.
+- **Gap text:** "Highest division achieved" for Division I; otherwise "N point(s) from Division X". Example (fake): 19 points (Division II) → "1 point from Division I".
+- **Unresolved edge case:** a student with **fewer than 7 graded subjects**. The legacy system printed nothing. Needs a decision (Part C).
+
+### A3.4 Card-level derived values
+| Value | Rule |
+|---|---|
+| Top / Strongest subject | the subject with the highest total (on a tie, the first in class subject order) |
+| Best Improvement (primary only) | the subject with the largest (c2 − c1); a subject with only one mark counts as 0; printed as `+x.xx` |
+| Subjects Taken | the number of subject rows printed |
+| Subjects Passed | rows whose grade is not E or F. **Never hard-code "All Passed"** (legacy bug) |
+| Class average / class top (chart) | per subject, over the class: the mean and the max of each student's weighted total; students with neither mark are excluded |
+| Position / rank | **Not on the card today.** It was removed from an older version. The school's raw results files still contain POS. Needs a decision (Part C) |
+
+### A3.5 Comments, attendance, conduct, signatures
+| Item | Current behaviour |
+|---|---|
+| Class teacher comment | One overall comment per student, **typed by a person, never generated**. Clean the whitespace, soft hyphens and zero-width spaces. Printed in italic between gold quote marks |
+| Comment check | Warn (do not block) when a comment says "not enrolled in / not taking / does not study X" while X has marks |
+| Per-subject comments, parent comment | TERMINAL only. Make them optional per cycle |
+| Attendance | **Legacy card: absent. ERP card: INCLUDED (decided 2026-10-24).** Read from the ERP's daily registers; rules in A3.8 |
+| Conduct, gender, admission number, photo | Not on the card |
+| Signatures | Three slots: **Class Teacher · Academic Dean · Principal**. Image or blank line. **No approval workflow today:** if the signature file exists, the card counts as signed. The ERP should add a real sign-off |
+
+### A3.6 Mark status codes (from the analytics pack and the device policy)
+| Code | Meaning |
+|---|---|
+| (number 0–100) | a real mark; 0 is a real zero |
+| `ABS` | absent |
+| `NR` | no result where one was expected |
+| `NA` | subject not taken (optional subject) |
+| `PENDING` | no learner in the class has a mark for this component yet |
+| `DISQ` | **disqualified for exam malpractice**: counts as zero, the parent is notified the same day, a disciplinary record is created (Digital Devices Policy JSS/DD/POL/2025/001 §8) |
+| `INVALID` | unusable input (text, more than 100, less than 0); must never be saved |
+
+Missing scores are **never** filled in by estimation.
+
+### A3.7 Analytics rules (for class, HOD and management dashboards)
+- **Pass:** primary A–C (41+); secondary A–D (30+). **Quality pass:** A–B (primary 61+, secondary 65+).
+- **Performance Index:** grade index A=100, B=75, C=50, D=25, E/F=0, averaged.
+- **Traffic lights (configurable):** Performance Index green ≥62.5, amber ≥50 · Risk Index (% of learners in Tier 2/3) green ≤10%, amber ≤20% · Completion green ≥95%, amber ≥85% · Subject Health (% of class-subjects rated Strong/Stable) green ≥70%, amber ≥50%.
+- **Subject rating** (class-subject, n≥5): Strong / Stable / Watch / Priority Intervention / Critical, from the mean against the pass/quality bands and the % below pass.
+- **Support tiers:**
+  - **Tier 3 Intensive:** overall below pass, or 3+ subjects below pass.
+  - **Tier 2 Targeted:** 2 subjects below pass, or Maths/English/Kiswahili below pass, or close to pass with a failed subject, or a strong decline while below quality pass.
+  - **Tier 1 Monitor:** everything else that is flagged.
+  - Review dates: Tier 3 in 14 days; the others at the next assessment.
+- **Change categories:** Strong improvement ≥+10 · Moderate ≥+5 · Stable ±5 · Moderate decline · Strong decline ≤−10.
+- **Moderation signals:** component mean shift ≥10, pass-rate shift ≥15, SD ≥20 or ≤5, IQR ≤5, ≥40% below pass, rank correlation (Spearman) <0.5, parallel-stream gap ≥10.
+- **Privacy:** named-learner views are "CONFIDENTIAL — academic use only". The public view has no names and **no group smaller than 5**. Intervention bands are never shown to parents.
+
+### A3.8 Attendance on the report card (new in the ERP; the legacy cards had none)
+
+**Source data already in the ERP.** Read it; never rebuild attendance.
+- **Daily register (roll call):** one mark per student per school day, per stream. There is **no per-lesson register**.
+  - Table `attendances`. Filter `context = 'daily_roll_call'`, `attendable_type = 'person'`, `attendable_id = student's person_id`, with `section_id` and `occurred_on` (date).
+  - `status` is a typed enum: `present | absent | late | excused`. Plus `arrived_at` (late arrivals) and `note`.
+  - Unique: one mark per student, per day, per stream.
+- **`roll_calls`:** one row per stream per day. Only **counted** registers are valid: live registers, plus catch-up ("backfill") registers that have been **approved** (`RollCall::scopeCounted()`). A pending or declined catch-up register must not count.
+- **Corrections** (`attendance_corrections`, approved) already rewrite the `attendances` row, so the card just reads `attendances`. `attendance_changes` is history only.
+- **Non-school days:**
+  - Weekends.
+  - `public_holidays`. Attendance uses this table; the older `tz_public_holidays` is used only by SEN.
+  - `school_holidays` (date ranges).
+  - **No-register days**: `events` with `event_type = 'no_register'` and a scope of school, unit, class or section. An absence on a no-register day is automatically turned into **excused**.
+- **Existing helpers to reuse without editing:** `Services/Attendance/SchoolDayCalendar::isSchoolDay()`, `RegisterCalendar::reasonFor(section, date)`, and the counting pattern in `AttendanceDashboardController`.
+- **What does not exist yet:** a per-student or date-range summary, a term date table, and any portal attendance view. The report card needs a **new read-only aggregator**.
+
+**Computation for student S over the cycle's date range [from, to]** (`attendance_from`/`attendance_to` on the report cycle, defaulting to term start → report date):
+1. Marks = the student's `daily_roll_call` rows in range, queried **by person, not section**, so a mid-term stream transfer still counts. Skip soft-deleted rows. Call `withoutGlobalScope('class_teacher')`: the `ClassTeacherScoped` scope returns nothing for a queued job with no logged-in user.
+2. Drop marks on days whose register does not count (catch-up register not approved).
+3. **Possible school days** = weekdays, minus public holidays, minus school holidays, minus no-register days for the student's stream. Load holidays and events **once** for the range, never one query per day.
+4. **Not recorded** = possible school days with no counted mark. **Show it separately; never count it as absent.**
+5. Counts: Present, Late, Absent (= unexcused), Excused. **Days attended = present + late.**
+6. **Attendance rate** = (present + late) ÷ (present + late + absent + excused) × 100, rounded to 1 dp. This matches the ERP attendance dashboard: late counts as attended, and excused stays in the denominator. Confirm the formula with the school (C13).
+
+**What the card shows** (compact section "ATTENDANCE", after the Performance summary):
+| Field | Example (fake) |
+|---|---|
+| Days attended / school days recorded | 58 / 62 |
+| Attendance rate | 93.5% |
+| Late arrivals | 3 |
+| Absent (unexcused) | 2 |
+| Excused | 2 |
+| Not recorded (only if > 0) | 1 day not recorded |
+| Period covered | 6 July – 4 September 2026 |
+
+- **Rating text** (configurable thresholds; suggested defaults): ≥95% "Excellent attendance" · 90–94.9% "Good attendance" · 80–89.9% "Attendance needs improvement" · <80% "Attendance is a concern". Text plus colour, never colour alone. **Bilingual EN/SW on the parent PDF and portal.**
+- Parent-facing wording: say "Absent", not "Unexcused". Never show notes, reasons or correction history on the card.
+- **Sensitivity:** attendance is a regulated typed field (CLAUDE.md rule 1), and attendance work needs tests (rule 7). Today `audit_logs.sensitive_category` has **no 'attendance' value**, so attendance reads are not audited (a known platform gap). Card reads are already audited as 'grades'. Adding 'attendance' to the enum is a platform migration for Deo (C12).
+- **Scope guard:** an aggregator placed in `backend/app/Services/Academic/` (e.g. `ReportCardAttendanceSummary`) that only reads attendance stays inside the allowed paths. Editing `Services/Attendance/*`, attendance models, `routes/academic.php` or the audit enum does not (C1, C12).
+
+---
+
+## A4. Report card visual spec (printed A4, MID-TERM design)
+
+**Page:** A4 portrait, zero margins, backgrounds printed. Aim for 1–2 pages. Keep each section together on one page (`break-inside: avoid`).
+
+**Print palette** (the school's existing card; slightly different from the ERP screen tokens, see Part C):
+
+| Token | Hex | Token | Hex |
+|---|---|---|---|
+| burgundy | `#5C1218` | parchment | `#F8F3EA` |
+| burgundy-mid / -lt | `#7A1B23` / `#9C2B35` | parchment-dk | `#EDE4D2` |
+| gold | `#C9A84C` | cream | `#FDFAF4` |
+| gold-lt / gold-dk | `#E0C876` / `#A07A2A` | ink / mid / lt / faint | `#1C1008` `#3B2A1A` `#6B5744` `#9E8E7E` |
+| improve (blue) | `#1A5276` | success | `#2D6A4F` |
+
+**Grade badges:** A = burgundy fill with gold-lt text · B = `#F0E3C6` fill / gold-dk text · C = `#E4EBE2` / `#4A6B4E` · D = `#F3E4DE` / `#9C5B45` · E and F = `#F6E2E2` / `#AA3333`.
+**Fonts:** Playfair Display (headings, numbers) and DM Sans (body). **Self-host them; never load from the Google Fonts CDN** (keeps data in-country and allows offline rendering).
+
+**Sections, top to bottom:**
+1. **Header band** (burgundy gradient), in three columns:
+   - Left: logo in a white tile, then the school name in gold capitals, then the tagline "Academic Year {year} · {cycle} Assessment".
+   - Centre: "Student / Report Card" on two lines.
+   - Right: date badges for **Report Date** and **School Opens**.
+2. Gold line–diamond–line ornament.
+3. **Student details** in four cards: Student (UPPERCASE, Playfair, burgundy) · Class · Class Teacher · Academic Year. **Never hard-code the year** (legacy bug).
+4. **Performance summary:**
+   - **Primary, 6 cards:** Overall Average (featured, solid burgundy, "out of 100") · Overall Grade · Top Score · Strongest Subject · Best Improvement · Subjects Taken.
+   - **Secondary, 4 cards:** Overall Average · Division ("DIVISION II", sub-line "19 Points · Credit") · Top Subject · Subjects Taken ("N Passed").
+   - **No-division class:** 3 cards.
+4b. **Attendance** (new; A3.8):
+   - A compact white card row with Days attended "58 / 62", Attendance rate "93.5%" with rating text, Late, Absent, Excused, and Not recorded (only if > 0).
+   - Footnote: "Period covered: 6 July – 4 September 2026".
+   - Print style: DM Sans values, tiny uppercase labels, a thin burgundy progress bar for the rate. `break-inside: avoid`.
+5. **Subject results table:**
+   - Columns: `#` · Subject · Component 1 (weight shown) · Component 2 (weight shown) · **Total** (bold, 2 dp) · Grade badge.
+   - Burgundy header; the top subject's row is lightly tinted.
+   - TERMINAL option: a Progress column (c2 − c1) and a comment row under each subject.
+6. **Performance chart:**
+   - A pill reading "★ Strongest Subject: X — 88.25 / 100" (primary adds "▲ Best Improvement: Y — +6.00").
+   - Grouped bars per subject: Achieved `#E74C3C`, Class Avg `#3498DB`, Class Topper `#2ECC71`, with value labels.
+   - Y axis 0–100; legend below; 3:1 aspect.
+   - **Do not rely on colour alone:** label the bars directly.
+7. **Grade scale:** 5 chips (letter, range, descriptor, plus "N pt" for secondary).
+8. **Division scale** (secondary with division only): 5 chips; the achieved one is solid burgundy with "▲ N pts", followed by the gap text.
+9. **Educator comments:** "CLASS TEACHER" plus the name, then the italic comment. **Hide the card when there is no comment.**
+10. **Signatures:** Class Teacher · Academic Dean · Principal (image or line, then name, then role).
+11. **Footer:**
+    - Small crest, "Josephian Schools", "Mbezi Beach Rafia, Dar es Salaam, Tanzania".
+    - Instagram / LinkedIn / josephian.co.tz.
+    - A seal pill, using HTML entity `&#9670;` for the diamond (the literal character printed as "?" on primary cards).
+
+---
+
+## A5. How it maps onto the ERP today
+
+### What the ERP already has (Academic / Exams, Phase 1)
+```
+Exam (exams)  name · type cat|exam|mock · academic_year · term t1|t2|t3 · class_id? · starts_on/ends_on
+              status draft → moderation → published → frozen  (one-way, ExamPublishService, 409 on illegal moves)
+ └─ MarkingScheme (per subject)  max_score · pass_mark · weight (0–100) · unique(exam, subject)
+     └─ Result  person_id · score decimal(6,2) · grade? · remarks? · entered_by · unique(scheme, person)
+GradebookEntry  continuous assessment (separate from the formal Exam pipeline)
+```
+- **Result is the only place a score is written**, whether it came from bulk entry or the online exam runner.
+- Results are editable **only while the exam is `draft`**.
+- **Permissions:**
+  - `academic.exam.manage` (Registrar): create exams, moderate, publish, freeze, NECTA export.
+  - `academic.result.manage` (Teacher): enter marks.
+  - Plus `academic.exam.view`, `academic.result.view` and `portal.exam.attempt` (student).
+- **Existing screens:** `/academic/exams`, `/academic/exams/:id`, `/academic/marksheets/:markingSchemeId`, `/academic/gradebook`, `/academic/transcript/:personId`, `/my-exams`.
+- **PDFs** are made today with **dompdf** (`barryvdh/laravel-dompdf`, Blade views), as in ESRAC and finance. dompdf **does not support CSS Grid or Flexbox well**, while the legacy card relies on Grid and was printed with Chromium. This is a decision (Part C).
+- **Reports:** the ERP has **no report-card feature yet**. The transcript is the nearest thing.
+
+### Natural mapping
+| Legacy concept | ERP home |
+|---|---|
+| Component 1 "Monthly" | an `Exam` with `type=cat` |
+| Component 2 "Mid-Term/Terminal" | an `Exam` with `type=exam` |
+| Report cycle (C1 25% + C2 75%) | **new:** a report cycle linking 1–N exams with component weights, plus term, report date, school-opens date and toggles |
+| Grade scales and divisions | **new:** grading scheme tables (per unit/level), configurable. Do not hard-code the bands in PHP |
+| Subjects per class | the existing `subjects` table, plus an ordered class→subject link with core/subsidiary and optional flags |
+| Teacher comment | **new:** report comment (student, cycle, optional subject, type) |
+| Signatures + "signed" | **new:** sign-off steps (class teacher → academic dean → principal), with signature images held in settings or staff profiles |
+| PDF batch + log | **new:** report-card batch and per-student report-card records (status, file, errors) |
+| Status codes ABS/NA/DISQ… | **new:** a status on `results` (needs a new migration, rule 11: never edit an old one) |
+| Attendance section | **existing** `attendances` + `roll_calls` + holiday/no-register tables, read by a **new** `Services/Academic` aggregator, with the date range taken from the report cycle (A3.8) |
+
+### Repo constraints that apply to this work
+- **`academic-scope-guard.yml`:** for any PR author other than Deo, a PR **fails CI** if it touches files outside these paths:
+  - `Http/Controllers/Api/V1/Academic/`, `Services/Academic/`
+  - `Models/(Exam|MarkingScheme|Result)*`, `Policies/(Exam|MarkingScheme|Result)*Policy`
+  - migrations matching `_(exam|marking_scheme|result)s?_`
+  - seeders `(Exam|Marking|Result|AcademicMarks)*Seeder`
+  - `tests/Feature/Academic/`, `frontend/src/pages/academic/`
+  - the two portal exam pages and the two e2e specs
+
+  A new `ReportCard` model, a `report_cards` migration, a new route file entry, a component in `components/`, or the permission registry would all **fall outside it**. See Part C.
+- **Grades are sensitive data.** Every read must be audited (rule 6), and **tests are mandatory before merge** (rule 7: Pest including negative-permission tests, plus Vitest/Playwright).
+- **Parent-facing output is bilingual EN/SW** (rule 8; English wins on any discrepancy), and API errors carry `message_sw`.
+- Primary keys are UUIDs, routes live under `/api/v1`, responses use the Resource envelope, timezone is `Africa/Dar_es_Salaam`, and spelling is British.
+- **Joshua's own rules:**
+  - Code only, committed under Joshua's name.
+  - Never push `.md` files, Claude files, skills, agents, MCP config or design assets.
+  - Push only when Joshua says so and the change has been verified working.
+  - Work on Exams and Report Cards only.
+
+---
+
+## A6. Legacy bugs NOT to copy
+1. "Excellent" vs "Outstanding" for grade A. Use **Outstanding**.
+2. "All Passed" hard-coded on the primary card.
+3. "Academic Year 2026", the Report Date and the School Opens date hard-coded in templates.
+4. Footer diamond printed as "?" (an encoding bug).
+5. `normalize_division("Division II")` returned "ISION II", so the active division never highlighted.
+6. Averages divided by all subjects instead of the subjects actually sat.
+7. Excel and Python computed points from different grades (exam-only vs weighted). Use **weighted only**.
+8. The single-mark rule differed between scripts. Use the **100% rule** everywhere.
+9. The overall score came from a cached Excel value and printed 0.00 if the workbook was never recalculated. **Always compute on the server.**
+10. Signature chosen by matching part of a filename (unpredictable when two files matched).
+11. Subjects were defined by column position, so a hand-inserted subject broke the totals. **Subjects must come from data.**
+12. Grade badges C–F and negative progress had no styling.
+13. Empty comment cards printed empty quote marks.
+14. Fonts loaded from a CDN at render time.
+
+---
+
+# PART B — PROMPTS
+
+> **Always paste B0 first, then one prompt from B1–B4.** Ask for **one screen or component per generation**. Where a prompt says "ERP stack", generate React 18 + Tailwind code that uses the ERP's component library.
+
+## B0. Master context prompt (paste before every other prompt)
+
+```text
+You are building part of "Josephian ERP", the institutional platform for Josephian Schools (Dar es Salaam, Tanzania).
+Module: EXAMS + REPORT CARDS (Academic vertical). Do not design or change any other module.
+
+STACK (locked)
+- Frontend: React 18 + Vite + Tailwind, React Router, TanStack Query (all server state), i18next (EN/SW), Vitest + Testing Library, Playwright.
+- Backend: Laravel 12 REST API under /api/v1, Sanctum bearer tokens, spatie/laravel-permission, MySQL 8, UUID primary keys.
+  Responses use a Resource envelope { data, meta }. Errors use { message, message_sw } on parent-facing endpoints.
+- Data hooks: useResourceList(key, url), useCreateResource(key, url) from src/lib/useApiResource; the axios client is src/lib/apiClient.
+- Existing UI kit (import from 'src/components/ui'): Button (primary|secondary|ghost|inverse), Input, Select, Textarea, Checkbox,
+  Table (Table.Head/Body/Row/HeaderCell/Cell, Body zebra), Modal (focus-trapped), Toast (useToast().show({message, variant})),
+  Badge (neutral|info|success|warning|error|gold — gold ONLY for SEN/ESRAC), EmptyState, ErrorState(onRetry), SkipLink, LanguageToggle.
+- Auth: useAuth() gives can('permission.key'). Route guards: RequirePermission. Pages live in frontend/src/pages/academic/ and start with <AcademicSubNav/>.
+
+ERP SCREEN DESIGN TOKENS (use these Tailwind names; never raw hex in components)
+- Colours: maroon #5A1011 (hover #73201F) primary actions, links, headings; gold #FEE530 ACCENT ONLY (badge fill with charcoal text, never a button or body text);
+  charcoal #2B2B2B text; grey-600 #5F5F5F secondary text; silver #D3D3D3 borders; paper #FBF7F2 app background; card #FFFFFF.
+  Semantic: sem-error #C62828/#FDECEA, sem-success #2E7D32/#E8F5E9, sem-warning #A15C00/#FFF6E5, sem-info #1565C0/#E8F0FB.
+- Type: Roboto only. text-display 28/700, text-h2 22/700, text-h3 18/500, text-body 16, text-small 14 (minimum for body), text-micro 12 (metadata only).
+- Spacing tokens space-1..space-8 (4px base). Radius sm 4 (inputs), md 8 (cards/buttons), full (pills). Shadow: shadow-1 only. Flat + 1px silver border is the house look.
+- Tables: maroon header row with white text, horizontal dividers only, optional paper zebra. Wrap wide tables in overflow-x-auto; switch to cards below the md breakpoint.
+- Focus: 2px maroon outline with 2px offset, never removed. Touch targets at least 44x44px. Validate on blur; show errors under the field plus a focusable error summary.
+
+DOMAIN RULES (authoritative)
+- Report cycle = Component 1 (default "Monthly", 25%) + Component 2 (default "Mid-Term" or "Terminal", 75%). Names and weights are configurable per cycle.
+- Subject total: both present = round(c1*w1 + c2*w2, 2); only one present = that mark counts 100%; neither = subject omitted from the card.
+- Component average = sum / number of marks actually entered. Overall = avg(c1)*w1 + avg(c2)*w2 (if one is missing, the other counts 100%). 2 decimals.
+- PRIMARY grades: A 81-100 Outstanding, B 61-80 Very Good, C 41-60 Good, D 21-40 Satisfactory, E 0-20 Can do better. No points, no division.
+- SECONDARY grades: A 75-100 (1pt) Outstanding, B 65-74 (2) Very Good, C 45-64 (3) Good, D 30-44 (4) Satisfactory, F 0-29 (5) Can do better.
+- DIVISION (secondary, unless the class has "no division"): sum of the best 7 (lowest) points from weighted subject grades.
+  I 7-17 Distinction, II 18-21 Credit, III 22-25 Merit, IV 26-33 Pass, 0 34-35 Fail. Gap text: "N point(s) from Division X" / "Highest division achieved".
+- Grading bands come from configuration (grading schemes), never hard-coded in UI logic.
+- Mark status codes: numeric 0-100, ABS (absent), NR (no result), NA (not taken), PENDING, DISQ (malpractice = 0, parent notified), never INVALID.
+- Passed = grade not E/F. Strongest subject = highest total. Best improvement (primary) = max(c2 - c1).
+- ATTENDANCE (on every report card): read from the daily register (attendances, context daily_roll_call; status present|absent|late|excused),
+  counted registers only, over the cycle's attendance date range. Show days attended (present+late) / school days recorded, rate %
+  = (present+late)/(present+late+absent+excused) to 1 dp, late, absent, excused, and "not recorded" days separately (never counted as absent).
+  Rating text: >=95 Excellent, 90-94.9 Good, 80-89.9 Needs improvement, <80 Concern (configurable). Parents see "Absent", never notes or reasons.
+- Exam lifecycle: draft -> moderation -> published -> frozen (one-way). Marks are editable only in draft.
+  Report cards are signed off by Class Teacher -> Academic Dean -> Principal, then released to parents.
+- Roles: Registrar (academic.exam.manage: cycles, moderation, publish, batches), Teacher (academic.result.manage: marks + comments),
+  Academic Dean / Principal (sign-off), Guardian Portal and Student Portal (read only their own published cards).
+- School structure: Early Years (Baby Class, KG1-3, Grade 1 Nyerere/Mwinyi, Grade 2 Mkapa/Kikwete), Primary (Grade 3 Magufuli/Karume,
+  Grade 4 Asha-Rose Migiro/Bibi Titi Mohamed, Grade 5 Kawawa, Grade 6 Warioba, Grade 7 Sokoine), Secondary (Form 1-4), Vocational.
+
+NON-NEGOTIABLES
+- Use only FAKE data in examples, stories, tests and seeds (e.g. "Student A", "Amina Juma (fake)"). Never real learner names.
+- Every parent- or student-facing string is bilingual EN/SW via i18n keys (English is the fallback). Staff-only screens may be English-only.
+- Show loading, empty and error states (with retry) on every data view. Disable actions the user lacks permission for, and hide them where appropriate.
+- Do not rely on colour alone: grades and statuses always show text as well as colour. Charts include a data-table fallback.
+- British English, TZS, dates as "4 September 2026", timezone Africa/Dar_es_Salaam.
+- Output: complete, runnable JSX with named exports, a short prop table, and a Vitest test covering render, states and one permission case.
+```
+
+---
+
+## B1. Sub-module screen prompts
+
+### B1.1 Report Cycle setup (Registrar)
+```text
+Build ReportCyclesPage (list) and ReportCycleFormModal (create/edit) at /academic/report-cycles.
+PURPOSE: the Registrar defines a reporting cycle, e.g. "Term 3 Mid-Term 2026".
+FIELDS: name; academic_year; term (t1|t2|t3); kind (midterm|terminal); unit/level scope (multi-select of classes);
+components: an ordered list of { label, exam (Select from /exams filtered by year/term), weight % }.
+  Default 2 rows: "Monthly" 25 + "Mid-Term" 75. Live validation: weights must total 100; at least 1 component.
+dates: report_date, school_opens_date (both date inputs, required before publishing);
+attendance period: attendance_from, attendance_to (default = term start → report_date; to >= from; live hint "42 possible school days in this period"
+after excluding weekends, public holidays and school holidays);
+options toggles: show per-subject comments, show parent comment, show Progress column, show class position (disabled with "Pending school decision" hint).
+LIST TABLE: Name · Year/Term · Kind · Classes count · Components ("Monthly 25% + Mid-Term 75%") · Status badge (Draft/Collecting marks/In sign-off/Released) · actions.
+PERMISSION: academic.exam.manage to create/edit; academic.exam.view to see.
+ACCEPTANCE: weights-not-100 shows an inline error AND a summary; modal returns focus to the trigger; empty state "No report cycles yet."; mobile shows cards.
+```
+
+### B1.2 Grading schemes (Registrar, settings-style)
+```text
+Build GradingSchemesPage at /academic/grading-schemes.
+Two schemes are seeded: "Primary (A–E)" and "Secondary NECTA (A–F + Division)". Show each as a card with an editable band table:
+letter · min · max · descriptor (EN + SW fields) · points (secondary only).
+Division bands sub-table (secondary): roman · min points · max points · label · best_n (default 7).
+Validation: bands contiguous 0–100 with no overlap or gap (show which rows conflict); points unique per letter.
+Assignment panel: which classes use which scheme, plus a per-class "No division" switch (e.g. the Vocational class).
+Live preview: a mini grade-scale chip row rendered from the edited bands.
+Changing a scheme that is in use by a released cycle is blocked with an explanation (read-only lock badge).
+ACCEPTANCE: keyboard-editable table; Save disabled until valid; unsaved-changes guard on navigation.
+```
+
+### B1.3 Class subject set-up and enrolment
+```text
+Build ClassSubjectsPage at /academic/classes/:classId/subjects.
+Left: ordered subject list for the class (drag handle AND up/down buttons for accessibility), each row: subject (from the catalogue),
+display label override, group (Core/Subsidiary), optional flag, short chart label (auto-suggest, max 14 chars).
+Right (secondary classes only): enrolment matrix for optional subjects. Rows = students (fake names), columns = optional subjects,
+checkbox cells with "select column" bulk action and sticky first column/header.
+Show a count "N of M students take Physics". Warn if a student takes fewer than 7 graded subjects ("Division cannot be computed").
+ACCEPTANCE: order persists; matrix scrolls horizontally inside its container only; 44px targets; screen-reader labels per cell ("Physics for Student A").
+```
+
+### B1.4 Marks entry grid (Teacher) — the most-used screen
+```text
+Build MarksEntryPage at /academic/report-cycles/:cycleId/classes/:classId/marks?component=<id>.
+Header: class + stream, component tabs (e.g. "Monthly · 25%" | "Mid-Term · 75%"), exam status badge, autosave indicator ("Saved 10:42").
+GRID: rows = students (No., name), columns = subjects in class order; each cell = MarkInputCell accepting 0–100 (decimals allowed, max 2 dp)
+OR a status code via a small menu/shortcut (A=ABS, N=NA, D=DISQ). Live computed columns (read-only, grey): Total, Average, Grade.
+Not-enrolled cells are disabled and show "—" with tooltip "Not taking this subject".
+KEYBOARD: arrows/Tab/Enter move between cells like a spreadsheet; Esc reverts the cell; paste a block from Excel fills multiple cells.
+VALIDATION: on blur; out-of-range turns the cell sem-error with a message; a sticky error summary lists invalid cells with links.
+LOCK: if exam.status !== 'draft' the grid is read-only with a banner "Marks are locked (status: Moderation). Ask the Registrar to reopen."
+SAVE: debounced autosave per row via TanStack mutation (bulk endpoint); offline-tolerant (queue + retry, show "Waiting to sync").
+Footer progress: "143 of 180 marks entered · 3 ABS · 1 DISQ".
+PERMISSION: academic.result.manage to edit; academic.result.view read-only.
+ACCEPTANCE: works with 40 students x 12 subjects without lag (memoised rows); a DISQ cell prompts a confirm modal explaining that
+the parent will be notified; mobile shows one-student-at-a-time card entry.
+```
+
+### B1.5 Teacher comments entry
+```text
+Build CommentsEntryPage at /academic/report-cycles/:cycleId/classes/:classId/comments.
+Split view: student list (with completion ticks and filter "missing comments") + editor for the selected student showing a compact
+results summary (subjects, totals, grades, overall, division) to write from.
+Fields: class teacher comment (Textarea, counter, recommended 40–90 words); optional per-subject comments if the cycle enables them;
+parent comment if enabled.
+Live checks (warnings, non-blocking): empty comment; mentions "not taking <Subject>" while that subject has marks; length over 120 words
+("may push the card onto another page").
+Next/Previous student buttons + Ctrl+Enter to save and advance.
+ACCEPTANCE: unsaved text survives switching students (draft per student); no auto-generated comment text anywhere.
+```
+
+### B1.6 Readiness check (pre-flight before generation)
+```text
+Build CycleReadinessPage at /academic/report-cycles/:cycleId/readiness.
+A per-class checklist table: Class · Marks completion % (progress bar + numbers) · Missing comments · Students with no marks (will be skipped) ·
+Pending/NR cells · Students with <7 graded subjects (secondary) · Attendance: school days with no counted register in the period
+(warning "5 days not recorded — take catch-up registers") and pending catch-up registers awaiting approval · Signatures configured · Exam status ·
+Overall state (Ready/Blocked/Warnings).
+Click a class to drill into a list of issues with deep links to the exact grid cell or comment.
+Top KPI strip: classes ready N/M, total cards to generate, blocking issues, warnings.
+ACCEPTANCE: Blocked vs Warnings distinguished by icon + text (not colour only); "Generate" is disabled until no blocking issues remain.
+```
+
+### B1.7 Report card preview (web) — primary and secondary
+```text
+Build ReportCardPreview (component) used at /academic/report-cycles/:cycleId/students/:studentId/report-card.
+It renders the PRINT design (not the ERP screen theme): parchment page, burgundy #5C1218 header, gold #C9A84C ornaments,
+Playfair Display headings + DM Sans body (self-hosted), A4 proportions (210mm wide), sections in this order:
+header (logo, school, "Academic Year {year} · {cycle} Assessment", Report Date + School Opens badges) → details (Student UPPERCASE, Class, Class Teacher, Academic Year)
+→ summary cards (primary 6: Overall Average featured, Overall Grade, Top Score, Strongest Subject, Best Improvement, Subjects Taken;
+secondary 4: Overall Average, Division, Top Subject, Subjects Taken "N Passed"; 3 if no division)
+→ ATTENDANCE card (days attended / school days recorded, rate % + rating text + thin burgundy bar, late, absent, excused,
+"not recorded" only if > 0, period covered)
+→ results table (#, Subject, C1 with weight, C2 with weight, Total bold 2dp, Grade badge; optional Progress + subject comment rows)
+→ chart (grouped bars Achieved/Class Avg/Class Topper with value labels + strongest pill) → grade scale chips → division scale (secondary)
+→ class teacher comment (hidden if empty) → 3 signatures → footer.
+Props: { card } matching the API resource (student, meta, subjects[], overall, top_subject, best_improvement, division{...}, comments, signatures, flags).
+Toolbar above (screen only, hidden in print): Download PDF, Print, language note, sign-off status chip.
+ACCEPTANCE: renders correctly for (a) primary 7 subjects, (b) secondary 12 subjects with division, (c) vocational no-division,
+(d) a class with no component-2 marks (single "100%" column, no Best Improvement), (e) attendance with 0 "not recorded" days (row hidden)
+and with some not-recorded days (shown, not counted as absent). Uses grade colours A–F from Part A4 with letter text.
+No hard-coded year or dates. Footer diamond via &#9670;.
+```
+
+### B1.8 Sign-off and release workflow
+```text
+Build ReportCardSignOffPage at /academic/report-cycles/:cycleId/sign-off.
+Stepper per class: Class Teacher ✓ → Academic Dean ✓ → Principal ✓ → Released to parents.
+Table: Class · Cards · Current step · Signed by/at for each step · Returned (with reason) · Action.
+Actions by role: the signer previews a sample of cards (open ReportCardPreview in a Modal, next/prev), then "Sign off class" (confirm modal with
+the declaration text) or "Return for correction" (required reason, notifies the class teacher).
+Release: Registrar (academic.exam.manage) releases signed classes; releasing notifies guardians (bilingual), and the cards become visible in the portal.
+Audit trail drawer per class: every action with user and timestamp.
+ACCEPTANCE: steps are strictly sequential (UI and API); a returned class re-opens comment/marks editing only if the exam is still draft
+(otherwise show "Ask the Registrar to reopen moderation"); history is immutable.
+```
+
+### B1.9 Batch generation and downloads
+```text
+Build ReportCardBatchesPage at /academic/report-cycles/:cycleId/batches.
+"Generate" panel: choose classes (multi), mode (all students | selected students), regenerate-unchanged toggle.
+Runs as a queued job: show a live progress list per class (queued/running/done/failed), counts, elapsed time, per-student failures with reasons.
+Results: per class, download the class ZIP or a merged class PDF; per student, view/download.
+History table (replaces the legacy SQLite log): when, by whom, classes, cards OK/failed, warnings, duration, files.
+ACCEPTANCE: polling stops when the job finishes; a failed student shows the reason and a retry button; downloads are permission-checked links.
+```
+
+### B1.10 Parent and student portal report view (bilingual)
+```text
+Build PortalReportCardsPage at /portal/report-cards (Guardian Portal + Student Portal).
+Guardian: child switcher (if several children), list of RELEASED cards by year/term (cards only, newest first) with Overall, Grade/Division.
+Detail: mobile-first summary (big Overall Average, Grade or Division with label, Subjects Taken/Passed), subject list as stacked cards
+(subject, total, grade badge with text), an attendance card (rate %, rating text, days attended / recorded, late, absent, excused —
+"Mahudhurio" in Swahili), class teacher comment, "Download PDF" button.
+All text via i18n EN/SW; LanguageToggle top-right; English prevails. Never show internal bands, tiers or class rankings.
+ACCEPTANCE: works at 360px wide, no horizontal scroll; 16px body text; unreleased cards are never listed (API also enforces);
+empty state "No report cards released yet / Hakuna ripoti iliyotolewa bado".
+```
+
+### B1.11 Class summary analytics (Class Teacher)
+```text
+Build ClassSummaryPage at /academic/report-cycles/:cycleId/classes/:classId/summary (confidential, staff only).
+Top 4 KPI tiles: Class Average (%, "N learners with results"), Passed %, Quality Pass %, Need Extra Support (count, "N intensive · N targeted").
+Two columns: Strong subjects list / Priority subjects list (with "N below pass"); horizontal bar chart per subject: combined mean bar +
+C1 and C2 mean dots + vertical pass-mark line, with a data table toggle.
+Learners requiring support table: Learner · Support tier badge (Intensive/Targeted/Monitor, text + colour) · Score · Subjects below pass · Focus · Review date.
+Most improved (top 3, with caveat "may reflect paper difficulty"), Close to quality pass list, generated action list.
+Banner "CONFIDENTIAL — academic use only".
+ACCEPTANCE: thresholds from config; n<5 groups show "Too few results to rate"; print-friendly A4 layout.
+```
+
+### B1.12 HOD department summary
+```text
+Build HodSummaryPage at /academic/report-cycles/:cycleId/departments.
+Overview table: Department · Class-subjects · Strong/Stable · Watch · Priority/Critical · Notable signals · Learners below pass.
+Department detail: table Class · Subject · n · Mean · Pass % · C1 mean · C2 mean · Change · Rank agreement · Signal (None/Minor/Notable/Large) · Below pass · Rating pill
+(Strong/Stable green, Watch amber, Priority Intervention/Critical red, "small n" grey — each with text).
+Side cards: Classes performing strongly / requiring intervention. Callout box with FACT / INTERPRETATION / ACTION.
+ACCEPTANCE: sortable columns with aria-sort; flagged rows marked with an icon + text; export to Excel.
+```
+
+### B1.13 Management dashboard
+```text
+Build AcademicPerformanceDashboard at /academic/report-cycles/:cycleId/dashboard (management roles).
+5 index tiles with traffic lights (Performance Index, Risk Index, Completion Rate, Subject Health, Learner Improvement (info only)),
+each showing value, status text (Green/Amber/Red), threshold and a one-line meaning.
+Class status table (class · mean · pass % · quality % · risk % · status), grade distribution chart per level,
+division counts (secondary), core subject panel (Maths, English, Kiswahili, Science), stream comparison for two-stream grades.
+Recommendations list (priority, finding, action, owner, deadline).
+ACCEPTANCE: every chart has a table fallback and accessible name; filters (level, class) sync to the URL; targets "Not set" handled.
+```
+
+### B1.14 Public anonymised summary
+```text
+Build PublicSummaryPage (staff-generated, shareable) at /academic/report-cycles/:cycleId/public-summary.
+Content: learners assessed of enrolled, pass rate, quality pass rate, completion; results by grade level (n, mean, pass %, quality %);
+results by subject family per level; 3–5 key messages (editable before publishing).
+Hard rules: no names, no learner rows, suppress any group with n<5 (show "Suppressed (fewer than 5)").
+ACCEPTANCE: a "Publish" preview shows exactly what external readers see; bilingual.
+```
+
+### B1.15 Excel import / export (teacher familiarity)
+```text
+Build MarksImportExport (modal launched from MarksEntryPage).
+EXPORT: download a class workbook in the familiar layout (Instructions with the subject list, Report Overview, one sheet per component
+with No./Name then Mark+Grade column pairs per subject, comments sheet, read-only summary).
+IMPORT: upload → parse preview table (matched students, matched subjects by name, cell-level problems: out of range, unknown code,
+unmatched student with fuzzy suggestions "needs confirmation") → confirm → apply as one bulk save. Blank or "-" means blank, never 0.
+ACCEPTANCE: nothing is written until the preview is confirmed; a downloadable error report; works only while the exam is draft.
+```
+
+---
+
+## B2. Reusable component prompts
+
+Paste B0 first. Every component needs props, states and a Vitest test.
+
+| # | Component | Prompt |
+|---|---|---|
+| B2.1 | **GradeBadge** | "Build GradeBadge({grade, scheme:'primary'\|'secondary', size:'sm'\|'md', variant:'screen'\|'print'}). Round pill showing the letter, with an aria-label like 'Grade B, Very Good'. Screen variant uses semantic tokens. Print variant uses A=#5C1218 bg/#E0C876 text, B=#F0E3C6/#A07A2A, C=#E4EBE2/#4A6B4E, D=#F3E4DE/#9C5B45, E/F=#F6E2E2/#AA3333. Unknown grade renders '–'." |
+| B2.2 | **MarkInputCell** | "Build MarkInputCell({value, status, max=100, disabled, onCommit, onNavigate}). Accepts a number 0–max (2 dp) or a status code ABS/NR/NA/DISQ via typing A/N/D or a small menu. Validates on blur and shows an error state with a message id for aria-describedby. Esc reverts; arrow and Enter keys call onNavigate(direction). Shows a 'saving/saved/failed' micro state." |
+| B2.3 | **StatusCodeChip** | "Build StatusCodeChip({code}) for ABS, NR, NA, PENDING, DISQ with text label and tooltip meaning (EN/SW keys). DISQ uses sem-error, PENDING uses sem-warning, NA is neutral. Never colour-only." |
+| B2.4 | **ComponentWeightHeader** | "Build ComponentWeightHeader({label, weight}) for table headers: label on top and a small '25%' weight pill below. Used in the marks grid and the report table." |
+| B2.5 | **SummaryCard** | "Build SummaryCard({label, value, sub, featured, tone}) in print style: rounded 20px; featured = solid burgundy with a gold-lt value in Playfair. Used for Overall Average, Division, Top Subject, Subjects Taken." |
+| B2.6 | **SubjectResultsTable** | "Build SubjectResultsTable({rows, components, showProgress, showSubjectComments, topSubjectId}) in print style. Burgundy header; total in bold with 2 dp; '–' for missing marks; top row tinted; optional comment row spanning all columns; break-inside: avoid per subject group." |
+| B2.7 | **PerformanceChart** | "Build PerformanceChart({subjects:[{shortLabel, achieved, classAvg, classTop}], strongest, bestImprovement}). Grouped bars with fixed colours #E74C3C/#3498DB/#2ECC71, value labels, y 0–100, legend below, 3:1 aspect, and a visually hidden data table. Must also render statically for PDF (SVG, no animation)." |
+| B2.8 | **GradeScaleChips** / **DivisionScale** | "Build GradeScaleChips({bands, showPoints}) and DivisionScale({bands, points, active}). The active division chip is solid burgundy with '▲ {points} pts', followed by the gap text 'N point(s) from Division X' or 'Highest division achieved'." |
+| B2.9 | **SignatureBlock** | "Build SignatureBlock({role, name, imageUrl, signedAt}). Image (max 52px high, object-fit contain) or a blank line, then the name, then an uppercase role label. Optionally shows a 'Signed 4 September 2026' micro line on screen only." |
+| B2.10 | **SignOffStepper** | "Build SignOffStepper({steps:[{key,label,status:'pending'\|'current'\|'done'\|'returned', by, at, reason}]}). Horizontal on desktop, vertical on mobile. Icons plus text status; the returned state shows the reason." |
+| B2.11 | **KpiTile** | "Build KpiTile({label, value, sub, status:'green'\|'amber'\|'red'\|'info', threshold}). Status dot plus status word; the threshold is shown on hover/focus and in screen-reader text." |
+| B2.12 | **RatingPill** / **SupportTierBadge** | "Build RatingPill({rating: Strong\|Stable\|Watch\|Priority\|Critical\|SmallN}) and SupportTierBadge({tier:1\|2\|3}) with text labels, semantic soft fills and an aria-label." |
+| B2.13 | **ReadinessChecklist** | "Build ReadinessChecklist({items:[{label, state:'ok'\|'warn'\|'block', count, link}]}) with icons plus text, grouped so blocking items come first." |
+| B2.14 | **CompletionBar** | "Build CompletionBar({entered, expected, abs, disq}). A progress bar with a numeric label, e.g. '143 / 180 (79%)'." |
+| B2.15 | **AttendanceSummary** | "Build AttendanceSummary({present, late, absent, excused, notRecorded, from, to, thresholds, variant:'screen'\|'print', lang}). Shows days attended (present+late) / school days recorded, rate % (1 dp) = (present+late)/(present+late+absent+excused), rating text from thresholds (≥95 Excellent / 90 Good / 80 Needs improvement / below Concern), a progress bar, small stats for Late, Absent, Excused, and 'N day(s) not recorded' only when > 0. Bilingual labels via i18n (Present/Waliohudhuria, Absent/Hayupo, Late/Kuchelewa, Excused/Ruhusa — have a native speaker confirm). Zero-division safe: no recorded days shows 'No attendance recorded for this period'. Print variant uses the A4 card palette." |
+
+---
+
+## B3. Backend prompts (only when we build the API)
+
+```text
+B3.1 Report cycle API — With B0 context: design Laravel 12 migrations (new files only, UUIDs, softDeletes on personal data),
+models, policies, FormRequests and controllers under Api/V1/Academic for report cycles + cycle components (exam_id, label, weight)
++ grading schemes/bands/division bands + report comments + sign-offs + report-card batches and per-student cards.
+Use typed constrained columns for grades/marks/status (rule 1: never JSON meta for regulated fields). Every read of results/cards is audit-logged
+(sensitive category 'grades'). Bilingual message_sw on parent-facing errors. Provide Pest tests incl. negative-permission cases.
+
+B3.2 Report card calculator — Write App\Services\Academic\ReportCardCalculator (pure, unit-tested) implementing Part A3 exactly:
+100% rule, averages over marks entered, overall from component averages, grades from configured bands, best-7 points from weighted grades,
+division + gap text, strongest subject, best improvement, subjects passed, class average/top per subject.
+Pest dataset tests using FAKE values; include edge cases: one component only, class without component 2, fewer than 7 graded subjects,
+DISQ counted as 0, NA excluded, ties for strongest subject.
+
+B3.3 PDF rendering — Render the A4 card from a Blade view mirroring Part A4. If dompdf (current ERP choice) cannot reproduce the
+layout (no CSS grid/flex), propose and implement the agreed alternative behind an interface (ReportCardRenderer) so the engine can be swapped.
+Self-host fonts; chart as static SVG; zero margins; print backgrounds; sections break-inside: avoid.
+
+B3.4 Attendance summary for report cards — Write App\Services\Academic\ReportCardAttendanceSummary (read-only; must NOT modify
+Services/Attendance/* or attendance models). Input: person_id(s), section context, date range from the report cycle.
+Read attendances (context daily_roll_call, attendable_type person, withoutGlobalScope('class_teacher')), keep only days whose roll_call
+is counted (live, or backfill with backfill_status approved), compute possible school days (weekdays minus public_holidays minus
+school_holidays minus no_register events for the stream), and return {present, late, absent, excused, not_recorded, days_attended,
+days_recorded, rate} per student. Batch-load holidays/events/roll_calls once for the whole class (no per-day or per-student queries).
+Pest tests with FAKE data: late counts as attended; excused in the denominator; uncounted backfill excluded; no-register day excluded;
+holiday excluded; mid-term stream transfer still counted (query by person); not-recorded days never counted as absent; zero recorded days → rate null.
+```
+
+---
+
+## B4. Quality-check prompt (run on any generated UI)
+
+```text
+Review the component/page below against: (1) the B0 tokens and component kit (no raw hex in screen UI, Roboto, maroon/gold rules);
+(2) accessibility (labels, focus ring, 44px targets, aria-sort/aria-describedby, colour never the only signal, chart table fallback);
+(3) states (loading, empty, error+retry, locked/read-only, permission-denied); (4) bilingual EN/SW on any parent/student-facing string;
+(5) domain rules from Part A3 (100% rule, weights, grade bands from config, division best-7, no hard-coded year/dates, no 'All Passed');
+(6) fake data only. List concrete defects with fixes, then output the corrected code.
+```
+
+---
+
+# PART D — EXAMS MODULE UI PROMPTS (redesign of the existing screens)
+
+> **What this covers:** the Exams screens that already exist in the ERP (studied 2026-10-24) and the gaps found in them. The API stays as it is unless a prompt marks a change "(needs API change — C14/C15)".
+> **Order:** paste **B0**, then **D0**, then one D prompt.
+> **Design-skill note:** the table, form, chart, confirmation and focus rules come from verified ui-ux-pro-max matches (data-table overflow, bulk actions, validation on blur, focusable error summary, confirmation dialogs, progress indicators, focus states, chart table fallbacks). The **exam-timer rules are general accessibility practice** (adjustable time limits, warning before expiry): the skill database had no match for them.
+
+## D0. Exams-module context (paste after B0)
+
+```text
+EXISTING EXAMS MODULE (keep the API; redesign the UI)
+Routes (frontend/src/App.jsx):
+  /academic/exams (academic.exam.view) · /academic/exams/:examId (academic.exam.view)
+  /academic/marksheets/:markingSchemeId (academic.result.view) · /academic/marking-schemes/:markingSchemeId/questions (academic.exam.view)
+  /academic/gradebook and /academic/transcript/:personId (academic.gradebook.view) · /my-exams and /my-exams/:markingSchemeId (portal.exam.attempt)
+API (all /api/v1, policies in controllers, locks return 409 {message, errors}):
+  GET/POST /exams (filters academic_year, class_id, status; paginated 15 — send per_page), GET/PATCH /exams/{id} (PATCH: name, starts_on, ends_on)
+  POST /exams/{id}/moderate | /publish | /freeze (exam.manage; one-way; 409 on skip/repeat) · GET /exams/{id}/necta-export (placeholder, meta.warning)
+  GET/POST/GET/DELETE /marking-schemes (exam_id, subject_id, max_score>=1 default 100, pass_mark>=0 nullable, weight 1-100 default 100; unique exam+subject)
+  GET /results (filters exam_id, marking_scheme_id, person_id) · POST /results/bulk {marking_scheme_id, entries:[{person_id, score>=0}]} upsert; PATCH /results/{id} {score, grade, remarks} — both 409 unless exam draft
+  GET/POST /exam-accommodations {exam_id, person_id, accommodation_type, notes} (exam.manage; sensitive 'health')
+  GET/POST/PATCH/DELETE /exam-questions {marking_scheme_id, type mcq|short_answer|essay, question_text, options[{key<=5,text}] (mcq, min 2), correct_option (mcq), points>=0.01, sequence}
+    write = academic.result.manage (Teacher); store 409 unless draft
+  PATCH /exam-answers/{id}/grade {score} (result.manage; attempt submitted + exam draft)
+  GET /portal/exams · GET /portal/exams/{schemeId} (never returns correct_option) · POST /portal/exams/{schemeId}/attempts (one attempt, no retake)
+  POST /portal/attempts/{id}/answers {exam_question_id, answer_text} · POST /portal/attempts/{id}/submit (MCQ auto-graded; essays wait for manual grading)
+  GET/POST /gradebook, POST /gradebook/bulk, PATCH/DELETE /gradebook/{id} · GET /students/{personId}/transcript
+Status meanings: draft = marks and questions editable; moderation = under review, read-only; published = final and visible; frozen = permanently locked.
+Roles: Registrar = academic.exam.manage (create exams, schemes, transitions, accommodations, NECTA); Teacher/Class Teacher = academic.result.manage
+  (marks, question bank, essay grading); Academic Support = read-only; Student Portal = portal.exam.attempt.
+
+TEST-LOCKED SELECTORS — the redesign MUST keep these (Playwright e2e marks-entry.spec.js, results-publish.spec.js):
+- Top nav link "Academic", subnav link "Exams", button "Log out".
+- ExamsPage: button "New exam"; fields labelled exactly "Name" and "Academic year"; the form lives in role="dialog" with a "Save" button;
+  toast "Exam created."; each exam name is a link.
+- ExamDetailPage: heading = exam name; the status Badge is a <span> whose whole text is the status word, placed BEFORE the stepper in the DOM;
+  the stepper renders each stage word in an <li>; buttons "Add marking scheme", "Send for moderation", "Publish", "Freeze" (none visible when frozen);
+  field "Subject" is a <select>; toast "Marking scheme added."; the first link inside a <table> is the subject → marksheet link, text = subject name.
+- MarksheetPage: heading "<Subject> marksheet"; field "Section" is a <select> with option labels "<Class> — <Section>" (em dash);
+  score inputs are <input type="number"> inside a <table>; button "Save scores"; toast "<n> score(s) recorded.";
+  a saved score appears as the input placeholder (e.g. "60.00"); when not draft the text "This exam is no longer draft" shows,
+  there are zero number inputs, and saved scores show as visible text (e.g. "72.00").
+If a redesign must change any of these, say so explicitly and update the matching e2e spec in the same change.
+
+KNOWN GAPS TO FIX IN THE REDESIGN: every list capped at 15 rows (pass per_page / paginate); no confirmation before irreversible transitions;
+saved score shown only as a placeholder; pass_mark unused; no grade/completion stats; the MCQ form allows only 2 options; no question edit/delete/reorder;
+no essay-grading screen; the exam runner has no timer, progress, navigation, submit confirmation or save indicator and posts on every keystroke;
+accommodations need a raw UUID; NECTA has no loading/error/download; students cannot see published results; staff pages are not translated.
+```
+
+## D1. Screen prompts
+
+### D1.1 Exams list (`/academic/exams`)
+```text
+Redesign ExamsPage. Header: h1 "Exams" + "New exam" (academic.exam.manage).
+Filter bar (synced to the URL): academic year, term (t1/t2/t3 shown as "Term 1/2/3"), class, status, type, search by name. Server pagination with page size 25.
+Table columns: Name (link) · Type (CAT / Exam / Mock badge) · Class (or "Whole school") · Year · Term · Dates (starts_on–ends_on, "4 Sep 2026") ·
+Subjects count · Status badge (draft neutral, moderation warning, published info, frozen success — text always visible) · Progress
+(marks entered %, when available).
+Group toggle: "By term" shows collapsible term groups with counts.
+New exam modal (role="dialog"): Name*, Type (CAT/Exam/Mock with a one-line help text each), Academic year*, Term ("Whole year" option),
+Class ("Leave blank for a whole-school exam"), Start date, End date (end >= start; inline error + summary). Buttons Cancel / Save.
+Toast "Exam created." Row actions (manage only): Edit (name and dates; PATCH), Open.
+Mobile: cards with name, status, class, term.
+KEEP: labels "Name", "Academic year", the dialog with "Save", the toast text, name as a link.
+ACCEPTANCE: empty state with a "Create your first exam" CTA for managers / explanatory text for others; ErrorState with retry; skeleton rows while loading.
+```
+
+### D1.2 Exam detail and workflow (`/academic/exams/:examId`)
+```text
+Redesign ExamDetailPage as a dashboard for one exam.
+Header: back link "← Exams", h1 exam name, meta line (Type · Class · Term · Year · dates), status Badge (<span>, before the stepper).
+Workflow stepper (<ol>, each stage word in an <li>): Draft → Moderation → Published → Frozen. Under each completed step show who and when
+(moderated_by/at, published_by/at, frozen_at). Under the current step, a plain-language "What this means" line
+(e.g. Moderation: "Marks are locked while the Academic Dean reviews them").
+Primary action button (academic.exam.manage), labelled exactly "Send for moderation" / "Publish" / "Freeze". Each opens a CONFIRM modal:
+consequence text (e.g. "Teachers can no longer edit marks. This cannot be undone."), a readiness summary (schemes without marks, % entered),
+and a "Type the exam name to confirm" field for Freeze. Handle 409 with the API message.
+Summary tiles: Subjects · Students · Marks entered % · Questions (online) · Accommodations.
+Marking schemes table: Subject (FIRST link in the table → marksheet) · Max score · Pass mark ("—") · Weight % · Marks entered (CompletionBar) ·
+Online ("Question bank" link + question count) · actions (Delete with confirm, draft only, manage only).
+"Add marking scheme" modal: Subject (<select>, label "Subject"; hide subjects already added), Max score (default 100), Pass mark, Weight (%) (1–100).
+Client-side check for a duplicate subject (avoids the API 500). Toast "Marking scheme added."
+Hide or disable add/delete outside draft, with a tooltip saying why.
+Accommodations card (manage): StudentPicker (search by name/admission no. from enrolments — replaces the raw UUID), type (Select: Extra time,
+Separate room, Reader, Scribe, Rest breaks, Other), extra minutes (for Extra time), notes. Mark as sensitive (health).
+NECTA export card (manage): "Preview export" with a loading state and error handling, the meta.warning shown as a warning banner,
+a table including the grade column, and "Download CSV".
+KEEP all test-locked selectors from D0.
+ACCEPTANCE: frozen shows no transition buttons; non-managers see read-only content without action buttons; the stepper is readable by screen readers
+(aria-current="step").
+```
+
+### D1.3 Marksheet / marks entry for one subject (`/academic/marksheets/:markingSchemeId`)
+```text
+Redesign MarksheetPage. Header: back link to the exam, h1 "<Subject> marksheet", meta "Max score 100 · Pass mark 40 · Exam status: draft".
+Lock banner when not draft (text must contain "This exam is no longer draft") + read-only table showing saved scores as visible text.
+Section <select> labelled "Section" with options "<Class> — <Section>"; load ALL enrolled students (per_page=100, or paginate) — never cut at 15.
+Table (inputs stay <input type="number"> inside <table>): No. · Student · Score (input; the saved value as placeholder AND a small "Saved 60.00" caption) ·
+Grade (computed from the configured scheme) · Pass/Below pass (text + icon, using pass_mark) · Remarks (optional; PATCH /results/{id}).
+Dirty-state tracking: changed cells highlighted; "Save scores" (exact text) saves only the changed rows via /results/bulk; toast "<n> score(s) recorded.";
+an unsaved-changes guard on navigation or section switch.
+Validation on blur: 0..max_score (also enforced in the UI, because the API does not check max_score); errors listed in a focusable summary.
+Keyboard: Enter/↓ moves to the next student, ↑ to the previous one; paste a column from Excel to fill down.
+Stats strip: entered N/M, missing, mean, highest, lowest, % below pass. "Missing only" filter.
+ACCEPTANCE: works for 40+ students; the KEEP selectors from D0; a read-only user (result.view only) sees no inputs and no Save.
+```
+
+### D1.4 Question bank (`/academic/marking-schemes/:markingSchemeId/questions`)
+```text
+Redesign ExamQuestionsPage (authoring = academic.result.manage; view = academic.exam.view).
+Header: back link, h1 "<Subject> question bank", a total-points meter "Total 48 / max score 100" (warning if different), a draft-lock banner when not draft
+(hide add/edit/delete).
+Question list: numbered cards in `sequence` order, with drag handle + Move up/Move down buttons (PATCH sequence); type badge (Multiple choice / Short answer / Essay),
+points, question text; MCQ shows options with key letters and the correct option marked (staff only) with text "Correct", not colour alone.
+Card actions: Edit, Duplicate, Delete (confirm).
+Add/Edit question modal: Type; Question (multi-line Textarea, required); MCQ: dynamic options list (add/remove, 2–6 options, keys A–F auto-assigned),
+a radio to pick the correct option; Points (>=0.01, step 0.5).
+"Preview as student" toggle renders the question exactly as the runner will (no correct answer).
+ACCEPTANCE: the 2-option limit is removed; reordering persists; 409 from the API is shown as "This exam is no longer draft"; empty state explains
+that online questions are optional.
+```
+
+### D1.5 Essay and short-answer grading (new screen; needs API change C14)
+```text
+Build EssayGradingPage at /academic/marking-schemes/:markingSchemeId/grading (academic.result.manage, exam draft only).
+Needs a new read endpoint listing submitted attempts with their answers (C14); grading uses the existing PATCH /exam-answers/{id}/grade {score}.
+Layout: left, a queue of submitted attempts (student, submitted_at, "3 to grade"), filter "Needs grading / Graded"; right, a one-question-at-a-time view
+(question text, points available, the student's answer in a readable box, score input 0..points, "Save & next").
+Toggle between "by student" and "by question" (grade one question for all students, which is fairer).
+Progress: "12 of 30 answers graded". When an attempt is fully graded, show "Result recorded" (the API writes the Result).
+ACCEPTANCE: keyboard flow (score field focused, Enter = save & next); never shows other students' answers on the same screen;
+the score is validated against the question's points.
+```
+
+### D1.6 Gradebook (`/academic/gradebook`)
+```text
+Redesign GradebookPage into two tabs.
+"Record scores": Section*, Subject*, Academic year*, Term (Select t1/t2/t3 — align with exams, not free text), Category (Select: Classwork, Homework,
+Quiz, Project, Test, Other), Title*, Max score; a student table with score inputs (all students, not 15); "Save scores"; a duplicate-submit guard
+(disable while saving + an idempotency warning if the same title/date already exists).
+"View entries": filters (section, subject, term, category); a table of existing entries (title, date, category, max, average, count) with drill-down
+to per-student scores, Edit (PATCH) and Delete (confirm).
+Students link to the transcript.
+Permission: without academic.gradebook.manage, show read-only content and the message "You don't have permission to record scores."
+ACCEPTANCE: no duplicate rows on a double click; both tabs paginate; empty states for each tab.
+```
+
+### D1.7 Transcript (`/academic/transcript/:personId`)
+```text
+Redesign TranscriptPage. Header: student name + class + admission no.; actions: "Print / Save PDF", and (platform.student-portal.manage)
+"Provision Student Portal access".
+The provisioning result opens a MODAL (not a toast) showing the login and temporary password once, with Copy buttons and a warning that it won't be
+shown again.
+Body: year → term ("Term 1" not "t1") → subject cards: average %, grade (configured scheme), the entries list (title, category, score/max).
+Add an "Exam results" section per term from GET /results?person_id= (published exams only), clearly separated from continuous assessment.
+Print stylesheet: A4, no navigation, school header.
+ACCEPTANCE: empty states per section; the term labels are human-readable; the password is never logged or left in a toast.
+```
+
+### D1.8 Student exam portal — My exams (`/my-exams`, bilingual)
+```text
+Redesign MyExamsPage (Student Portal; all text via i18n EN/SW).
+Sections: "Available now" (draft exams with questions: subject, exam name, number of questions, duration if set (C15), due date/ends_on,
+status badge Not started / In progress / Submitted / Graded with text) and "My results" (published exams: subject, score / max, grade) —
+the second section needs the student's own results (API change C14).
+Each card: a large tap target (≥44px), the primary action "Start" / "Continue" / "View".
+ACCEPTANCE: works at 360px; an exam that has left draft moves to results rather than vanishing silently; empty states in both languages.
+```
+
+### D1.9 Exam runner — Take exam (`/my-exams/:markingSchemeId`, bilingual)
+```text
+Redesign TakeExamPage (Student Portal; i18n EN/SW; distraction-free layout with no app nav during an attempt).
+Start screen: subject, exam, number of questions, total points, duration (C15), accommodation note (e.g. "+15 minutes extra time"), rules
+(one attempt only, answers save automatically, do not refresh during submission). Button "Start exam" → POST attempts.
+Attempt screen: sticky top bar with question progress "Question 4 of 12", answered count, a save indicator ("Saving…" / "All answers saved" / "Not saved — retrying"),
+and a timer if a duration is set (C15).
+Timer rules (general accessibility practice): visible mm:ss with a text equivalent; warnings at 5 minutes and 1 minute (role="status", not an alert modal
+that steals focus); extra time from accommodations added; the server is the source of truth for expiry; auto-submit at zero with a notice.
+Question navigator: a grid of numbered buttons showing answered / unanswered / flagged ("Flag for review"), with text labels and not colour alone.
+One question per view on mobile, optionally all on one page on desktop.
+MCQ: radio group with key letters (A, B, C…) and large touch targets. Short answer / essay: textarea with a word count.
+Autosave: debounce text answers (800 ms, using the existing lib/useDebouncedCallback) and save MCQ immediately; retry on failure; never lose typed text.
+Submit: "Review & submit" screen listing unanswered and flagged questions → confirm modal "You cannot change answers after submitting" → POST submit.
+Finished view: "Submitted" or "Graded", score per question when graded, "pending" for essays awaiting a teacher.
+ACCEPTANCE: no request per keystroke; correct answers are never in the payload; a refresh mid-attempt resumes with saved answers;
+keyboard-only completion is possible; reduced-motion respected.
+```
+
+## D2. Exams component prompts (paste B0 + D0 first)
+
+| # | Component | Prompt |
+|---|---|---|
+| D2.1 | **ExamStatusBadge** | "ExamStatusBadge({status}) renders a <span> whose whole text is the status word (draft/moderation/published/frozen), styled with semantic soft fills, plus a visually hidden description. It must stay a single span for the e2e tests." |
+| D2.2 | **ExamWorkflowStepper** | "ExamWorkflowStepper({status, history:{moderated_by, moderated_at, published_by, published_at, frozen_at}}) renders an <ol> of <li> stage words, with aria-current='step' on the current one, who/when under completed steps and a 'what this means' line; horizontal on desktop, vertical on mobile." |
+| D2.3 | **TransitionConfirmModal** | "TransitionConfirmModal({action:'moderate'\|'publish'\|'freeze', examName, readiness, onConfirm}) states the consequence, shows readiness warnings and requires typing the exam name for freeze. It handles 409 by showing the API message, and keeps focus trapped." |
+| D2.4 | **StudentPicker** | "StudentPicker({sectionId?, onSelect}) is a searchable combobox (name or admission no.) backed by enrolments, debounced, keyboard accessible (aria-autocomplete), and returns person_id. It replaces raw UUID inputs." |
+| D2.5 | **QuestionEditor** | "QuestionEditor({value, onChange}) covers type switching, a multi-line question field, dynamic MCQ options (2–6, keys A–F), correct-option radio, points, and validation messages." |
+| D2.6 | **QuestionNavigator** | "QuestionNavigator({questions, current, answered, flagged, onJump}) is a grid of numbered buttons with states shown by icon + text, ≥44px targets and arrow-key navigation." |
+| D2.7 | **ExamTimer** | "ExamTimer({endsAt, serverOffset, onExpire}) shows mm:ss, announces warnings at 5 and 1 minutes through a polite live region, respects reduced motion and never steals focus. Expiry is driven by the server time." |
+| D2.8 | **SaveIndicator** | "SaveIndicator({state:'idle'\|'saving'\|'saved'\|'error', lastSavedAt}) is a compact status with icon + text in an aria-live polite region." |
+| D2.9 | **MarkStatsStrip** | "MarkStatsStrip({scores, maxScore, passMark}) shows entered/missing, mean, highest, lowest and % below pass, each as a labelled stat." |
+| D2.10 | **NectaExportPreview** | "NectaExportPreview({examId}) has a loading state, an error state with retry, the warning banner from meta.warning, a table with an admission no/student/subject/score/grade column set, and a CSV download." |
+
+---
+
+# PART C — OPEN DECISIONS (settle before building the parts they block)
+
+| # | Decision | Why it matters | Suggested default |
+|---|---|---|---|
+| C1 | **Scope guard:** new tables/models (report cycles, grading schemes, sign-offs, batches) fall outside `academic-scope-guard.yml`'s allowed paths, as do route registration and the permission registry | A PR from Joshua would fail CI | Ask Deo to extend the guard's allow-list for `ReportCard*`, `Grading*` and route/permission entries, **or** Deo makes those small platform edits himself |
+| C2 | **PDF engine:** dompdf (current ERP) vs Chromium (Browsershot or a Gotenberg service), which the legacy card relies on for Grid | Decides whether the card design can be copied 1:1 | Prototype both on one fake card; choose by fidelity, and by whether af-south-1 can run a Chromium service |
+| C3 | **Card colours and fonts:** the print card uses burgundy `#5C1218` + Playfair/DM Sans; the ERP screens use maroon `#5A1011` + Roboto | Brand consistency | Keep the school's familiar print design for PDF/preview; use ERP tokens for every other screen. Ask Deo to confirm |
+| C4 | **Position / rank** on the card? | Removed in legacy, but raw results still carry POS | Off by default; per-cycle toggle only if the school asks |
+| C5 | ~~Attendance on the card?~~ **DECIDED 2026-10-24: YES** (A3.8). Conduct is still undecided | — | Conduct stays off for v1 |
+| C6 | **Fewer than 7 graded subjects** (secondary) | Legacy printed nothing | Show "Division: not computed (fewer than 7 subjects)" |
+| C7 | **Overall score rule:** weighted component averages (legacy) vs mean of subject totals | They can differ on the same card | Keep legacy for continuity; display the method in the footer note |
+| C8 | **TERMINAL extras** (subject comments, parent comment, Progress) | Teacher workload | Per-cycle toggles, off for mid-term, on for terminal |
+| C9 | **Where report cards live** (new `/academic/report-cycles` area vs inside `/academic/exams/:id`) | Navigation | A new sub-nav item "Report cards" next to "Exams" |
+| C10 | **Legacy data migration** | Real data is prohibited outside production until the go-live gate opens | Do not import legacy workbooks into dev/UAT; build fake fixtures modelled on the packages' JSON shape |
+| C11 | **Who signs** (class teacher, dean, principal): staff roles and signature image storage | Needs an encrypted document store and a role mapping | Store signature images as sensitive Documents; map the three roles in settings |
+| C12 | **Attendance audit gap:** `audit_logs.sensitive_category` has no 'attendance' value, so attendance reads are not audited | Rule 6 (audit sensitive reads); a platform migration outside Joshua's scope | Ask Deo to add 'attendance' to the enum; meanwhile card reads are audited as 'grades' |
+| C13 | **Attendance rate formula and thresholds**: (present+late)/(recorded) as the dashboard does, or over possible school days? Do the ≥95/90/80 rating bands fit? | What parents see | Match the dashboard; show "not recorded" days separately; thresholds configurable |
+| C14 | **Exams-module API gaps** (Part D): there is no endpoint listing submitted attempts for essay grading, lists are capped at 15 rows, a duplicate subject or accommodation returns a 500, and online exam scores are not scaled to max_score | Some D screens need small backend changes | Fix them inside `Api/V1/Academic` + `Services/Academic` (in scope); flag any route-file change (C1) |
+| C15 | **Exam timer / duration**: the online exam runner has no time limit today | Needs a new column (`exams` or `marking_schemes` duration) + server-side expiry | Add `duration_minutes` per marking scheme; the server enforces it; accommodations add extra time |
+
+---
+
+## Appendix — fake fixture example (shape only)
+
+```json
+{
+  "student": { "no": 1, "name": "STUDENT A (FAKE)" },
+  "meta": { "class_display": "Form 1", "class_teacher": "Teacher X (fake)", "academic_year": "2026",
+            "cycle": "Mid-Term", "report_date": "2026-09-04", "school_opens": "2026-09-14", "no_division": false },
+  "components": [ { "label": "Monthly", "weight": 25 }, { "label": "Mid-Term", "weight": 75 } ],
+  "subjects": [
+    { "name": "Mathematics", "short": "Math", "c1": 60, "c2": 80, "total": "75.00", "grade": "A", "points": 1 },
+    { "name": "Physics", "short": "Physics", "c1": null, "c2": 52, "total": "52.00", "grade": "C", "points": 3 }
+  ],
+  "overall": { "score": "64.31", "grade": "C" },
+  "division": { "points": 19, "roman": "II", "label": "Credit", "gap": "1 point from Division I" },
+  "top_subject": { "name": "Mathematics", "score": "75.00" },
+  "subjects_taken": 12, "subjects_passed": 11,
+  "attendance": { "from": "2026-07-06", "to": "2026-09-04", "present": 55, "late": 3, "absent": 2, "excused": 2,
+                  "not_recorded": 1, "days_attended": 58, "days_recorded": 62, "rate": "93.5", "rating": "Good attendance" },
+  "comment": "Fake comment text for layout testing only.",
+  "signatures": { "class_teacher": null, "academic_dean": null, "principal": null }
+}
+```

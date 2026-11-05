@@ -130,6 +130,46 @@ export interface GradingScheme {
   boundaries: GradeBoundary[];
 }
 
+/* ---------------- Attendance (report cards, knowledge base A3.8) ---------------- */
+
+/** Daily roll-call status, as typed in the ERP register. */
+export type AttendanceStatus = "present" | "late" | "absent" | "excused";
+
+/** Which rating band the attendance rate falls into (thresholds configurable). */
+export type AttendanceRatingKey =
+  | "excellent"
+  | "good"
+  | "needs-improvement"
+  | "concern"
+  | "none";
+
+/**
+ * Per-student attendance over a report cycle's attendance period (A3.8).
+ * Computed from counted daily roll-call marks only: late counts as attended,
+ * excused stays in the denominator, and days with no counted mark are shown
+ * separately — they are never counted as absent.
+ */
+export interface AttendanceSummary {
+  /** Attendance period covered (ISO dates). */
+  from: string;
+  to: string;
+  /** Possible school days: weekdays minus holidays minus no-register days. */
+  possibleSchoolDays: number;
+  present: number;
+  late: number;
+  absent: number;
+  excused: number;
+  /** Possible school days with no counted register mark. */
+  notRecorded: number;
+  /** present + late. */
+  daysAttended: number;
+  /** present + late + absent + excused. */
+  daysRecorded: number;
+  /** (present+late) / daysRecorded x 100 at 1 dp; null when nothing is recorded. */
+  rate: number | null;
+  rating: AttendanceRatingKey;
+}
+
 /* ---------------- Report cycles ---------------- */
 
 export type CycleStatus =
@@ -150,6 +190,14 @@ export interface ReportCycle {
   closingDate: string;
   releaseDate: string;
   parentsDayDate: string;
+  /** Report date printed on the card badge (never hard-coded in the view). */
+  reportDate: string;
+  /** When school reopens after this cycle's break (printed on the card badge). */
+  schoolOpensDate: string;
+  /** Attendance period (A3.8): defaults to term start -> report date. */
+  attendanceFrom: string;
+  /** Last day of the attendance period. */
+  attendanceTo: string;
 }
 
 /* ---------------- Marks / comments / results ---------------- */

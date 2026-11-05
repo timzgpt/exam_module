@@ -125,6 +125,10 @@ export default function ReportCyclesPage() {
       closingDate: form.endDate,
       releaseDate: addDays(form.endDate, 14),
       parentsDayDate: addDays(form.endDate, -7),
+      reportDate: addDays(form.endDate, 3),
+      schoolOpensDate: addDays(form.endDate, 24),
+      attendanceFrom: form.startDate,
+      attendanceTo: form.endDate,
     };
     setCycles((prev) => [cycle, ...prev]);
     setCreateOpen(false);

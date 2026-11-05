@@ -1,6 +1,9 @@
 import { DEFAULT_SCHEME_ID, divisionFor, gradeFor, subjectTotal, subjectsPassed } from "./grading";
+import { computeAttendanceSummary, possibleSchoolDays } from "./attendance";
 import { ACADEMIC_APPROVER, DEMO_IDS } from "./demo-config";
 import type {
+  AttendanceSummary,
+  AttendanceStatus,
   BookingSlot,
   BatchRun,
   ClassApproval,
@@ -300,6 +303,10 @@ export const cycles: ReportCycle[] = [
     closingDate: "2025-11-21",
     releaseDate: "2025-12-05",
     parentsDayDate: "2025-11-14",
+    reportDate: "2025-12-01",
+    schoolOpensDate: "2026-01-12",
+    attendanceFrom: "2025-09-08",
+    attendanceTo: "2025-11-28",
   },
   {
     id: DEMO_IDS.reportCycleId,
@@ -312,6 +319,12 @@ export const cycles: ReportCycle[] = [
     closingDate: "2026-03-13",
     releaseDate: "2026-04-06",
     parentsDayDate: "2026-03-27",
+    // A3.8: report date + school opens are printed on the card; the
+    // attendance period runs from term start to the last full school day.
+    reportDate: "2026-03-13",
+    schoolOpensDate: "2026-04-27",
+    attendanceFrom: "2026-01-12",
+    attendanceTo: "2026-03-11",
   },
   {
     id: "cy2",
@@ -324,6 +337,10 @@ export const cycles: ReportCycle[] = [
     closingDate: "2026-07-10",
     releaseDate: "2026-07-27",
     parentsDayDate: "2026-07-17",
+    reportDate: "2026-07-17",
+    schoolOpensDate: "2026-09-07",
+    attendanceFrom: "2026-04-27",
+    attendanceTo: "2026-07-17",
   },
 ];
 
@@ -1127,11 +1144,77 @@ export function departmentStats(): DepartmentStat[] {
  * Report-card extras
  * ================================================================ */
 
-export function studentAttendance(studentId: string): { present: number; total: number } {
+/* ----------------------------------------------------------------
+ * Attendance (A3.8) — demo daily-register aggregation
+ * ---------------------------------------------------------------- */
+
+const attendanceCache = new Map<string, AttendanceSummary>();
+
+/** Pinned flagship register so the demo card shows every A3.8 row. */
+const ATTENDANCE_PINNED: Record<
+  string,
+  { late: number; absent: number; excused: number; notRecorded: number }
+> = {
+  [DEMO_IDS.studentId]: { late: 2, absent: 2, excused: 1, notRecorded: 1 },
+};
+
+/**
+ * Per-student attendance summary for the current demo cycle, aggregated from
+ * a deterministic fake daily roll call over the cycle's attendance period
+ * (A3.8): counted marks only; late counts as attended; excused stays in the
+ * denominator; possible days with no counted mark are reported separately
+ * and are never counted as absent. A real integration queries by person
+ * (not section) so a mid-term stream transfer still counts.
+ */
+export function attendanceRecordFor(studentId: string): AttendanceSummary {
+  const cached = attendanceCache.get(studentId);
+  if (cached) return cached;
+  const cycle = currentCycle;
+  const possible = possibleSchoolDays(cycle.attendanceFrom, cycle.attendanceTo);
   const rnd = mulberry32(hashStr(`attend|${studentId}`));
-  const total = 62;
-  const present = total - Math.floor(rnd() * 6);
-  return { present, total };
+  const pinned = ATTENDANCE_PINNED[studentId] ?? {
+    late: Math.floor(rnd() * 4), // 0-3 late arrivals
+    absent: Math.floor(rnd() * 4), // 0-3 unexcused absences
+    excused: Math.floor(rnd() * 3), // 0-2 excused
+    notRecorded: Math.floor(rnd() * 3), // 0-2 days with no counted register
+  };
+  const recorded = possible - pinned.notRecorded;
+  const attended = recorded - pinned.absent - pinned.excused;
+  const present = Math.max(0, attended - pinned.late);
+  // One entry per possible school day, in calendar order — the aggregator
+  // only counts, so a stable placement keeps the demo deterministic.
+  const marks: (AttendanceStatus | null)[] = [
+    ...Array<AttendanceStatus>(present).fill("present"),
+    ...Array<AttendanceStatus>(pinned.late).fill("late"),
+    ...Array<AttendanceStatus>(pinned.absent).fill("absent"),
+    ...Array<AttendanceStatus>(pinned.excused).fill("excused"),
+    ...Array<AttendanceStatus | null>(pinned.notRecorded).fill(null),
+  ];
+  const summary = computeAttendanceSummary({
+    from: cycle.attendanceFrom,
+    to: cycle.attendanceTo,
+    possibleSchoolDays: possible,
+    marks,
+  });
+  attendanceCache.set(studentId, summary);
+  return summary;
+}
+
+/**
+ * Attendance readiness facts per class (fake catch-up register state, B1.6):
+ * school days with no counted register in the period, and catch-up
+ * ("backfill") registers awaiting approval. A pending or declined catch-up
+ * register must not count towards attendance (A3.8).
+ */
+export function attendanceReadinessFor(classId: string): {
+  missingRegisterDays: number;
+  pendingCatchUpRegisters: number;
+} {
+  const gaps: Record<string, { missingRegisterDays: number; pendingCatchUpRegisters: number }> = {
+    "cls-2a": { missingRegisterDays: 3, pendingCatchUpRegisters: 1 },
+    "cls-4a": { missingRegisterDays: 1, pendingCatchUpRegisters: 0 },
+  };
+  return gaps[classId] ?? { missingRegisterDays: 0, pendingCatchUpRegisters: 0 };
 }
 
 export function studentEffort(studentId: string, subjectId: string): string {

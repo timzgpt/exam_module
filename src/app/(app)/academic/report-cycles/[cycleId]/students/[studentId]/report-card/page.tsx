@@ -12,7 +12,9 @@ import {
 import { usePrintDownload } from "@/hooks/use-print-download";
 import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
+import { AttendanceSummaryCard } from "@/components/shared/attendance-summary";
 import {
+  attendanceRecordFor,
   classById,
   classSubjectsFor,
   classNameOf,
@@ -21,21 +23,113 @@ import {
   isPrimaryClass,
   prevCaOf,
   schemeForClass,
-  studentAttendance,
   studentById,
   studentEffort,
   studentResultOf,
   studentsInClass,
   subjectById,
   subjectRemark,
+  teacherById,
 } from "@/lib/demo-data";
-import { divisionFor, fmtTotalMark, gradeFor, mostImprovedSubject, subjectsPassed } from "@/lib/grading";
-import { fmtLongDate } from "@/lib/format";
+import {
+  DIVISION_BANDS,
+  divisionFor,
+  fmtTotalMark,
+  gradeFor,
+  mostImprovedSubject,
+  subjectTotal,
+  subjectsPassed,
+} from "@/lib/grading";
+import { fmtDateRange, fmtLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Download, Printer, TrendingUp } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+
+interface ChartRow {
+  name: string;
+  label: string;
+  achieved: number;
+  classAvg: number;
+  classTop: number;
+}
+
+/**
+ * Print-style grouped performance chart (A4 section 6): one row per subject
+ * with the achieved total, the class average and the class top. Every bar is
+ * value-labelled (never colour alone) and a visually hidden data table backs
+ * the chart for screen readers.
+ */
+function PerformanceChart({ rows }: { rows: ChartRow[] }) {
+  return (
+    <div className="mt-3 border border-border p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-sm bg-destructive/75" /> Achieved
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-sm bg-foreground/30" /> Class average
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-sm bg-success/70" /> Class top
+        </span>
+        <span className="ml-auto tabular">0 – 100</span>
+      </div>
+      <div className="mt-2 space-y-2">
+        {rows.map((row) => (
+          <div key={row.name} className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+            <p className="truncate text-2xs font-medium" title={row.name}>
+              {row.label}
+            </p>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 flex-1 rounded-sm bg-muted">
+                  <div className="h-full rounded-sm bg-destructive/75" style={{ width: `${Math.min(100, row.achieved)}%` }} />
+                </div>
+                <span className="w-10 text-right text-2xs tabular text-foreground">{fmtTotalMark(row.achieved)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="h-1 flex-1 rounded-sm bg-muted">
+                  <div className="h-full rounded-sm bg-foreground/30" style={{ width: `${Math.min(100, row.classAvg)}%` }} />
+                </div>
+                <span className="w-10 text-right text-2xs tabular text-muted-foreground">{fmtTotalMark(row.classAvg)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="h-1 flex-1 rounded-sm bg-muted">
+                  <div className="h-full rounded-sm bg-success/70" style={{ width: `${Math.min(100, row.classTop)}%` }} />
+                </div>
+                <span className="w-10 text-right text-2xs tabular text-muted-foreground">{fmtTotalMark(row.classTop)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Chart data-table fallback (B0: charts include a table fallback). */}
+      <table className="sr-only">
+        <caption>Subject totals against the class average and class top</caption>
+        <thead>
+          <tr>
+            <th scope="col">Subject</th>
+            <th scope="col">Achieved</th>
+            <th scope="col">Class average</th>
+            <th scope="col">Class top</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.name}>
+              <th scope="row">{row.name}</th>
+              <td>{fmtTotalMark(row.achieved)}</td>
+              <td>{fmtTotalMark(row.classAvg)}</td>
+              <td>{fmtTotalMark(row.classTop)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ReportCardPage() {
   const params = useParams<{ studentId?: string }>();
@@ -46,8 +140,10 @@ export default function ReportCardPage() {
   const result = studentResultOf(student.id);
   const classmates = studentsInClass(student.classId);
   const classSize = classmates.length;
-  const attendance = studentAttendance(student.id);
+  const attendance = attendanceRecordFor(student.id);
   const comment = commentFor(student.classId, student.id);
+  const classTeacherName =
+    teacherById(classById(student.classId)?.classTeacherId)?.name ?? "\u2014";
 
   const classSubjects = classSubjectsFor(student.classId);
   const scheme = schemeForClass(student.classId);
@@ -97,6 +193,24 @@ export default function ReportCardPage() {
   const mostImprovedSubjectRow = mostImproved
     ? rows.find((r) => r.subject.id === mostImproved.subjectId)
     : undefined;
+
+  // Chart data (A4 section 6): achieved total vs class average and class top
+  // per assessed subject, over the student's enrolled classmates.
+  const chartRows: ChartRow[] = assessed.map((r) => {
+    const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
+    const comps = getComponents(student.classId, r.subject.id);
+    const totals = Object.values(comps)
+      .filter((c) => c.enrolled)
+      .map((c) => subjectTotal(c.ca, c.exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75))
+      .filter((t): t is number => t !== null);
+    return {
+      name: r.subject.name,
+      label: cs?.chartLabel ?? r.subject.name,
+      achieved: r.mark ?? 0,
+      classAvg: totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0,
+      classTop: totals.length ? Math.max(...totals) : 0,
+    };
+  });
 
   const switchStudent = (id: string) => {
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
@@ -166,11 +280,22 @@ export default function ReportCardPage() {
         <div className="mx-auto mt-3 h-1 max-w-md border-y border-input" />
 
         <h2 className="mt-5 text-center text-base font-bold uppercase tracking-[0.18em]">
-          Student Terminal Report
+          Student Report Card
         </h2>
         <p className="mt-0.5 text-center text-xs text-muted-foreground">
           {cycle.term} · {cycle.academicYear} Academic Year
         </p>
+        {/* Report date + school opens badges (A4 header; never hard-coded). */}
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <span className="rounded border border-border px-2.5 py-1 text-2xs">
+            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">Report date</span>{" "}
+            <span className="font-medium tabular">{fmtLongDate(cycle.reportDate)}</span>
+          </span>
+          <span className="rounded border border-border px-2.5 py-1 text-2xs">
+            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">School opens</span>{" "}
+            <span className="font-medium tabular">{fmtLongDate(cycle.schoolOpensDate)}</span>
+          </span>
+        </div>
 
         {/* Student info grid */}
         <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-3 text-compact sm:grid-cols-3">
@@ -187,15 +312,17 @@ export default function ReportCardPage() {
             <p className="mt-0.5 font-medium">{classNameOf(student.classId)}</p>
           </div>
           <div>
+            <p className={CARD_LABEL}>Class Teacher</p>
+            <p className="mt-0.5 font-medium">{classTeacherName}</p>
+          </div>
+          <div>
+            <p className={CARD_LABEL}>Academic Year</p>
+            <p className="mt-0.5 font-medium tabular">{cycle.academicYear}</p>
+          </div>
+          <div>
             <p className={CARD_LABEL}>Position</p>
             <p className="mt-0.5 font-medium tabular">
               {result ? `${result.rank} of ${classSize}` : "-"}
-            </p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Attendance</p>
-            <p className="mt-0.5 font-medium tabular">
-              {attendance.present} / {attendance.total} days
             </p>
           </div>
           <div>
@@ -276,11 +403,11 @@ export default function ReportCardPage() {
         </table>
 
         {strongest ? (
-          <p className="mt-2 text-2xs text-muted-foreground">
-            Strongest subject: <span className="font-medium text-foreground">{strongest.subject.name}</span> ·{" "}
-            {fmtTotalMark(strongest.mark as number)} (ties go to the first subject in report-card order)
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-2xs font-medium text-primary">
+            ★ Strongest subject: {strongest.subject.name} — {fmtTotalMark(strongest.mark as number)} / 100
           </p>
         ) : null}
+        {chartRows.length > 0 ? <PerformanceChart rows={chartRows} /> : null}
         {mostImproved && mostImprovedSubjectRow ? (
           <p className="mt-1 text-2xs text-muted-foreground">
             Most improved: <span className="font-medium text-foreground">{mostImprovedSubjectRow.subject.name}</span> · CA up{" "}
@@ -316,19 +443,64 @@ export default function ReportCardPage() {
           ))}
         </div>
 
-        <p className="mt-2 text-center text-2xs text-muted-foreground">
-          {isPrimary
-            ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
-            : noDivision
-              ? "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."
-              : division
-                ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
-                    division.gapToDivisionI <= 0
-                      ? "Highest division achieved"
-                      : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
-                  }`
-                : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
-        </p>
+        {/* Attendance (A3.8): after the performance summary, before the scales. */}
+        <AttendanceSummaryCard variant="print" summary={attendance} className="mt-4" />
+
+        {/* Grade scale chips (A4 section 7) — rendered from the class scheme. */}
+        <div className="mt-4">
+          <p className={CARD_LABEL}>Grade scale</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {scheme.boundaries.map((b) => (
+              <span
+                key={b.grade}
+                className="rounded border border-border px-2 py-1 text-2xs text-muted-foreground"
+              >
+                <span className="font-bold text-foreground">{b.grade}</span> {b.min}–{b.max} · {b.remark}
+                {showPoints ? ` · ${b.points} pt${b.points === 1 ? "" : "s"}` : ""}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Division scale chips + gap text (A4 section 8); C6 wording when
+            the student has fewer than 7 graded subjects. */}
+        {showPoints ? (
+          <div className="mt-3">
+            <p className={CARD_LABEL}>Division scale</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {DIVISION_BANDS.map((b) => {
+                const achieved = division?.division === b.division;
+                return (
+                  <span
+                    key={b.division}
+                    className={cn(
+                      "rounded border px-2 py-1 text-2xs",
+                      achieved
+                        ? "border-primary bg-primary font-semibold text-primary-foreground"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    Div {b.division} · {b.min}–{b.max} · {b.label}
+                    {achieved && division ? ` \u25B2 ${division.pointsSum} pts` : ""}
+                  </span>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-2xs text-muted-foreground">
+              {division
+                ? division.gapToDivisionI <= 0
+                  ? "Highest division achieved — computed from the best 7 graded subject points."
+                  : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I — computed from the best 7 graded subject points.`
+                : "Division: not computed (fewer than 7 graded subjects)."}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-center text-2xs text-muted-foreground">
+            {isPrimary
+              ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
+              : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
+          </p>
+        )}
 
         {/* Remarks */}
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -350,20 +522,34 @@ export default function ReportCardPage() {
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
         </p>
-        <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact">
+        {/* Three signature slots (A4 section 10): Class Teacher · Academic
+            Dean · Principal. A real sign-off adds images and timestamps. */}
+        <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
           <div>
-            <div className="mx-auto w-48 border-t border-foreground/30" />
+            <div className="mx-auto w-40 border-t border-foreground/30" />
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
               Class Teacher
             </p>
           </div>
           <div>
-            <div className="mx-auto w-48 border-t border-foreground/30" />
+            <div className="mx-auto w-40 border-t border-foreground/30" />
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Head of School
+              Academic Dean
+            </p>
+          </div>
+          <div>
+            <div className="mx-auto w-40 border-t border-foreground/30" />
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Principal
             </p>
           </div>
         </div>
+
+        {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
+            literal character printed as "?" on old cards). */}
+        <p className="mt-6 text-center text-2xs text-muted-foreground">
+          {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
+        </p>
       </div>
       </div>
     </div>

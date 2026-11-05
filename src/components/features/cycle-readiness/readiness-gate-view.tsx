@@ -13,7 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCycleContext } from "@/hooks/use-academic-context";
+import { possibleSchoolDays } from "@/lib/attendance";
 import {
+  attendanceReadinessFor,
   approvalFor,
   classes,
   classNameOf,
@@ -25,6 +27,7 @@ import {
 import {
   AlertTriangle,
   BadgeCheck,
+  CalendarOff,
   CheckCircle2,
   Info,
   MessageSquareText,
@@ -52,9 +55,10 @@ export function ReadinessGateView() {
     const cp = commentProgress(cls.id);
     const commentsPct = cp.total > 0 ? Math.round((cp.done / cp.total) * 100) : 0;
     const approval = approvalFor(cls.id);
+    const attendance = attendanceReadinessFor(cls.id);
     const eligible =
       marksPct === 100 && (approval.status === "approved" || approval.status === "submitted");
-    return { cls, marksPct, done, total, commentsPct, cp, approval, eligible };
+    return { cls, marksPct, done, total, commentsPct, cp, approval, attendance, eligible };
   });
 
   /* Blocking issues: incomplete marks, and pending approvals on classes with incomplete marks. */
@@ -70,8 +74,14 @@ export function ReadinessGateView() {
     .map((c) => ({ cls: c.cls, approval: c.approval, marksPct: c.marksPct }));
   const blockingCount = marksIssues.length + approvalIssues.length;
 
-  /* Warnings: classes with missing class-teacher comments. */
+  /* Warnings: classes with missing class-teacher comments, plus attendance
+     gaps (B1.6): school days with no counted register in the period and
+     pending catch-up registers awaiting approval. */
   const commentWarnings = perClass.filter((c) => c.cp.done < c.cp.total);
+  const attendanceWarnings = perClass.filter(
+    (c) => c.attendance.missingRegisterDays > 0 || c.attendance.pendingCatchUpRegisters > 0,
+  );
+  const warningCount = commentWarnings.length + attendanceWarnings.length;
 
   return (
     <div className="space-y-5">
@@ -210,24 +220,37 @@ export function ReadinessGateView() {
           description="Non-blocking, but worth chasing before release."
           actions={
             <StatusBadge
-              tone={commentWarnings.length === 0 ? "success" : "warning"}
-              label={commentWarnings.length === 0 ? "None" : `${commentWarnings.length} classes`}
+              tone={warningCount === 0 ? "success" : "warning"}
+              label={warningCount === 0 ? "None" : `${warningCount} items`}
             />
           }
         >
-          {commentWarnings.length === 0 ? (
+          {warningCount === 0 ? (
             <EmptyState
               icon={MessageSquareText}
-              title="All comments complete"
-              description="Every class-teacher comment has been written."
+              title="All clear"
+              description="Every class-teacher comment is written and every register is counted."
             />
           ) : (
             <ul className="space-y-2.5">
               {commentWarnings.map((c) => (
-                <li key={c.cls.id} className="flex items-start gap-2.5">
+                <li key={`comment-${c.cls.id}`} className="flex items-start gap-2.5">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                   <p className="text-compact text-foreground tabular">
                     {c.cls.name}: {c.cp.done} of {c.cp.total} class-teacher comments complete
+                  </p>
+                </li>
+              ))}
+              {attendanceWarnings.map((c) => (
+                <li key={`attendance-${c.cls.id}`} className="flex items-start gap-2.5">
+                  <CalendarOff className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <p className="text-compact text-foreground tabular">
+                    {c.cls.name}: {c.attendance.missingRegisterDays} day
+                    {c.attendance.missingRegisterDays === 1 ? "" : "s"} not recorded — take catch-up
+                    registers
+                    {c.attendance.pendingCatchUpRegisters > 0
+                      ? ` · ${c.attendance.pendingCatchUpRegisters} catch-up register awaiting approval`
+                      : ""}
                   </p>
                 </li>
               ))}
@@ -249,6 +272,7 @@ export function ReadinessGateView() {
                   <TableHead className="pl-4">Class</TableHead>
                   <TableHead>Marks</TableHead>
                   <TableHead>Comments</TableHead>
+                  <TableHead>Attendance</TableHead>
                   <TableHead>Approval</TableHead>
                   <TableHead className="pr-4">Eligible?</TableHead>
                 </TableRow>
@@ -281,6 +305,28 @@ export function ReadinessGateView() {
                         </div>
                         <Progress value={c.commentsPct} className="mt-1 h-1.5" />
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-compact tabular">
+                        {c.attendance.missingRegisterDays === 0 &&
+                        c.attendance.pendingCatchUpRegisters === 0 ? (
+                          <span className="inline-flex items-center gap-1.5 text-success">
+                            <CheckCircle2 className="size-3.5" /> All days recorded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-warning-strong">
+                            <AlertTriangle className="size-3.5" />
+                            {c.attendance.missingRegisterDays} day
+                            {c.attendance.missingRegisterDays === 1 ? "" : "s"} not recorded
+                            {c.attendance.pendingCatchUpRegisters > 0
+                              ? ` · ${c.attendance.pendingCatchUpRegisters} pending`
+                              : ""}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-2xs text-muted-foreground tabular">
+                        {possibleSchoolDays(cycle.attendanceFrom, cycle.attendanceTo)} possible school days
+                      </p>
                     </TableCell>
                     <TableCell>
                       <StatusBadge

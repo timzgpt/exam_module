@@ -26,6 +26,18 @@ export function fmtStamp(value: string): string {
   return `${d} ${MONTHS_SHORT[m - 1]} ${y}${time ? ` ${time}` : ""}`;
 }
 
+/** "2026-01-12", "2026-03-11" -> "12 January \u2013 11 March 2026" */
+export function fmtDateRange(from: string, to: string): string {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  if (!fy || !fm || !fd || !ty || !tm || !td) return `${from} \u2013 ${to}`;
+  const fromText = `${fd} ${MONTHS_LONG[fm - 1]}`;
+  const toText = `${td} ${MONTHS_LONG[tm - 1]}`;
+  return fy === ty
+    ? `${fromText} \u2013 ${toText} ${ty}`
+    : `${fromText} ${fy} \u2013 ${toText} ${ty}`;
+}
+
 /** "09:00 - 09:20" -> "09:00" (start of the slot window). */
 export function slotStart(label: string): string {
   return label.split("-")[0].trim();

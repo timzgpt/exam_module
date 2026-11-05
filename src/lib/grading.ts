@@ -96,8 +96,9 @@ export function mostImprovedSubject(
   return deltas.reduce((best, d) => (d.delta > best.delta ? d : best));
 }
 
-/** CSEE division bands: best-7 points sum mapped to a division. */
-const DIVISION_BANDS: {
+/** CSEE division bands: best-7 points sum mapped to a division. Exported for
+ * the report card's division-scale chip strip (knowledge base A4 section 8). */
+export const DIVISION_BANDS: {
   division: DivisionResult["division"];
   label: string;
   min: number;
