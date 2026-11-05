@@ -79,7 +79,7 @@ export function ReportCardView({ child }: { child: Student }) {
       <div className="print:hidden mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-compact font-medium text-foreground">
-            Terminal report · {firstName(child.name)}
+            {currentCycle.name} · {firstName(child.name)}
           </p>
           <p className="text-xs text-muted-foreground">
             Use &quot;Save as PDF&quot; in the print dialog to keep a copy.

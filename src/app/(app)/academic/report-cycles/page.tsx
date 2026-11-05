@@ -64,6 +64,13 @@ const STEP_LABELS: Record<CycleStatus, string> = {
   released: "Released",
 };
 
+/** The three report-cycle exams — the cycle name is always "{exam} - {year}". */
+const EXAM_OPTIONS = [
+  { label: "Mid-Term", kind: "mid-term" },
+  { label: "Terminal Exam", kind: "terminal" },
+  { label: "Annual Exam", kind: "annual" },
+] as const;
+
 function daysUntil(dateStr: string): number {
   const ms =
     new Date(`${dateStr}T00:00:00Z`).getTime() - new Date(`${DEMO_TODAY}T00:00:00Z`).getTime();
@@ -106,22 +113,36 @@ export default function ReportCyclesPage() {
   const [cycles, setCycles] = useState<ReportCycle[]>(demoCycles);
   const [selectedId, setSelectedId] = useState<string>(DEMO_IDS.reportCycleId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", term: "Term 1", startDate: "", endDate: "" });
+  const [form, setForm] = useState<{
+    exam: string;
+    term: string;
+    year: string;
+    startDate: string;
+    endDate: string;
+  }>({
+    exam: "Terminal Exam",
+    term: "Term 1",
+    year: SCHOOL.academicYear,
+    startDate: "",
+    endDate: "",
+  });
 
   const active = cycles.find((c) => c.id === DEMO_IDS.reportCycleId) ?? currentCycle;
   const selected = cycles.find((c) => c.id === selectedId) ?? active;
   const daysToClose = daysUntil(active.closingDate);
 
   const createCycle = () => {
-    if (!form.name.trim() || !form.startDate || !form.endDate) return;
+    if (!form.year.trim() || !form.startDate || !form.endDate) return;
+    const kind = EXAM_OPTIONS.find((o) => o.label === form.exam)?.kind ?? "terminal";
     const cycle: ReportCycle = {
       id: `cy-${Date.now()}`,
-      name: form.name.trim(),
+      // Naming convention: "{Exam} - {year}" — e.g. "Terminal Exam - 2026".
+      name: `${form.exam} - ${form.year.trim()}`,
       term: form.term,
-      academicYear: SCHOOL.academicYear,
-      // Cycles created here are end-of-term reports (terminal engine);
-      // mid-term cycles carry their own kind on the cycle record.
-      kind: "terminal",
+      academicYear: form.year.trim(),
+      // The engine follows the exam: Mid-Term runs the mid-term engine;
+      // Terminal and Annual exams run the terminal engine.
+      kind,
       startDate: form.startDate,
       endDate: form.endDate,
       status: "preparation",
@@ -135,7 +156,13 @@ export default function ReportCyclesPage() {
     };
     setCycles((prev) => [cycle, ...prev]);
     setCreateOpen(false);
-    setForm({ name: "", term: "Term 1", startDate: "", endDate: "" });
+    setForm({
+      exam: "Terminal Exam",
+      term: "Term 1",
+      year: SCHOOL.academicYear,
+      startDate: "",
+      endDate: "",
+    });
     toast({
       title: "Cycle created",
       description: `${cycle.name} was added in preparation. Set its closing and release dates next.`,
@@ -163,30 +190,57 @@ export default function ReportCyclesPage() {
               </DialogHeader>
               <div className="grid gap-3.5 py-1">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="cycle-name">Cycle name</Label>
-                  <Input
-                    id="cycle-name"
-                    placeholder="e.g. Term 3 · 2026 Report Cycle"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Term</Label>
+                  <Label>Exam</Label>
                   {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
-                  <Select value={form.term} onValueChange={(v) => setForm({ ...form, term: v })}>
+                  <Select value={form.exam} onValueChange={(v) => setForm({ ...form, exam: v })}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["Term 1", "Term 2", "Term 3"].map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
+                      {EXAM_OPTIONS.map((o) => (
+                        <SelectItem key={o.label} value={o.label}>
+                          {o.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label>Term</Label>
+                    {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
+                    <Select value={form.term} onValueChange={(v) => setForm({ ...form, term: v })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Term 1", "Term 2", "Term 3"].map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="cycle-year">Academic year</Label>
+                    <Input
+                      id="cycle-year"
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={form.year}
+                      onChange={(e) => setForm({ ...form, year: e.target.value })}
+                    />
+                  </div>
+                </div>
+                {/* The name is derived, never free-typed: "{Exam} - {year}". */}
+                <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Cycle name ·{" "}
+                  <span className="font-semibold text-foreground">
+                    {form.exam} - {form.year.trim() || "…"}
+                  </span>
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label htmlFor="cycle-start">Start date</Label>
@@ -214,7 +268,7 @@ export default function ReportCyclesPage() {
                 </Button>
                 <Button
                   onClick={createCycle}
-                  disabled={!form.name.trim() || !form.startDate || !form.endDate}
+                  disabled={!form.year.trim() || !form.startDate || !form.endDate}
                 >
                   Create cycle
                 </Button>

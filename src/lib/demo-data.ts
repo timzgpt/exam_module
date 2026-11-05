@@ -294,7 +294,7 @@ export const exams: Exam[] = [
 export const cycles: ReportCycle[] = [
   {
     id: "cy0",
-    name: "Term 3 · 2025 Report Cycle",
+    name: "Terminal Exam - 2025",
     term: "Term 3",
     academicYear: "2025",
     kind: "terminal",
@@ -314,7 +314,7 @@ export const cycles: ReportCycle[] = [
     // demo: mid-term cards use the 3:1 chart with the in-image legend and
     // the Best-Improvement badge on primary classes (chart prompt §8/§9).
     id: "cy1m",
-    name: "Mid-Term · Term 1 2026 Report Cycle",
+    name: "Mid-Term - 2026",
     term: "Term 1",
     academicYear: "2026",
     kind: "mid-term",
@@ -331,7 +331,7 @@ export const cycles: ReportCycle[] = [
   },
   {
     id: DEMO_IDS.reportCycleId,
-    name: "Term 1 · 2026 Report Cycle",
+    name: "Terminal Exam - 2026",
     term: "Term 1",
     academicYear: "2026",
     kind: "terminal",
@@ -349,21 +349,24 @@ export const cycles: ReportCycle[] = [
     attendanceTo: "2026-03-11",
   },
   {
+    // The Annual Exam cycle — the third name in the "{Exam} - {year}"
+    // convention. Annual cards run the same Terminal engine as end-of-term
+    // cycles (see ReportCycle.kind in lib/types.ts).
     id: "cy2",
-    name: "Term 2 · 2026 Report Cycle",
-    term: "Term 2",
+    name: "Annual Exam - 2026",
+    term: "Term 3",
     academicYear: "2026",
-    kind: "terminal",
-    startDate: "2026-04-27",
-    endDate: "2026-07-17",
+    kind: "annual",
+    startDate: "2026-09-07",
+    endDate: "2026-11-20",
     status: "preparation",
-    closingDate: "2026-07-10",
-    releaseDate: "2026-07-27",
-    parentsDayDate: "2026-07-17",
-    reportDate: "2026-07-17",
-    schoolOpensDate: "2026-09-07",
-    attendanceFrom: "2026-04-27",
-    attendanceTo: "2026-07-17",
+    closingDate: "2026-11-13",
+    releaseDate: "2026-11-27",
+    parentsDayDate: "2026-11-06",
+    reportDate: "2026-11-23",
+    schoolOpensDate: "2027-01-11",
+    attendanceFrom: "2026-09-07",
+    attendanceTo: "2026-11-20",
   },
 ];
 
