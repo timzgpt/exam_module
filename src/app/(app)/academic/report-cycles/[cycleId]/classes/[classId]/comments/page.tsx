@@ -7,21 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
-import {
-  commentFor,
-  commentTemplates,
-  studentsInClass,
-} from "@/lib/demo-data";
+import { commentFor, studentsInClass } from "@/lib/demo-data";
 import type { CommentRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ChevronRight, MessageSquareText, PenLine, Search, Send } from "lucide-react";
@@ -44,7 +33,6 @@ export default function CommentsPage() {
   );
   const [selectedId, setSelectedId] = useState<string>(students[0]?.id ?? "");
   const [query, setQuery] = useState("");
-  const [templateKey, setTemplateKey] = useState("");
   const [edited, setEdited] = useState<Set<string>>(() => new Set());
 
   const selected = selectedId ? comments[selectedId] : undefined;
@@ -70,16 +58,6 @@ export default function CommentsPage() {
       next.add(selectedId);
       return next;
     });
-  };
-
-  const insertTemplate = (key: string) => {
-    setTemplateKey(key);
-    const template = commentTemplates[Number(key)];
-    if (!template || !selectedId) return;
-    const base = (comments[selectedId].classTeacher ?? "").trimEnd();
-    const next = `${base ? `${base} ` : ""}${template}`.slice(0, REMARK_MAX);
-    updateSelected({ classTeacher: next });
-    toast({ title: "Template inserted", description: "The template text was appended to the class teacher's remark." });
   };
 
   const saveDraft = () => {
@@ -146,7 +124,7 @@ export default function CommentsPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Comments: ${cls.name}`}
-        description={`${cycle.name} · write the class teacher's remark and parental involvement per student, insert templates and submit for report generation.`}
+        description={`${cycle.name} · write the class teacher's remark and parental involvement per student, then submit for report generation.`}
       />
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
@@ -287,23 +265,6 @@ export default function CommentsPage() {
                 <p className="text-2xs text-muted-foreground">
                   Required for every student before a report card can be released.
                 </p>
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Insert template</Label>
-                {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
-                <Select value={templateKey} onValueChange={insertTemplate}>
-                  <SelectTrigger className="w-full sm:w-80">
-                    <SelectValue placeholder="Insert template…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {commentTemplates.map((t, i) => (
-                      <SelectItem key={i} value={String(i)}>
-                        {t.length > 64 ? `${t.slice(0, 64)}…` : t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-4">
