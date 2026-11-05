@@ -119,6 +119,9 @@ export default function ReportCyclesPage() {
       name: form.name.trim(),
       term: form.term,
       academicYear: SCHOOL.academicYear,
+      // Cycles created here are end-of-term reports (terminal engine);
+      // mid-term cycles carry their own kind on the cycle record.
+      kind: "terminal",
       startDate: form.startDate,
       endDate: form.endDate,
       status: "preparation",

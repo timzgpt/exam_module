@@ -184,6 +184,14 @@ export interface ReportCycle {
   name: string;
   term: string;
   academicYear: string;
+  /**
+   * Which report engine this cycle's cards come from. The Mid-Term engine
+   * counts a student with a single assessment at 100% in the chart's class
+   * stats and shows the Best-Improvement badge on primary cards; the
+   * Terminal engine only counts students with BOTH components in class
+   * stats and never shows the improvement badge (chart prompt §4/§8).
+   */
+  kind: "mid-term" | "terminal";
   startDate: string;
   endDate: string;
   status: CycleStatus;

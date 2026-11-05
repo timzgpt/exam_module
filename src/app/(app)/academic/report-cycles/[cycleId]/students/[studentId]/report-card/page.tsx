@@ -12,6 +12,13 @@ import {
 import { usePrintDownload } from "@/hooks/use-print-download";
 import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
+import {
+  buildChartSeries,
+  CHART_FALLBACK_TEXT,
+  classScoreFor,
+  generateChartImage,
+  type ChartVariant,
+} from "@/lib/chart/performance-chart";
 import { AttendanceSummaryCard } from "@/components/shared/attendance-summary";
 import {
   attendanceRecordFor,
@@ -37,7 +44,6 @@ import {
   fmtTotalMark,
   gradeFor,
   mostImprovedSubject,
-  subjectTotal,
   subjectsPassed,
 } from "@/lib/grading";
 import { fmtDateRange, fmtLongDate } from "@/lib/format";
@@ -49,62 +55,87 @@ const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-mute
 
 interface ChartRow {
   name: string;
-  label: string;
   achieved: number;
   classAvg: number;
   classTop: number;
 }
 
+interface PerformanceChartSectionProps {
+  /** Which report engine printed this card (mid-term vs terminal rules). */
+  variant: ChartVariant;
+  /** Static data-URI chart image; null renders the fallback paragraph. */
+  chartImage: string | null;
+  rows: ChartRow[];
+  strongest: { name: string; score: number } | null;
+  /** Mid-Term primary cards only (chart prompt §8). */
+  bestImprovement: { name: string; value: number } | null;
+  isPrimary: boolean;
+}
+
 /**
- * Print-style grouped performance chart (A4 section 6): one row per subject
- * with the achieved total, the class average and the class top. Every bar is
- * value-labelled (never colour alone) and a visually hidden data table backs
- * the chart for screen readers.
+ * "Performance Charts" section (A4 section 6 / chart prompt §8): badge row,
+ * the static grouped bar chart image, the Terminal HTML legend and a
+ * visually hidden data table backing the chart for screen readers (B0:
+ * charts include a table fallback).
  */
-function PerformanceChart({ rows }: { rows: ChartRow[] }) {
+function PerformanceChartSection({
+  variant,
+  chartImage,
+  rows,
+  strongest,
+  bestImprovement,
+  isPrimary,
+}: PerformanceChartSectionProps) {
+  // Section heading: "Performance Chart" on secondary terminal cards only.
+  const heading = variant === "mid-term" || isPrimary ? "Performance Charts" : "Performance Chart";
   return (
     <div className="mt-3 border border-border p-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-destructive/75" /> Achieved
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-foreground/30" /> Class average
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-success/70" /> Class top
-        </span>
-        <span className="ml-auto tabular">0 – 100</span>
-      </div>
-      <div className="mt-2 space-y-2">
-        {rows.map((row) => (
-          <div key={row.name} className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
-            <p className="truncate text-2xs font-medium" title={row.name}>
-              {row.label}
-            </p>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5">
-                <div className="h-1.5 flex-1 rounded-sm bg-muted">
-                  <div className="h-full rounded-sm bg-destructive/75" style={{ width: `${Math.min(100, row.achieved)}%` }} />
-                </div>
-                <span className="w-10 text-right text-2xs tabular text-foreground">{fmtTotalMark(row.achieved)}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="h-1 flex-1 rounded-sm bg-muted">
-                  <div className="h-full rounded-sm bg-foreground/30" style={{ width: `${Math.min(100, row.classAvg)}%` }} />
-                </div>
-                <span className="w-10 text-right text-2xs tabular text-muted-foreground">{fmtTotalMark(row.classAvg)}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="h-1 flex-1 rounded-sm bg-muted">
-                  <div className="h-full rounded-sm bg-success/70" style={{ width: `${Math.min(100, row.classTop)}%` }} />
-                </div>
-                <span className="w-10 text-right text-2xs tabular text-muted-foreground">{fmtTotalMark(row.classTop)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className={CARD_LABEL}>{heading}</p>
+      {variant === "mid-term" ? (
+        <div className="mt-0.5">
+          <p className="text-compact font-medium">Subject Score Analysis</p>
+          <p className="text-2xs text-muted-foreground">
+            Student score vs class average across all subjects
+          </p>
+        </div>
+      ) : null}
+      {strongest || bestImprovement ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {strongest ? (
+            <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-2xs font-medium text-primary">
+              ★ Strongest Subject: {strongest.name} — {fmtTotalMark(strongest.score)} / 100
+            </span>
+          ) : null}
+          {bestImprovement ? (
+            <span className="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-2xs font-medium text-success-strong">
+              ▲ Best Improvement: {bestImprovement.name} — +{bestImprovement.value}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {chartImage ? (
+        <img
+          src={chartImage}
+          alt="Grouped bar chart comparing achieved marks with the class average and class topper for every assessed subject"
+          className="chart-img mt-2 w-full"
+        />
+      ) : (
+        <p className="mt-2 text-2xs text-muted-foreground">{CHART_FALLBACK_TEXT}</p>
+      )}
+      {variant === "terminal" ? (
+        // Terminal legend is rendered in HTML, not in the chart image (§9).
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-sm" style={{ background: "#E74C3C" }} /> Achieved Marks
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-sm" style={{ background: "#3498DB" }} /> Class Avg
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-sm" style={{ background: "#2ECC71" }} /> Class Topper
+          </span>
+        </div>
+      ) : null}
       {/* Chart data-table fallback (B0: charts include a table fallback). */}
       <table className="sr-only">
         <caption>Subject totals against the class average and class top</caption>
@@ -194,23 +225,40 @@ export default function ReportCardPage() {
     ? rows.find((r) => r.subject.id === mostImproved.subjectId)
     : undefined;
 
-  // Chart data (A4 section 6): achieved total vs class average and class top
-  // per assessed subject, over the student's enrolled classmates.
+  // Chart data (A4 section 6 / chart prompt §3–§4): achieved total vs class
+  // average and class top per assessed subject, over the student's enrolled
+  // classmates. Class stats follow the cycle's engine: mid-term counts a
+  // student with a single assessment at 100%; terminal only counts students
+  // with BOTH components (chart prompt §4/§9).
+  const variant: ChartVariant = cycle.kind === "mid-term" ? "mid-term" : "terminal";
   const chartRows: ChartRow[] = assessed.map((r) => {
     const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
     const comps = getComponents(student.classId, r.subject.id);
-    const totals = Object.values(comps)
+    const scores = Object.values(comps)
       .filter((c) => c.enrolled)
-      .map((c) => subjectTotal(c.ca, c.exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75))
+      .map((c) => classScoreFor(variant, c.ca, c.exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75))
       .filter((t): t is number => t !== null);
     return {
       name: r.subject.name,
-      label: cs?.chartLabel ?? r.subject.name,
       achieved: r.mark ?? 0,
-      classAvg: totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0,
-      classTop: totals.length ? Math.max(...totals) : 0,
+      classAvg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+      classTop: scores.length ? Math.max(...scores) : 0,
     };
   });
+  // Series + static chart image (chart prompt §7 call sequence).
+  const chartSeries = buildChartSeries(
+    chartRows.map((r) => ({ name: r.name, achieved: r.achieved })),
+    chartRows.map((r) => r.classAvg),
+    chartRows.map((r) => r.classTop),
+    strongest?.subject.name ?? "",
+    variant,
+  );
+  const chartImage = generateChartImage(chartSeries, variant);
+  // Best-Improvement badge: Mid-Term primary cards only (chart prompt §8).
+  const chartBestImprovement =
+    variant === "mid-term" && mostImproved && mostImprovedSubjectRow
+      ? { name: mostImprovedSubjectRow.subject.name, value: mostImproved.delta }
+      : null;
 
   const switchStudent = (id: string) => {
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
@@ -402,13 +450,19 @@ export default function ReportCardPage() {
           </tbody>
         </table>
 
-        {strongest ? (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-2xs font-medium text-primary">
-            ★ Strongest subject: {strongest.subject.name} — {fmtTotalMark(strongest.mark as number)} / 100
-          </p>
+        {assessed.length > 0 ? (
+          <PerformanceChartSection
+            variant={variant}
+            chartImage={chartImage}
+            rows={chartRows}
+            strongest={strongest ? { name: strongest.subject.name, score: strongest.mark as number } : null}
+            bestImprovement={chartBestImprovement}
+            isPrimary={isPrimary}
+          />
         ) : null}
-        {chartRows.length > 0 ? <PerformanceChart rows={chartRows} /> : null}
-        {mostImproved && mostImprovedSubjectRow ? (
+        {/* The Best-Improvement badge carries the improvement info on
+            mid-term primary cards; the explainer line covers the rest. */}
+        {mostImproved && mostImprovedSubjectRow && !chartBestImprovement ? (
           <p className="mt-1 text-2xs text-muted-foreground">
             Most improved: <span className="font-medium text-foreground">{mostImprovedSubjectRow.subject.name}</span> · CA up{" "}
             {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject with a single recorded term
