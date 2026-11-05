@@ -35,6 +35,13 @@ import type { Student } from "@/lib/types";
 import { Download } from "lucide-react";
 
 /**
+ * Terminal and annual reports print without the "Teacher's remark" captions
+ * (school rule): the remark text stands alone and the caption space is left
+ * blank. Mid-term cards keep the captions.
+ */
+const REMARK_CAPTIONS_OFF = currentCycle.kind === "terminal" || currentCycle.kind === "annual";
+
+/**
  * Printable report card view of the parent hub, for one child. Rendered only
  * when the child's card is not on hold (held cards show the hold panel).
  *
@@ -123,7 +130,12 @@ export function ReportCardView({ child }: { child: Student }) {
                 <TableHead>Subject</TableHead>
                 <TableHead className="text-right">Mark</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
-                <TableHead className="min-w-50">Teacher&apos;s remark</TableHead>
+                <TableHead
+                  className="min-w-50"
+                  aria-label="Teacher's remark"
+                >
+                  {REMARK_CAPTIONS_OFF ? "" : "Teacher\u2019s remark"}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -187,11 +199,19 @@ export function ReportCardView({ child }: { child: Student }) {
         <AttendanceSummaryCard variant="screen" summary={attendance} className="mt-3" />
 
         <div className="mt-3 rounded-lg border border-border/80 bg-muted/40 p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Class teacher&apos;s remark
-          </p>
-          <p className="mt-1.5 text-compact leading-relaxed text-foreground">
-            {comment.classTeacher ?? "Awaiting remark"}
+          {REMARK_CAPTIONS_OFF ? null : (
+            <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Class teacher&apos;s remark
+            </p>
+          )}
+          <p
+            className={
+              REMARK_CAPTIONS_OFF
+                ? "text-compact leading-relaxed text-foreground"
+                : "mt-1.5 text-compact leading-relaxed text-foreground"
+            }
+          >
+            {comment.classTeacher ?? (REMARK_CAPTIONS_OFF ? "\u00A0" : "Awaiting remark")}
           </p>
           {classTeacher ? (
             <p className="mt-2 text-xs text-muted-foreground">

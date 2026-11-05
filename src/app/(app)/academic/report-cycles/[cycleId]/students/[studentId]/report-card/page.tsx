@@ -260,6 +260,10 @@ export default function ReportCardPage() {
   // student with a single assessment at 100%; terminal only counts students
   // with BOTH components (chart prompt §4/§9).
   const variant: ChartVariant = cycle.kind === "mid-term" ? "mid-term" : "terminal";
+  // Terminal and annual reports print without the "Teacher's remark"
+  // captions (school rule): the remark text stands alone and the caption
+  // space is left blank. Mid-term cards keep the captions.
+  const isTerminalLike = cycle.kind === "terminal" || cycle.kind === "annual";
   const chartRows: ChartRow[] = assessed.map((r) => {
     const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
     const comps = getComponents(student.classId, r.subject.id);
@@ -632,7 +636,10 @@ export default function ReportCardPage() {
                     </tr>
                     <tr>
                       <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
-                        <span className={cn(CELL_LABEL, "mr-2")}>Teacher&apos;s remark</span>
+                        {/* Terminal/annual: no caption — the remark prints alone. */}
+                        {!isTerminalLike ? (
+                          <span className={cn(CELL_LABEL, "mr-2")}>Teacher&apos;s remark</span>
+                        ) : null}
                         <span className="text-compact italic leading-relaxed text-foreground/80">
                           {!enrolled
                             ? "Not taking this subject."
@@ -808,7 +815,7 @@ export default function ReportCardPage() {
 
           {/* Division scale + gap text (A4 section 8); C6 wording when the
               student has fewer than 7 graded subjects. Primary and no-division
-              classes print the explanatory line instead. */}
+              classes print no division section at all. */}
           {showPoints ? (
             <table className={cn(TBL, "mt-4")}>
               <colgroup>
@@ -867,13 +874,7 @@ export default function ReportCardPage() {
                 </tr>
               </tbody>
             </table>
-          ) : (
-            <p className="mt-3 text-center text-2xs text-muted-foreground">
-              {isPrimary
-                ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
-                : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
-            </p>
-          )}
+          ) : null}
 
           {/* Performance chart section (table-wrapped) */}
           {assessed.length > 0 ? (
@@ -901,14 +902,27 @@ export default function ReportCardPage() {
                   Remarks
                 </th>
               </tr>
-              <tr>
-                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
-                  Class teacher&apos;s remark
-                </th>
-                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
-                  {comment.classTeacher ?? "Awaiting remark"}
-                </td>
-              </tr>
+              {isTerminalLike ? (
+                // Terminal/annual: no "Class teacher's remark" caption — the
+                // remark prints alone; a missing remark leaves blank space.
+                <tr>
+                  <td
+                    colSpan={2}
+                    className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}
+                  >
+                    {comment.classTeacher ?? "\u00A0"}
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                    Class teacher&apos;s remark
+                  </th>
+                  <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+                    {comment.classTeacher ?? "Awaiting remark"}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
                   Parental involvement
