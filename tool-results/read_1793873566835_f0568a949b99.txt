@@ -1,0 +1,960 @@
+     1→"use client";
+     2→
+     3→import { Fragment } from "react";
+     4→import { PageHeader } from "@/components/shared/page-header";
+     5→import { Button } from "@/components/ui/button";
+     6→import {
+     7→  Select,
+     8→  SelectContent,
+     9→  SelectItem,
+    10→  SelectTrigger,
+    11→  SelectValue,
+    12→} from "@/components/ui/select";
+    13→import { usePrintDownload } from "@/hooks/use-print-download";
+    14→import { useCycleContext } from "@/hooks/use-academic-context";
+    15→import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
+    16→import {
+    17→  buildChartSeries,
+    18→  CHART_FALLBACK_TEXT,
+    19→  classScoreFor,
+    20→  generateChartImage,
+    21→  type ChartVariant,
+    22→} from "@/lib/chart/performance-chart";
+    23→import {
+    24→  attendanceRecordFor,
+    25→  classById,
+    26→  classSubjectsFor,
+    27→  classNameOf,
+    28→  commentFor,
+    29→  getComponents,
+    30→  isPrimaryClass,
+    31→  prevCaOf,
+    32→  schemeForClass,
+    33→  studentById,
+    34→  studentResultOf,
+    35→  studentsInClass,
+    36→  subjectById,
+    37→  subjectRemark,
+    38→  teacherById,
+    39→} from "@/lib/demo-data";
+    40→import {
+    41→  DIVISION_BANDS,
+    42→  divisionFor,
+    43→  fmtTotalMark,
+    44→  gradeFor,
+    45→  mostImprovedSubject,
+    46→  subjectsPassed,
+    47→} from "@/lib/grading";
+    48→import { ATTENDANCE_RATING_TEXT } from "@/lib/attendance";
+    49→import { fmtDateRange, fmtLongDate } from "@/lib/format";
+    50→import { cn } from "@/lib/utils";
+    51→import { AlertTriangle, Download, Printer } from "lucide-react";
+    52→import { useParams, useRouter } from "next/navigation";
+    53→
+    54→/**
+    55→ * The card is printed as pure white paper laid out entirely with bordered
+    56→ * tables (the school's requested "totally white, only table" design). The
+    57→ * single accent colour is the brand maroon #5C0A14 — the exact maroon of
+    58→ * the Josephian Schools shield — used for the title band and every table
+    59→ * header row; all other fills are white.
+    60→ */
+    61→const BRAND = "#5C0A14";
+    62→
+    63→/* Shared chrome for the card's tables. */
+    64→const TBL = "w-full table-fixed border-collapse";
+    65→/** Full-width maroon section bar (first row of each section table). */
+    66→const SECTION_BAR =
+    67→  "border border-border bg-[#5C0A14] px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-white";
+    68→/** Maroon column-heading cell. */
+    69→const COL_HEAD =
+    70→  "border border-border bg-[#5C0A14] px-2 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white";
+    71→/** Standard bordered body cell (white). */
+    72→const CELL = "border border-border bg-white px-2 py-1.5 align-middle";
+    73→/** Tiny uppercase label used inside bordered cells. */
+    74→const CELL_LABEL =
+    75→  "text-3xs font-semibold uppercase tracking-[0.12em] text-muted-foreground";
+    76→
+    77→interface ChartRow {
+    78→  name: string;
+    79→  achieved: number;
+    80→  classAvg: number;
+    81→  classTop: number;
+    82→}
+    83→
+    84→interface PerformanceChartSectionProps {
+    85→  /** Which report engine printed this card (mid-term vs terminal rules). */
+    86→  variant: ChartVariant;
+    87→  /** Static data-URI chart image; null renders the fallback paragraph. */
+    88→  chartImage: string | null;
+    89→  rows: ChartRow[];
+    90→  strongest: { name: string; score: number } | null;
+    91→  /** Mid-Term primary cards only (chart prompt §8). */
+    92→  bestImprovement: { name: string; value: number } | null;
+    93→  isPrimary: boolean;
+    94→}
+    95→
+    96→/**
+    97→ * "Performance Charts" section (A4 section 6 / chart prompt §8) — also laid
+    98→ * out as a table: a maroon section bar and a single bordered body cell
+    99→ * holding the badge lines, the static grouped bar chart image, the Terminal
+   100→ * HTML legend and a visually hidden data table backing the chart for screen
+   101→ * readers (B0: charts include a table fallback).
+   102→ */
+   103→function PerformanceChartSection({
+   104→  variant,
+   105→  chartImage,
+   106→  rows,
+   107→  strongest,
+   108→  bestImprovement,
+   109→  isPrimary,
+   110→}: PerformanceChartSectionProps) {
+   111→  // Section heading: "Performance Chart" on secondary terminal cards only.
+   112→  const heading = variant === "mid-term" || isPrimary ? "Performance Charts" : "Performance Chart";
+   113→  return (
+   114→    <table className={cn(TBL, "mt-4")}>
+   115→      <tbody>
+   116→        <tr>
+   117→          <th scope="colgroup" className={SECTION_BAR}>
+   118→            {heading}
+   119→          </th>
+   120→        </tr>
+   121→        <tr>
+   122→          <td className={CELL}>
+   123→            {strongest || bestImprovement ? (
+   124→              <div className="mb-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-2xs font-semibold">
+   125→                {strongest ? (
+   126→                  <span style={{ color: BRAND }}>
+   127→                    ★ Strongest Subject: {strongest.name} — {fmtTotalMark(strongest.score)} / 100
+   128→                  </span>
+   129→                ) : null}
+   130→                {bestImprovement ? (
+   131→                  <span className="text-[#2D6A4E]">
+   132→                    ▲ Best Improvement: {bestImprovement.name} — +{bestImprovement.value}
+   133→                  </span>
+   134→                ) : null}
+   135→              </div>
+   136→            ) : null}
+   137→            {chartImage ? (
+   138→              <img
+   139→                src={chartImage}
+   140→                alt="Grouped bar chart comparing achieved marks with the class average and class topper for every assessed subject"
+   141→                className="chart-img w-full"
+   142→              />
+   143→            ) : (
+   144→              <p className="text-2xs text-muted-foreground">{CHART_FALLBACK_TEXT}</p>
+   145→            )}
+   146→            {variant === "terminal" ? (
+   147→              // Terminal legend is rendered in HTML, not in the chart image (§9).
+   148→              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+   149→                <span className="inline-flex items-center gap-1">
+   150→                  <span className="size-2 rounded-sm" style={{ background: "#E74C3C" }} /> Achieved Marks
+   151→                </span>
+   152→                <span className="inline-flex items-center gap-1">
+   153→                  <span className="size-2 rounded-sm" style={{ background: "#3498DB" }} /> Class Avg
+   154→                </span>
+   155→                <span className="inline-flex items-center gap-1">
+   156→                  <span className="size-2 rounded-sm" style={{ background: "#2ECC71" }} /> Class Topper
+   157→                </span>
+   158→              </div>
+   159→            ) : null}
+   160→            {/* Chart data-table fallback (B0: charts include a table fallback). */}
+   161→            <table className="sr-only">
+   162→              <caption>Subject totals against the class average and class top</caption>
+   163→              <thead>
+   164→                <tr>
+   165→                  <th scope="col">Subject</th>
+   166→                  <th scope="col">Achieved</th>
+   167→                  <th scope="col">Class average</th>
+   168→                  <th scope="col">Class top</th>
+   169→                </tr>
+   170→              </thead>
+   171→              <tbody>
+   172→                {rows.map((row) => (
+   173→                  <tr key={row.name}>
+   174→                    <th scope="row">{row.name}</th>
+   175→                    <td>{fmtTotalMark(row.achieved)}</td>
+   176→                    <td>{fmtTotalMark(row.classAvg)}</td>
+   177→                    <td>{fmtTotalMark(row.classTop)}</td>
+   178→                  </tr>
+   179→                ))}
+   180→              </tbody>
+   181→            </table>
+   182→          </td>
+   183→        </tr>
+   184→      </tbody>
+   185→    </table>
+   186→  );
+   187→}
+   188→
+   189→export default function ReportCardPage() {
+   190→  const params = useParams<{ studentId?: string }>();
+   191→  const router = useRouter();
+   192→  const { cycle } = useCycleContext();
+   193→  const student = studentById(params.studentId ?? "") ?? studentById(DEMO_IDS.studentId)!;
+   194→
+   195→  const result = studentResultOf(student.id);
+   196→  const classmates = studentsInClass(student.classId);
+   197→  const classSize = classmates.length;
+   198→  const attendance = attendanceRecordFor(student.id);
+   199→  const comment = commentFor(student.classId, student.id);
+   200→  const classTeacherName =
+   201→    teacherById(classById(student.classId)?.classTeacherId)?.name ?? "\u2014";
+   202→
+   203→  const classSubjects = classSubjectsFor(student.classId);
+   204→  const scheme = schemeForClass(student.classId);
+   205→  const isPrimary = isPrimaryClass(student.classId);
+   206→  // Assessment split shown in the table header (25 % monthly / 75 % terminal).
+   207→  const caPct = classSubjects[0]?.caMarks ?? 25;
+   208→  const examPct = classSubjects[0]?.examMarks ?? 75;
+   209→  // Top band of the class scheme — rendered as the filled grade badge.
+   210→  const topGrade = scheme.boundaries[0]?.grade;
+   211→  const allRows = classSubjects.map((cs) => {
+   212→    const subject = subjectById(cs.subjectId)!;
+   213→    const comp = getComponents(student.classId, cs.subjectId)[student.id];
+   214→    const enrolled = comp?.enrolled ?? true;
+   215→    const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
+   216→    const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
+   217→    return { subject, enrolled, mark, grade, ca: comp?.ca ?? null, exam: comp?.exam ?? null };
+   218→  });
+   219→  // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
+   220→  // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
+   221→  // Remaining rows renumber continuously after any omitted subject (the #
+   222→  // column below).
+   223→  const rows = allRows.filter((r) => !r.enrolled || r.mark !== null);
+   224→  const assessed = allRows.filter((r) => r.mark !== null);
+   225→  const pointsTotal = assessed.reduce((a, r) => a + (r.grade?.points ?? 0), 0);
+   226→  // Secondary division: best 7 subject points; null when fewer than 7 graded
+   227→  // (and always null for primary classes — divisions are a NECTA outcome).
+   228→  const division = isPrimary ? null : divisionFor(assessed.map((r) => r.grade?.points ?? null));
+   229→  const passed = subjectsPassed(assessed.map((r) => r.grade?.grade ?? null));
+   230→  // Strongest subject: highest total; ties go to the first in subject order.
+   231→  const strongest =
+   232→    assessed.length > 0
+   233→      ? assessed.reduce((best, r) => ((r.mark as number) > (best.mark as number) ? r : best))
+   234→      : undefined;
+   235→  // Points and division are hidden on primary cards (Primary A–E bands carry
+   236→  // no points) and on any secondary class whose teacher set the Report
+   237→  // Overview "No Division" flag to Yes.
+   238→  const noDivision = !isPrimary && (classById(student.classId)?.noDivision ?? false);
+   239→  const showPoints = !isPrimary && !noDivision;
+   240→  // Most improved (primary only): largest CA delta C2 − C1 per subject; a
+   241→  // single recorded term counts as 0. Ties go to the first subject in order.
+   242→  const mostImproved = (() => {
+   243→    if (!isPrimary) return null;
+   244→    const deltas = classSubjects.map((cs) => {
+   245→      const comp = getComponents(student.classId, cs.subjectId)[student.id];
+   246→      const cur = comp?.enrolled ? comp.ca ?? null : null;
+   247→      const prev = prevCaOf(student.classId, cs.subjectId)[student.id] ?? null;
+   248→      return { subjectId: cs.subjectId, delta: cur !== null && prev !== null ? cur - prev : 0 };
+   249→    });
+   250→    const best = mostImprovedSubject(deltas);
+   251→    return best && best.delta > 0 ? best : null;
+   252→  })();
+   253→  const mostImprovedSubjectRow = mostImproved
+   254→    ? rows.find((r) => r.subject.id === mostImproved.subjectId)
+   255→    : undefined;
+   256→
+   257→  // Chart data (A4 section 6 / chart prompt §3–§4): achieved total vs class
+   258→  // average and class top per assessed subject, over the student's enrolled
+   259→  // classmates. Class stats follow the cycle's engine: mid-term counts a
+   260→  // student with a single assessment at 100%; terminal only counts students
+   261→  // with BOTH components (chart prompt §4/§9).
+   262→  const variant: ChartVariant = cycle.kind === "mid-term" ? "mid-term" : "terminal";
+   263→  const chartRows: ChartRow[] = assessed.map((r) => {
+   264→    const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
+   265→    const comps = getComponents(student.classId, r.subject.id);
+   266→    const scores = Object.values(comps)
+   267→      .filter((c) => c.enrolled)
+   268→      .map((c) => classScoreFor(variant, c.ca, c.exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75))
+   269→      .filter((t): t is number => t !== null);
+   270→    return {
+   271→      name: r.subject.name,
+   272→      achieved: r.mark ?? 0,
+   273→      classAvg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+   274→      classTop: scores.length ? Math.max(...scores) : 0,
+   275→    };
+   276→  });
+   277→  // Series + static chart image (chart prompt §7 call sequence).
+   278→  const chartSeries = buildChartSeries(
+   279→    chartRows.map((r) => ({ name: r.name, achieved: r.achieved })),
+   280→    chartRows.map((r) => r.classAvg),
+   281→    chartRows.map((r) => r.classTop),
+   282→    strongest?.subject.name ?? "",
+   283→    variant,
+   284→  );
+   285→  const chartImage = generateChartImage(chartSeries, variant);
+   286→  // Best-Improvement badge: Mid-Term primary cards only (chart prompt §8).
+   287→  const chartBestImprovement =
+   288→    variant === "mid-term" && mostImproved && mostImprovedSubjectRow
+   289→      ? { name: mostImprovedSubjectRow.subject.name, value: mostImproved.delta }
+   290→      : null;
+   291→
+   292→  const switchStudent = (id: string) => {
+   293→    router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
+   294→  };
+   295→
+   296→  const downloadPdf = usePrintDownload(
+   297→    "Use 'Save as PDF' in the print dialog to download the report card.",
+   298→  );
+   299→
+   300→  // Performance summary cells; the points/division pair appears only where
+   301→  // points are printed (secondary classes without the No-Division flag).
+   302→  const summaryCells = [
+   303→    { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-", accent: false },
+   304→    { label: "Average", value: result ? result.average.toFixed(1) : "-", accent: false },
+   305→    {
+   306→      label: "Overall grade",
+   307→      value: result && result.count > 0 ? result.grade : "-",
+   308→      accent: true,
+   309→    },
+   310→    ...(showPoints
+   311→      ? [
+   312→          {
+   313→            label: "Points total",
+   314→            value: assessed.length > 0 ? String(pointsTotal) : "-",
+   315→            accent: false,
+   316→          },
+   317→          {
+   318→            label: "Division",
+   319→            value: division ? `Div ${division.division}` : "—",
+   320→            accent: true,
+   321→          },
+   322→        ]
+   323→      : []),
+   324→    {
+   325→      label: "Subjects passed",
+   326→      value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-",
+   327→      accent: false,
+   328→    },
+   329→    { label: "Class size", value: String(classSize), accent: false },
+   330→  ];
+   331→
+   332→  // Attendance row cells; "Not recorded" appears only when > 0 (A3.8).
+   333→  const rateText = attendance.rate === null ? "–" : `${attendance.rate.toFixed(1)}%`;
+   334→  const attRatingText =
+   335→    attendance.rating === "none" ? null : ATTENDANCE_RATING_TEXT[attendance.rating];
+   336→  const attCells = [
+   337→    {
+   338→      label: "Days attended / recorded",
+   339→      value: `${attendance.daysAttended} / ${attendance.daysRecorded}`,
+   340→    },
+   341→    { label: "Attendance rate", value: rateText },
+   342→    { label: "Late", value: String(attendance.late) },
+   343→    { label: "Absent", value: String(attendance.absent) },
+   344→    { label: "Excused", value: String(attendance.excused) },
+   345→    ...(attendance.notRecorded > 0
+   346→      ? [
+   347→          {
+   348→            label: "Not recorded",
+   349→            value: `${attendance.notRecorded} day${attendance.notRecorded === 1 ? "" : "s"}`,
+   350→          },
+   351→        ]
+   352→      : []),
+   353→  ];
+   354→
+   355→  return (
+   356→    <div className="space-y-5">
+   357→      <PageHeader
+   358→        title="Report card"
+   359→        description={`${student.name} · ${classNameOf(student.classId)} · ${cycle.name}`}
+   360→      />
+   361→
+   362→      {/* Toolbar: screen only, never printed */}
+   363→      <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-white p-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+   364→        <div className="flex flex-wrap items-center gap-2">
+   365→          <span className="text-xs font-medium text-muted-foreground">Student</span>
+   366→          {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
+   367→          <Select value={student.id} onValueChange={switchStudent}>
+   368→            <SelectTrigger className="h-8 w-full text-compact sm:w-65">
+   369→              <SelectValue />
+   370→            </SelectTrigger>
+   371→            <SelectContent>
+   372→              {classmates.map((s) => (
+   373→                <SelectItem key={s.id} value={s.id}>
+   374→                  {s.name}
+   375→                </SelectItem>
+   376→              ))}
+   377→            </SelectContent>
+   378→          </Select>
+   379→        </div>
+   380→        <div className="flex items-center gap-2">
+   381→          <Button size="sm" className="gap-1.5" onClick={downloadPdf}>
+   382→            <Download className="size-4" /> Download PDF
+   383→          </Button>
+   384→          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.print()}>
+   385→            <Printer className="size-4" /> Print
+   386→          </Button>
+   387→        </div>
+   388→      </div>
+   389→
+   390→      {/* Legacy rule 7: a student with no marks at all renders an empty
+   391→          subject table — warn before printing instead of generating. */}
+   392→      {assessed.length === 0 ? (
+   393→        <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-compact text-destructive print:hidden">
+   394→          <AlertTriangle className="size-4 shrink-0" />
+   395→          No marks have been entered for this student yet — report cards are generated only after marks exist.
+   396→        </div>
+   397→      ) : null}
+   398→
+   399→      {/* The printable card: scrollable on a phone, exact A4 sheet in print.
+   400→          Totally white paper; every section is a bordered table. */}
+   401→      <div className="overflow-x-auto print:overflow-visible">
+   402→        <div className="print-area mx-auto w-full max-w-205 border border-border bg-white p-8 font-serif text-foreground shadow-sm">
+   403→          {/* School header: logo + school block on white */}
+   404→          <div className="flex items-center gap-4">
+   405→            <img
+   406→              src="/josephian-logo.png"
+   407→              alt="Josephian Schools logo"
+   408→              className="h-20 w-20 shrink-0"
+   409→            />
+   410→            <div className="min-w-0 flex-1 text-center">
+   411→              <p
+   412→                className="text-lg font-bold uppercase tracking-[0.2em]"
+   413→                style={{ color: BRAND }}
+   414→              >
+   415→                {SCHOOL.name}
+   416→              </p>
+   417→              <p className="mt-0.5 text-xs italic text-muted-foreground">{SCHOOL.motto}</p>
+   418→              <p className="mt-0.5 text-2xs text-muted-foreground">
+   419→                {SCHOOL.address} · {SCHOOL.phone} · {SCHOOL.email}
+   420→              </p>
+   421→            </div>
+   422→            <div aria-hidden className="h-20 w-20 shrink-0" />
+   423→          </div>
+   424→
+   425→          {/* Title band — maroon table header row */}
+   426→          <table className={cn(TBL, "mt-4")}>
+   427→            <tbody>
+   428→              <tr>
+   429→                <th scope="colgroup" className="bg-[#5C0A14] px-3 py-2 text-center">
+   430→                  <span className="block text-sm font-bold uppercase tracking-[0.3em] text-white">
+   431→                    Student Report Card
+   432→                  </span>
+   433→                  <span className="mt-0.5 block text-2xs font-medium tracking-[0.1em] text-white/85">
+   434→                    {cycle.term} · {cycle.academicYear} Academic Year · {cycle.name}
+   435→                  </span>
+   436→                </th>
+   437→              </tr>
+   438→            </tbody>
+   439→          </table>
+   440→
+   441→          {/* Student particulars */}
+   442→          <table className={cn(TBL, "mt-4")}>
+   443→            <colgroup>
+   444→              <col className="w-[17%]" />
+   445→              <col className="w-[33%]" />
+   446→              <col className="w-[17%]" />
+   447→              <col className="w-[33%]" />
+   448→            </colgroup>
+   449→            <tbody>
+   450→              <tr>
+   451→                <th colSpan={4} scope="colgroup" className={SECTION_BAR}>
+   452→                  Student Particulars
+   453→                </th>
+   454→              </tr>
+   455→              <tr>
+   456→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   457→                  Student name
+   458→                </th>
+   459→                <td className={cn(CELL, "font-medium")}>{student.name}</td>
+   460→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   461→                  Admission no
+   462→                </th>
+   463→                <td className={cn(CELL, "font-medium tabular")}>{student.admissionNo}</td>
+   464→              </tr>
+   465→              <tr>
+   466→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   467→                  Class
+   468→                </th>
+   469→                <td className={cn(CELL, "font-medium")}>{classNameOf(student.classId)}</td>
+   470→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   471→                  Class teacher
+   472→                </th>
+   473→                <td className={cn(CELL, "font-medium")}>{classTeacherName}</td>
+   474→              </tr>
+   475→              <tr>
+   476→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   477→                  Academic year
+   478→                </th>
+   479→                <td className={cn(CELL, "font-medium tabular")}>{cycle.academicYear}</td>
+   480→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   481→                  Report cycle
+   482→                </th>
+   483→                <td className={cn(CELL, "font-medium")}>{cycle.name}</td>
+   484→              </tr>
+   485→              <tr>
+   486→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   487→                  Report date
+   488→                </th>
+   489→                <td className={cn(CELL, "font-medium tabular")}>
+   490→                  {fmtLongDate(cycle.reportDate)}
+   491→                </td>
+   492→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   493→                  School opens
+   494→                </th>
+   495→                <td className={cn(CELL, "font-medium tabular")}>
+   496→                  {fmtLongDate(cycle.schoolOpensDate)}
+   497→                </td>
+   498→              </tr>
+   499→            </tbody>
+   500→          </table>
+   501→
+   502→          {/* Subject results — the card's core table: monthly and terminal
+   503→              components with their assessment weights, weighted total, grade
+   504→              badge and exam-vs-CA progress, with the subject teacher's remark
+   505→              quoted in a full-width row beneath each subject. */}
+   506→          <table className={cn(TBL, "mt-4")}>
+   507→            <colgroup>
+   508→              <col className="w-[5%]" />
+   509→              <col className="w-[29%]" />
+   510→              <col className="w-[13%]" />
+   511→              <col className="w-[13%]" />
+   512→              <col className="w-[16.5%]" />
+   513→              <col className="w-[11.5%]" />
+   514→              <col className="w-[12%]" />
+   515→            </colgroup>
+   516→            <thead>
+   517→              <tr>
+   518→                <th colSpan={7} scope="colgroup" className={SECTION_BAR}>
+   519→                  Subject Results
+   520→                </th>
+   521→              </tr>
+   522→              <tr>
+   523→                <th scope="col" className={COL_HEAD}>
+   524→                  #
+   525→                </th>
+   526→                <th scope="col" className={cn(COL_HEAD, "pl-4 text-left")}>
+   527→                  Subject
+   528→                </th>
+   529→                <th scope="col" className={COL_HEAD}>
+   530→                  Monthly
+   531→                  <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
+   532→                    {caPct} %
+   533→                  </span>
+   534→                </th>
+   535→                <th scope="col" className={COL_HEAD}>
+   536→                  Terminal
+   537→                  <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
+   538→                    {examPct} %
+   539→                  </span>
+   540→                </th>
+   541→                <th scope="col" className={COL_HEAD}>
+   542→                  Total
+   543→                </th>
+   544→                <th scope="col" className={COL_HEAD}>
+   545→                  Grade
+   546→                </th>
+   547→                <th scope="col" className={COL_HEAD}>
+   548→                  Progress
+   549→                </th>
+   550→              </tr>
+   551→            </thead>
+   552→            <tbody>
+   553→              {rows.map((row, rowIndex) => {
+   554→                const { subject, enrolled, mark, grade, ca, exam } = row;
+   555→                // Progress = terminal − monthly, shown only when both
+   556→                // components exist (single-assessment subjects carry their
+   557→                // mark at 100 % and have no progress to report).
+   558→                const delta = ca !== null && exam !== null ? exam - ca : null;
+   559→                return (
+   560→                  <Fragment key={subject.id}>
+   561→                    <tr>
+   562→                      <td
+   563→                        className={cn(
+   564→                          CELL,
+   565→                          "text-center text-2xs tabular text-muted-foreground",
+   566→                        )}
+   567→                      >
+   568→                        {rowIndex + 1}
+   569→                      </td>
+   570→                      <td className={cn(CELL, "pl-4 text-[15px] font-semibold")}>
+   571→                        {subject.name}
+   572→                      </td>
+   573→                      <td
+   574→                        className={cn(
+   575→                          CELL,
+   576→                          "text-center text-[15px] tabular",
+   577→                          ca === null && "text-muted-foreground",
+   578→                        )}
+   579→                      >
+   580→                        {ca ?? "—"}
+   581→                      </td>
+   582→                      <td
+   583→                        className={cn(
+   584→                          CELL,
+   585→                          "text-center text-[15px] tabular",
+   586→                          exam === null && "text-muted-foreground",
+   587→                        )}
+   588→                      >
+   589→                        {exam ?? "—"}
+   590→                      </td>
+   591→                      <td className={cn(CELL, "text-center text-[15px] font-bold tabular")}>
+   592→                        {enrolled && mark !== null ? mark.toFixed(2) : "—"}
+   593→                      </td>
+   594→                      <td className={cn(CELL, "text-center")}>
+   595→                        {enrolled && grade?.grade ? (
+   596→                          <span
+   597→                            className={cn(
+   598→                              "inline-flex size-7 items-center justify-center rounded-full text-sm font-bold",
+   599→                              grade.grade === topGrade
+   600→                                ? "text-white"
+   601→                                : "border border-border bg-white text-foreground",
+   602→                            )}
+   603→                            style={
+   604→                              grade.grade === topGrade ? { backgroundColor: BRAND } : undefined
+   605→                            }
+   606→                          >
+   607→                            {grade.grade}
+   608→                          </span>
+   609→                        ) : (
+   610→                          <span className="text-[15px] text-muted-foreground">—</span>
+   611→                        )}
+   612→                      </td>
+   613→                      <td className={cn(CELL, "text-center")}>
+   614→                        {delta !== null ? (
+   615→                          <span
+   616→                            className={cn(
+   617→                              "text-[15px] font-bold tabular",
+   618→                              delta > 0
+   619→                                ? "text-[#2D6A4E]"
+   620→                                : delta < 0
+   621→                                  ? "text-[#C0392B]"
+   622→                                  : "text-muted-foreground",
+   623→                            )}
+   624→                          >
+   625→                            {delta > 0 ? "+" : delta < 0 ? "-" : ""}
+   626→                            {Math.abs(delta).toFixed(2)}
+   627→                          </span>
+   628→                        ) : (
+   629→                          <span className="text-[15px] text-muted-foreground">—</span>
+   630→                        )}
+   631→                      </td>
+   632→                    </tr>
+   633→                    <tr>
+   634→                      <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
+   635→                        <span className={cn(CELL_LABEL, "mr-2")}>Teacher&apos;s remark</span>
+   636→                        <span className="text-compact italic leading-relaxed text-foreground/80">
+   637→                          {!enrolled
+   638→                            ? "Not taking this subject."
+   639→                            : mark !== null
+   640→                              ? subjectRemark(mark, scheme)
+   641→                              : "Not assessed."}
+   642→                        </span>
+   643→                      </td>
+   644→                    </tr>
+   645→                  </Fragment>
+   646→                );
+   647→              })}
+   648→            </tbody>
+   649→          </table>
+   650→
+   651→          <p className="mt-1.5 text-2xs text-muted-foreground">
+   652→            A subject with only one assessment sat carries that mark at 100%; a subject with no
+   653→            marks at all is omitted and the remaining rows renumber continuously.
+   654→          </p>
+   655→
+   656→          {/* Most improved (primary): the Best-Improvement line above the
+   657→              chart carries it on mid-term cards; this line covers the rest. */}
+   658→          {mostImproved && mostImprovedSubjectRow && !chartBestImprovement ? (
+   659→            <p className="mt-1 text-2xs text-muted-foreground">
+   660→              Most improved:{" "}
+   661→              <span className="font-medium text-foreground">
+   662→                {mostImprovedSubjectRow.subject.name}
+   663→              </span>{" "}
+   664→              · CA up {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject
+   665→              with a single recorded term counts as 0)
+   666→            </p>
+   667→          ) : null}
+   668→
+   669→          {/* Performance summary */}
+   670→          <table className={cn(TBL, "mt-4")}>
+   671→            <tbody>
+   672→              <tr>
+   673→                <th colSpan={summaryCells.length} scope="colgroup" className={SECTION_BAR}>
+   674→                  Performance Summary
+   675→                </th>
+   676→              </tr>
+   677→              <tr>
+   678→                {summaryCells.map((cell) => (
+   679→                  <th key={cell.label} scope="col" className={cn(CELL, "text-center", CELL_LABEL)}>
+   680→                    {cell.label}
+   681→                  </th>
+   682→                ))}
+   683→              </tr>
+   684→              <tr>
+   685→                {summaryCells.map((cell) => (
+   686→                  <td
+   687→                    key={cell.label}
+   688→                    className={cn(CELL, "text-center text-sm font-bold tabular")}
+   689→                    style={cell.accent ? { color: BRAND } : undefined}
+   690→                  >
+   691→                    {cell.value}
+   692→                  </td>
+   693→                ))}
+   694→              </tr>
+   695→            </tbody>
+   696→          </table>
+   697→
+   698→          {/* Attendance (A3.8): after the performance summary, before the scales. */}
+   699→          <table className={cn(TBL, "mt-4")}>
+   700→            <tbody>
+   701→              <tr>
+   702→                <th colSpan={attCells.length} scope="colgroup" className={SECTION_BAR}>
+   703→                  Attendance · Mahudhurio
+   704→                </th>
+   705→              </tr>
+   706→              {attendance.daysRecorded === 0 ? (
+   707→                <tr>
+   708→                  <td colSpan={attCells.length} className={cn(CELL, "text-center text-compact")}>
+   709→                    No attendance recorded for this period.
+   710→                  </td>
+   711→                </tr>
+   712→              ) : (
+   713→                <>
+   714→                  <tr>
+   715→                    {attCells.map((cell) => (
+   716→                      <th
+   717→                        key={cell.label}
+   718→                        scope="col"
+   719→                        className={cn(CELL, "text-center", CELL_LABEL)}
+   720→                      >
+   721→                        {cell.label}
+   722→                      </th>
+   723→                    ))}
+   724→                  </tr>
+   725→                  <tr>
+   726→                    {attCells.map((cell) => (
+   727→                      <td
+   728→                        key={cell.label}
+   729→                        className={cn(CELL, "text-center text-sm font-bold tabular")}
+   730→                      >
+   731→                        {cell.value}
+   732→                      </td>
+   733→                    ))}
+   734→                  </tr>
+   735→                </>
+   736→              )}
+   737→              <tr>
+   738→                <td colSpan={attCells.length} className={cn(CELL, "text-2xs text-muted-foreground")}>
+   739→                  Period covered: {fmtDateRange(attendance.from, attendance.to)}
+   740→                  {attRatingText ? ` — ${attRatingText}` : ""}
+   741→                  {attendance.notRecorded > 0
+   742→                    ? " · Days not recorded have no counted register and are never counted as absent."
+   743→                    : ""}
+   744→                </td>
+   745→              </tr>
+   746→            </tbody>
+   747→          </table>
+   748→
+   749→          {/* Grade scale — rendered from the class scheme. */}
+   750→          <table className={cn(TBL, "mt-4")}>
+   751→            <colgroup>
+   752→              <col className="w-[12%]" />
+   753→              <col className="w-[18%]" />
+   754→              <col />
+   755→              {showPoints ? <col className="w-[12%]" /> : null}
+   756→            </colgroup>
+   757→            <thead>
+   758→              <tr>
+   759→                <th
+   760→                  colSpan={showPoints ? 4 : 3}
+   761→                  scope="colgroup"
+   762→                  className={SECTION_BAR}
+   763→                >
+   764→                  Grading Scale
+   765→                </th>
+   766→              </tr>
+   767→              <tr>
+   768→                <th scope="col" className={COL_HEAD}>
+   769→                  Grade
+   770→                </th>
+   771→                <th scope="col" className={COL_HEAD}>
+   772→                  Marks
+   773→                </th>
+   774→                <th scope="col" className={COL_HEAD}>
+   775→                  Remark
+   776→                </th>
+   777→                {showPoints ? (
+   778→                  <th scope="col" className={COL_HEAD}>
+   779→                    Points
+   780→                  </th>
+   781→                ) : null}
+   782→              </tr>
+   783→            </thead>
+   784→            <tbody>
+   785→              {scheme.boundaries.map((b) => {
+   786→                const achieved = result?.grade === b.grade;
+   787→                return (
+   788→                  <tr key={b.grade}>
+   789→                    <td
+   790→                      className={cn(CELL, "text-center font-bold")}
+   791→                      style={achieved ? { color: BRAND } : undefined}
+   792→                    >
+   793→                      {b.grade}
+   794→                      {achieved ? " ▲" : ""}
+   795→                    </td>
+   796→                    <td className={cn(CELL, "text-center tabular")}>
+   797→                      {b.min}–{b.max}
+   798→                    </td>
+   799→                    <td className={CELL}>{b.remark}</td>
+   800→                    {showPoints ? (
+   801→                      <td className={cn(CELL, "text-center tabular")}>{b.points}</td>
+   802→                    ) : null}
+   803→                  </tr>
+   804→                );
+   805→              })}
+   806→            </tbody>
+   807→          </table>
+   808→
+   809→          {/* Division scale + gap text (A4 section 8); C6 wording when the
+   810→              student has fewer than 7 graded subjects. Primary and no-division
+   811→              classes print the explanatory line instead. */}
+   812→          {showPoints ? (
+   813→            <table className={cn(TBL, "mt-4")}>
+   814→              <colgroup>
+   815→                <col className="w-[18%]" />
+   816→                <col className="w-[22%]" />
+   817→                <col />
+   818→              </colgroup>
+   819→              <thead>
+   820→                <tr>
+   821→                  <th colSpan={3} scope="colgroup" className={SECTION_BAR}>
+   822→                    Division Scale
+   823→                  </th>
+   824→                </tr>
+   825→                <tr>
+   826→                  <th scope="col" className={COL_HEAD}>
+   827→                    Division
+   828→                  </th>
+   829→                  <th scope="col" className={COL_HEAD}>
+   830→                    Points
+   831→                  </th>
+   832→                  <th scope="col" className={COL_HEAD}>
+   833→                    Description
+   834→                  </th>
+   835→                </tr>
+   836→              </thead>
+   837→              <tbody>
+   838→                {DIVISION_BANDS.map((b) => {
+   839→                  const achieved = division?.division === b.division;
+   840→                  return (
+   841→                    <tr key={b.division}>
+   842→                      <td
+   843→                        className={cn(CELL, "text-center font-bold")}
+   844→                        style={achieved ? { color: BRAND } : undefined}
+   845→                      >
+   846→                        Div {b.division}
+   847→                        {achieved ? " ▲" : ""}
+   848→                      </td>
+   849→                      <td className={cn(CELL, "text-center tabular")}>
+   850→                        {b.min}–{b.max}
+   851→                      </td>
+   852→                      <td className={CELL}>
+   853→                        {b.label}
+   854→                        {achieved && division ? ` — ${division.pointsSum} pts` : ""}
+   855→                      </td>
+   856→                    </tr>
+   857→                  );
+   858→                })}
+   859→                <tr>
+   860→                  <td colSpan={3} className={cn(CELL, "text-2xs text-muted-foreground")}>
+   861→                    {division
+   862→                      ? division.gapToDivisionI <= 0
+   863→                        ? "Highest division achieved — computed from the best 7 graded subject points."
+   864→                        : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I — computed from the best 7 graded subject points.`
+   865→                      : "Division: not computed (fewer than 7 graded subjects)."}
+   866→                  </td>
+   867→                </tr>
+   868→              </tbody>
+   869→            </table>
+   870→          ) : (
+   871→            <p className="mt-3 text-center text-2xs text-muted-foreground">
+   872→              {isPrimary
+   873→                ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
+   874→                : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
+   875→            </p>
+   876→          )}
+   877→
+   878→          {/* Performance chart section (table-wrapped) */}
+   879→          {assessed.length > 0 ? (
+   880→            <PerformanceChartSection
+   881→              variant={variant}
+   882→              chartImage={chartImage}
+   883→              rows={chartRows}
+   884→              strongest={
+   885→                strongest ? { name: strongest.subject.name, score: strongest.mark as number } : null
+   886→              }
+   887→              bestImprovement={chartBestImprovement}
+   888→              isPrimary={isPrimary}
+   889→            />
+   890→          ) : null}
+   891→
+   892→          {/* Remarks */}
+   893→          <table className={cn(TBL, "mt-4")}>
+   894→            <colgroup>
+   895→              <col className="w-[22%]" />
+   896→              <col />
+   897→            </colgroup>
+   898→            <tbody>
+   899→              <tr>
+   900→                <th colSpan={2} scope="colgroup" className={SECTION_BAR}>
+   901→                  Remarks
+   902→                </th>
+   903→              </tr>
+   904→              <tr>
+   905→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   906→                  Class teacher&apos;s remark
+   907→                </th>
+   908→                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+   909→                  {comment.classTeacher ?? "Awaiting remark"}
+   910→                </td>
+   911→              </tr>
+   912→              <tr>
+   913→                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+   914→                  Parental involvement
+   915→                </th>
+   916→                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+   917→                  {comment.parentalInvolvement ?? "Awaiting input"}
+   918→                </td>
+   919→              </tr>
+   920→            </tbody>
+   921→          </table>
+   922→
+   923→          {/* Footer: parents' day + signatures */}
+   924→          <p className="mt-5 text-center text-xs text-muted-foreground">
+   925→            Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
+   926→          </p>
+   927→          {/* Three signature slots (A4 section 10): Class Teacher · Academic
+   928→              Dean · Principal. A real sign-off adds images and timestamps. */}
+   929→          <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
+   930→            <div>
+   931→              <div className="mx-auto w-40 border-t border-foreground/30" />
+   932→              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   933→                Class Teacher
+   934→              </p>
+   935→            </div>
+   936→            <div>
+   937→              <div className="mx-auto w-40 border-t border-foreground/30" />
+   938→              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   939→                Academic Dean
+   940→              </p>
+   941→            </div>
+   942→            <div>
+   943→              <div className="mx-auto w-40 border-t border-foreground/30" />
+   944→              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   945→                Principal
+   946→              </p>
+   947→            </div>
+   948→          </div>
+   949→
+   950→          {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
+   951→              literal character printed as "?" on old cards). */}
+   952→          <p className="mt-6 text-center text-2xs text-muted-foreground">
+   953→            {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
+   954→          </p>
+   955→        </div>
+   956→      </div>
+   957→    </div>
+   958→  );
+   959→}
+   960→
