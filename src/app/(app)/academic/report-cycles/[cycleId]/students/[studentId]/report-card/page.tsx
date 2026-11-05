@@ -478,19 +478,9 @@ export default function ReportCardPage() {
                 </th>
                 <td className={cn(CELL, "font-medium tabular")}>{cycle.academicYear}</td>
                 <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
-                  Position
-                </th>
-                <td className={cn(CELL, "font-medium tabular")}>
-                  {result ? `${result.rank} of ${classSize}` : "-"}
-                </td>
-              </tr>
-              <tr>
-                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
                   Report cycle
                 </th>
-                <td colSpan={3} className={cn(CELL, "font-medium")}>
-                  {cycle.name}
-                </td>
+                <td className={cn(CELL, "font-medium")}>{cycle.name}</td>
               </tr>
               <tr>
                 <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
