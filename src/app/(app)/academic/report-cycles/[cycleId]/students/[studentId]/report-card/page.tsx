@@ -23,7 +23,6 @@ import {
   studentsInClass,
   subjectRemark,
   subjects,
-  verificationRecords,
 } from "@/lib/demo-data";
 import { gradeFor } from "@/lib/grading";
 import { fmtLongDate } from "@/lib/format";
@@ -43,9 +42,6 @@ export default function ReportCardPage() {
   const classSize = classmates.length;
   const attendance = studentAttendance(student.id);
   const comment = commentFor(student.classId, student.id);
-  const verification = verificationRecords.find(
-    (v) => v.studentId === student.id && v.cycleId === cycle.id,
-  );
 
   const rows = subjects.map((sub) => {
     const mark = result?.marks[sub.id] ?? null;
@@ -243,25 +239,6 @@ export default function ReportCardPage() {
               Head of School
             </p>
           </div>
-        </div>
-
-        {/* Verification strip */}
-        <div className="mt-8 flex flex-col gap-2 border border-input px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-mono text-xs tracking-[0.2em] text-foreground">
-              {verification
-                ? verification.code
-                : `JS26-T1-${student.admissionNo.slice(-4)}-`}
-            </p>
-            {verification ? (
-              <p className="mt-0.5 font-mono text-2xs text-muted-foreground">{verification.checksum}</p>
-            ) : null}
-          </div>
-          <p className="text-2xs text-muted-foreground">
-            {verification
-              ? "Authenticate at josephian.ac.tz/verify"
-              : "Verification code appears on issued copies"}
-          </p>
         </div>
       </div>
       </div>

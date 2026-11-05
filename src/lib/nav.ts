@@ -13,7 +13,6 @@ import {
   ListChecks,
   MessageSquareText,
   PenLine,
-  ScanSearch,
   SlidersHorizontal,
 } from "lucide-react";
 import type { NavItemDef } from "./types";
@@ -180,14 +179,6 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         hrefTemplate: "/portal/parents-day",
         icon: CalendarPlus,
         description: "Simple appointment booking",
-      },
-      {
-        key: "verify",
-        label: "Verify a report card (public)",
-        group: "Parent portal",
-        hrefTemplate: "/verify",
-        icon: ScanSearch,
-        description: "Secure report verification",
       },
     ],
   },

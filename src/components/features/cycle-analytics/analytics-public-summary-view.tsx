@@ -16,7 +16,7 @@ import { useCycleContext } from "@/hooks/use-academic-context";
 import { Copy, Globe, Info, Lock } from "lucide-react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import { useState } from "react";
-import { SCHOOL, routes } from "@/lib/demo-config";
+import { SCHOOL } from "@/lib/demo-config";
 import { cycleStatsFor } from "@/lib/demo-data";
 import { formatAvg } from "@/lib/grading";
 
@@ -215,7 +215,7 @@ export function AnalyticsPublicSummaryView() {
             ) : null}
 
             <p className="mt-6 border-t border-border/70 pt-3 text-center text-xs text-muted-foreground">
-              Issued by {SCHOOL.name} · verification available at {routes.verify}
+              Issued by {SCHOOL.name}
             </p>
           </div>
         )}

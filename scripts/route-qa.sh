@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Route QA: all 23 module routes plus unknown-id deep links must return 200.
+# Route QA: all 22 module routes plus unknown-id deep links must return 200.
 set -u
 BASE="http://localhost:3000"
 CY="cy1"
@@ -29,7 +29,6 @@ ROUTES=(
   "/portal/report-cards/on-hold"
   "/portal/progress"
   "/portal/parents-day"
-  "/verify"
 )
 
 fail=0
@@ -57,7 +56,7 @@ for r in "/academic/report-cycles/some-unknown-cycle/readiness" "/academic/class
 done
 
 if [ "$fail" = "0" ]; then
-  echo "ALL ROUTES OK (23 + 2 fallbacks)"
+  echo "ALL ROUTES OK (22 + 2 fallbacks)"
 else
   echo "ROUTE FAILURES DETECTED"
   exit 1

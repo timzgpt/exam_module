@@ -186,17 +186,6 @@ export interface BookingSlot {
   bookedByStudentId: string | null;
 }
 
-/* ---------------- Verification ---------------- */
-
-export interface VerificationRecord {
-  code: string;
-  studentId: string;
-  cycleId: string;
-  issuedAt: string;
-  checksum: string;
-  revoked: boolean;
-}
-
 /* ---------------- Targets ---------------- */
 
 export interface StudentTarget {

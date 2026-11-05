@@ -36,13 +36,12 @@ ROUTES = [
     ("/portal/report-cards/on-hold", "portal-on-hold"),
     ("/portal/progress", "portal-progress"),
     ("/portal/parents-day", "portal-parents-day"),
-    ("/verify", "verify"),
 ]
 
 SHOTS = {
     "exams": [1280, 800], "marks": [1440, 900], "report-card": [1440, 1600],
     "portal-report-cards": [390, 844], "cycle-dashboard": [1280, 900],
-    "verify": [1280, 800], "home": [1280, 800],
+    "home": [1280, 800],
 }
 
 errors = []

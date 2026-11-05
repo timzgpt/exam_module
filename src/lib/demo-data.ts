@@ -16,7 +16,6 @@ import type {
   StudentTarget,
   Subject,
   Teacher,
-  VerificationRecord,
 } from "./types";
 
 /* ================================================================
@@ -642,57 +641,6 @@ export function targetFor(studentId: string): StudentTarget {
     targetAverage: Math.min(97, Math.round(base + 5 + rnd() * 6)),
     focus: FOCUS_AREAS[Math.floor(rnd() * FOCUS_AREAS.length)],
   };
-}
-
-/* ================================================================
- * Verification (public)
- * ================================================================ */
-
-export const verificationRecords: VerificationRecord[] = [
-  {
-    code: "JS26-T1-0147-9F3A",
-    studentId: DEMO_IDS.studentId,
-    cycleId: DEMO_IDS.reportCycleId,
-    issuedAt: "2026-04-06",
-    checksum: "SHA-256 · 9f3a…c21e",
-    revoked: false,
-  },
-  {
-    code: "JS26-T1-0152-77B2",
-    studentId: "f1b-04",
-    cycleId: DEMO_IDS.reportCycleId,
-    issuedAt: "2026-04-06",
-    checksum: "SHA-256 · 77b2…d904",
-    revoked: false,
-  },
-  {
-    code: "JS25-T3-0031-45C1",
-    studentId: "f4a-02",
-    cycleId: "cy0",
-    issuedAt: "2025-12-05",
-    checksum: "SHA-256 · 45c1…aa17",
-    revoked: true,
-  },
-];
-
-export type VerifyOutcome =
-  | { state: "valid"; record: VerificationRecord }
-  | { state: "not-found" }
-  | { state: "tampered"; record: VerificationRecord }
-  | { state: "revoked"; record: VerificationRecord };
-
-export function verifyCode(raw: string): VerifyOutcome {
-  const code = raw.trim().toUpperCase();
-  if (code === "JS26-T1-0147-0000") {
-    return {
-      state: "tampered",
-      record: verificationRecords[0],
-    };
-  }
-  const found = verificationRecords.find((r) => r.code === code);
-  if (!found) return { state: "not-found" };
-  if (found.revoked) return { state: "revoked", record: found };
-  return { state: "valid", record: found };
 }
 
 /* ================================================================

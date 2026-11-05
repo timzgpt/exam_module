@@ -9,7 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { ALL_NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
+import { NAV_GROUPS } from "@/lib/nav";
 import { resolveHref, SCHOOL } from "@/lib/demo-config";
 import { useNavContext } from "@/lib/store";
 import { useUiStore } from "@/lib/ui-store";
@@ -70,23 +70,10 @@ export function CommandPalette() {
             </CommandGroup>
           </div>
         ))}
-        <CommandSeparator />
-        <CommandGroup heading="Public">
-          <CommandItem value="verify a report card public" onSelect={() => run("/verify")} className="gap-2">
-            <ScanSearchIcon />
-            <span className="text-sm">Verify a report card</span>
-          </CommandItem>
-        </CommandGroup>
         <div className="border-t px-3 py-2 text-2xs text-muted-foreground">
           {SCHOOL.name} · School Reports
         </div>
       </CommandList>
     </CommandDialog>
   );
-}
-
-function ScanSearchIcon() {
-  const Item = ALL_NAV_ITEMS.find((i) => i.key === "verify");
-  const Icon = Item!.icon;
-  return <Icon className="size-4 text-muted-foreground" />;
 }

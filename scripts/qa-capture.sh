@@ -27,7 +27,6 @@ declare -a ROUTES=(
   "portal-hold|/portal/report-cards/on-hold"
   "portal-progress|/portal/progress"
   "portal-day|/portal/parents-day"
-  "verify|/verify"
 )
 
 for entry in "${ROUTES[@]}"; do

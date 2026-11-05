@@ -103,5 +103,4 @@ export const routes = {
   portalOnHold: "/portal/report-cards/on-hold",
   portalProgress: "/portal/progress",
   portalParentsDay: "/portal/parents-day",
-  verify: "/verify",
 } as const;
