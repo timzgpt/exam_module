@@ -314,7 +314,7 @@ export const cycles: ReportCycle[] = [
     // demo: mid-term cards use the 3:1 chart with the in-image legend and
     // the Best-Improvement badge on primary classes (chart prompt §8/§9).
     id: "cy1m",
-    name: "Mid-Term - 2026",
+    name: "Mid term - 2026",
     term: "Term 1",
     academicYear: "2026",
     kind: "mid-term",

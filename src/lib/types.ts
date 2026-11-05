@@ -192,7 +192,7 @@ export interface ReportCycle {
    * stats and never shows the improvement badge (chart prompt §4/§8).
    * Annual Exams run the same Terminal engine.
    *
-   * Cycle naming convention: "{Exam} - {year}" — "Mid-Term - 2026",
+   * Cycle naming convention: "{Exam} - {year}" — "Mid term - 2026",
    * "Terminal Exam - 2026", "Annual Exam - 2026".
    */
   kind: "mid-term" | "terminal" | "annual";

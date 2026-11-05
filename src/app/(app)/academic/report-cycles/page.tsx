@@ -66,7 +66,7 @@ const STEP_LABELS: Record<CycleStatus, string> = {
 
 /** The three report-cycle exams — the cycle name is always "{exam} - {year}". */
 const EXAM_OPTIONS = [
-  { label: "Mid-Term", kind: "mid-term" },
+  { label: "Mid term", kind: "mid-term" },
   { label: "Terminal Exam", kind: "terminal" },
   { label: "Annual Exam", kind: "annual" },
 ] as const;
