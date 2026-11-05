@@ -23,6 +23,7 @@ import {
 import {
   attendanceRecordFor,
   classById,
+  classes,
   classSubjectsFor,
   classNameOf,
   commentFor,
@@ -48,6 +49,7 @@ import {
 import { ATTENDANCE_RATING_TEXT } from "@/lib/attendance";
 import { fmtDateRange, fmtLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useAppContext } from "@/lib/store";
 import { AlertTriangle, Download, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -202,6 +204,14 @@ export default function ReportCardPage() {
 
   const classSubjects = classSubjectsFor(student.classId);
   const scheme = schemeForClass(student.classId);
+  // ── Two report card templates ────────────────────────────────────────
+  // The student's school level selects the template, so choosing a class
+  // in the toolbar or the header switches between them:
+  //   • PRIMARY (Grades 1–7) — A–E bands, no points, no division.
+  //   • SECONDARY (Forms 1–4) — NECTA CSEE A–F bands, best-7 points,
+  //     Division and the Division Scale strip.
+  // `showPoints` below gates every secondary-only section; primary cards
+  // simply never render points or division anywhere.
   const isPrimary = isPrimaryClass(student.classId);
   // Assessment split shown in the table header (25 % monthly / 75 % terminal).
   const caPct = classSubjects[0]?.caMarks ?? 25;
@@ -294,12 +304,25 @@ export default function ReportCardPage() {
       : null;
 
   const switchStudent = (id: string) => {
+    setStoreStudent(id);
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
+  };
+
+  // Class switch on the card itself: opens the class's first student, so
+  // the primary/secondary template follows the selected class.
+  const switchClass = (classId: string) => {
+    const first = studentsInClass(classId)[0];
+    if (!first) return;
+    setStoreClass(classId);
+    setStoreStudent(first.id);
+    router.push(`/academic/report-cycles/${cycle.id}/students/${first.id}/report-card`);
   };
 
   const downloadPdf = usePrintDownload(
     "Use 'Save as PDF' in the print dialog to download the report card.",
   );
+  const setStoreClass = useAppContext((s) => s.setClass);
+  const setStoreStudent = useAppContext((s) => s.setStudent);
 
   // Performance summary cells; the points/division pair appears only where
   // points are printed (secondary classes without the No-Division flag).
@@ -366,10 +389,24 @@ export default function ReportCardPage() {
       {/* Toolbar: screen only, never printed */}
       <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-white p-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Class</span>
+          {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
+          <Select value={student.classId} onValueChange={switchClass}>
+            <SelectTrigger className="h-8 w-full text-compact sm:w-45" aria-label="Class">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span className="text-xs font-medium text-muted-foreground">Student</span>
           {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
           <Select value={student.id} onValueChange={switchStudent}>
-            <SelectTrigger className="h-8 w-full text-compact sm:w-65">
+            <SelectTrigger className="h-8 w-full text-compact sm:w-65" aria-label="Student">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

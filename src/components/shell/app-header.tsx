@@ -19,7 +19,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SCHOOL } from "@/lib/demo-config";
 import { breadcrumbFor } from "@/lib/nav";
-import { classes, cycles, marksDeadlines, cycleById } from "@/lib/demo-data";
+import { classes, cycles, marksDeadlines, cycleById, studentsInClass } from "@/lib/demo-data";
 import { useAppContext } from "@/lib/store";
 import { useUiStore } from "@/lib/ui-store";
 import { Bell, Search } from "lucide-react";
@@ -28,8 +28,47 @@ import { usePathname, useRouter } from "next/navigation";
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { cycleId, classId, setCycle, setClass } = useAppContext();
+  const { cycleId, classId, setCycle, setClass, setStudent } = useAppContext();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
+
+  // The cycle/class pickers define the browsing context. Pages under a
+  // [cycleId], [classId] or [studentId] route segment are URL-driven, so a
+  // context change rewrites those segments in place: picking "Standard 5A"
+  // on a report-card page opens that class's card (the primary template),
+  // not the previously-selected class. The store keeps the sidebar links
+  // pointing at the same place.
+  const navigateWithContext = (next: { cycleId?: string; classId?: string }) => {
+    let path = pathname;
+    if (next.cycleId && path.includes("/academic/report-cycles/")) {
+      path = path.replace(/(\/academic\/report-cycles\/)[^/]+/, `$1${next.cycleId}`);
+    }
+    if (next.classId) {
+      if (path.includes("/academic/classes/")) {
+        path = path.replace(/(\/academic\/classes\/)[^/]+/, `$1${next.classId}`);
+      } else if (path.includes("/classes/")) {
+        path = path.replace(/(\/classes\/)[^/]+/, `$1${next.classId}`);
+      } else if (/\/students\/[^/]+/.test(path)) {
+        // Student-scoped page: a class switch moves to that class's first
+        // student (students belong to exactly one class).
+        const first = studentsInClass(next.classId)[0];
+        if (first) {
+          setStudent(first.id);
+          path = path.replace(/(\/students\/)[^/]+/, `$1${first.id}`);
+        }
+      }
+    }
+    if (path !== pathname) router.push(path);
+  };
+
+  const onCycleChange = (id: string) => {
+    setCycle(id);
+    navigateWithContext({ cycleId: id });
+  };
+
+  const onClassChange = (id: string) => {
+    setClass(id);
+    navigateWithContext({ classId: id });
+  };
 
   const trail = breadcrumbFor(pathname, (t) =>
     t
@@ -81,7 +120,7 @@ export function AppHeader() {
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Cycle context */}
-        <Select value={cycleId} onValueChange={setCycle}> {/* ds-allow-native-select: Radix listbox trigger */}
+        <Select value={cycleId} onValueChange={onCycleChange}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger
             size="sm"
             className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-none md:flex"
@@ -102,7 +141,7 @@ export function AppHeader() {
         </Select>
 
         {/* Class context */}
-        <Select value={classId} onValueChange={setClass}> {/* ds-allow-native-select: Radix listbox trigger */}
+        <Select value={classId} onValueChange={onClassChange}> {/* ds-allow-native-select: Radix listbox trigger */}
           <SelectTrigger
             size="sm"
             className="hidden h-8 w-auto gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-none md:flex"
