@@ -16,6 +16,46 @@ export interface Subject {
   department: DepartmentName;
 }
 
+/* ---------------- Class subjects ---------------- */
+
+/** Core subjects are compulsory; subsidiaries are opt-in per student. */
+export type SubjectType = "core" | "subsidiary";
+
+/**
+ * A subject assigned to a specific class for the term: which teacher delivers
+ * it, how it is assessed and which students take it. Array position IS the
+ * subject order used on the report card and in every marks-entry grid.
+ */
+export interface ClassSubject {
+  subjectId: string;
+  classId: string;
+  type: SubjectType;
+  /** Short name for narrow columns and broadsheets (keep under 12 chars). */
+  chartLabel: string;
+  teacherId: string;
+  periodsPerWeek: number;
+  /** Number of written papers sat at end of term (1 or 2). */
+  examPapers: 1 | 2;
+  /** Continuous-assessment weight out of 100 (tests, practicals, coursework). */
+  caMarks: number;
+  /** End-of-term written examination weight out of 100. */
+  examMarks: number;
+  /** CA + Exam (normally 100). Derived, kept for display. */
+  fullMarks: number;
+}
+
+/** Status codes typed into the marks grid in place of a number. */
+export type MarkStatusCode = "ABS" | "NA" | "NR" | "PENDING" | "DISQ";
+
+export interface DivisionResult {
+  division: "I" | "II" | "III" | "IV" | "0";
+  label: string;
+  /** Sum of the best 7 subject points (lower = better). */
+  pointsSum: number;
+  /** pointsSum - 17; 0 or less means Division I already achieved. */
+  gapToDivisionI: number;
+}
+
 export interface Teacher {
   id: string;
   name: string;

@@ -19,53 +19,111 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
+  classSubjectsFor,
   defaultScheme,
+  eligibleStudentsFor,
+  getComponents,
   getMarks,
+  markStatusOf,
   studentsInClass,
   subjectAveragesFor,
+  subjectById,
   subjectTeacherOf,
-  subjects,
 } from "@/lib/demo-data";
-import { averageOf, formatAvg, gradeFor } from "@/lib/grading";
+import type { MarkStatusCode } from "@/lib/types";
+import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
-import { ClipboardList, Keyboard, Loader2, Percent, RotateCcw, Save, TrendingUp } from "lucide-react";
+import {
+  ClipboardList,
+  Keyboard,
+  Loader2,
+  Percent,
+  RotateCcw,
+  Save,
+  ShieldOff,
+  TrendingUp,
+} from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-type ParsedMark = { state: "empty" } | { state: "valid"; value: number } | { state: "invalid" };
+type ParsedCell =
+  | { state: "empty" }
+  | { state: "valid"; value: number }
+  | { state: "code"; code: MarkStatusCode }
+  | { state: "invalid" };
 
-function parseMark(raw: string): ParsedMark {
-  const t = raw.trim();
+const STATUS_MEANING: Record<MarkStatusCode, string> = {
+  ABS: "Absent — treated as blank, excluded from averages",
+  NA: "Not assessed — treated as blank, excluded from averages",
+  NR: "Not reported — treated as blank, excluded from averages",
+  PENDING: "Not yet entered — treated as blank",
+  DISQ: "Disqualified / malpractice — counted as a real zero (0.0)",
+};
+
+function parseCell(raw: string): ParsedCell {
+  const t = raw.trim().toUpperCase();
   if (t === "") return { state: "empty" };
-  if (!/^-?\d+$/.test(t)) return { state: "invalid" };
+  if (t === "ABS" || t === "NA" || t === "NR" || t === "PENDING")
+    return { state: "code", code: t };
+  if (t === "DISQ") return { state: "code", code: "DISQ" };
+  if (!/^\d+(\.\d+)?$/.test(t)) return { state: "invalid" };
   const n = Number(t);
   if (n < 0 || n > 100) return { state: "invalid" };
   return { state: "valid", value: n };
 }
 
-const toWorking = (baseline: Record<string, number | null>): Record<string, string> =>
-  Object.fromEntries(Object.entries(baseline).map(([sid, v]) => [sid, v === null ? "" : String(v)]));
+interface RowCells {
+  ca: string;
+  exam: string;
+}
+
+/** Subject total + status for a row of the working grid. */
+function rowMark(cells: RowCells): { total: number | null; status: MarkStatusCode | null } {
+  const ca = parseCell(cells.ca);
+  const exam = parseCell(cells.exam);
+  const codeCell = ca.state === "code" ? ca : exam.state === "code" ? exam : null;
+  if (codeCell) {
+    return { total: codeCell.code === "DISQ" ? 0 : null, status: codeCell.code };
+  }
+  const caVal = ca.state === "valid" ? ca.value : null;
+  const examVal = exam.state === "valid" ? exam.value : null;
+  return { total: subjectTotal(caVal, examVal, 30, 70), status: null };
+}
 
 export default function MarksEntryPage() {
   const { toast } = useToast();
   const { klass: cls } = useClassContext();
   const { cycle } = useCycleContext();
   const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
+  const classSubjects = useMemo(() => classSubjectsFor(cls.id), [cls.id]);
 
-  const [subjectId, setSubjectId] = useState<string>(subjects[0].id);
-  const [baseline, setBaseline] = useState<Record<string, number | null>>(
-    () => ({ ...getMarks(cls.id, subjects[0].id) }),
-  );
-  const [working, setWorking] = useState<Record<string, string>>(() =>
-    toWorking({ ...getMarks(cls.id, subjects[0].id) }),
-  );
+  const first = classSubjects[0];
+
+  const toBaseline = (subjectId: string): Record<string, RowCells> =>
+    Object.fromEntries(
+      students.map((s) => {
+        const comp = getComponents(cls.id, subjectId)[s.id];
+        const enrolled = comp?.enrolled ?? true;
+        const status = markStatusOf(cls.id, subjectId, s.id);
+        if (!enrolled || (comp?.ca === null && comp?.exam === null && comp?.status === null)) {
+          return [s.id, { ca: "", exam: "" }];
+        }
+        if (status) return [s.id, { ca: status, exam: "" }];
+        return [s.id, { ca: String(comp?.ca ?? ""), exam: String(comp?.exam ?? "") }];
+      }),
+    );
+
+  const [subjectId, setSubjectId] = useState<string>(first.subjectId);
+  const [baseline, setBaseline] = useState<Record<string, RowCells>>(() => toBaseline(first.subjectId));
+  const [working, setWorking] = useState<Record<string, RowCells>>(() => toBaseline(first.subjectId));
   const [saving, setSaving] = useState(false);
 
-  /** Committed marks per subject: seeds the tab badges and updates on save. */
+  /** Committed totals per subject: seeds the tab badges and updates on save. */
   const [savedBySubject, setSavedBySubject] = useState<Record<string, Record<string, number | null>>>(
-    () => Object.fromEntries(subjects.map((s) => [s.id, { ...getMarks(cls.id, s.id) }])),
+    () => Object.fromEntries(classSubjects.map((cs) => [cs.subjectId, { ...getMarks(cls.id, cs.subjectId) }])),
   );
 
-  const subject = subjects.find((s) => s.id === subjectId) ?? subjects[0];
+  const classSubject = classSubjects.find((c) => c.subjectId === subjectId) ?? first;
+  const subject = subjectById(classSubject.subjectId)!;
   const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
 
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -77,66 +135,82 @@ export default function MarksEntryPage() {
     }
   };
 
-  const onCellKeyDown = (
-    e: KeyboardEvent<HTMLInputElement>,
-    studentIndex: number,
-  ) => {
+  const onCellKeyDown = (e: KeyboardEvent<HTMLInputElement>, studentIndex: number, col: 0 | 1) => {
     const el = e.currentTarget;
-    const r = Number(el.dataset.r ?? studentIndex);
-    const c = Number(el.dataset.c ?? 0);
     switch (e.key) {
       case "ArrowDown":
       case "Enter": {
         e.preventDefault();
-        if (r + 1 < students.length) focusCell(r + 1, c);
+        if (studentIndex + 1 < students.length) focusCell(studentIndex + 1, col);
         break;
       }
       case "ArrowUp": {
         e.preventDefault();
-        if (r - 1 >= 0) focusCell(r - 1, c);
+        if (studentIndex - 1 >= 0) focusCell(studentIndex - 1, col);
         break;
       }
       case "ArrowLeft": {
-        if ((el.selectionStart ?? 0) === 0 && (el.selectionEnd ?? 0) === 0 && c > 0) {
+        if ((el.selectionStart ?? 0) === 0 && (el.selectionEnd ?? 0) === 0 && col === 1) {
           e.preventDefault();
-          focusCell(r, c - 1);
+          focusCell(studentIndex, 0);
         }
         break;
       }
       case "ArrowRight": {
         const len = el.value.length;
-        if ((el.selectionStart ?? 0) === len && (el.selectionEnd ?? 0) === len) {
+        if ((el.selectionStart ?? 0) === len && (el.selectionEnd ?? 0) === len && col === 0) {
           e.preventDefault();
-          focusCell(r, c + 1);
+          focusCell(studentIndex, 1);
         }
         break;
       }
       case "Escape": {
         e.preventDefault();
-        setWorking((prev) => ({ ...prev, [students[r].id]: "" }));
+        setWorking((prev) => ({
+          ...prev,
+          [students[studentIndex].id]: { ...prev[students[studentIndex].id], [col === 0 ? "ca" : "exam"]: "" },
+        }));
         break;
       }
     }
   };
 
-  const parsedRows = useMemo(
-    () => students.map((s) => ({ student: s, parsed: parseMark(working[s.id] ?? "") })),
-    [students, working],
+  const setCell = (studentId: string, col: 0 | 1, value: string) =>
+    setWorking((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [col === 0 ? "ca" : "exam"]: value },
+    }));
+
+  const rows = useMemo(
+    () =>
+      students.map((s, i) => {
+        const cells = working[s.id] ?? { ca: "", exam: "" };
+        const enrolled = getComponents(cls.id, subject.id)[s.id]?.enrolled ?? true;
+        return { student: s, index: i, cells, enrolled, mark: rowMark(cells) };
+      }),
+    [students, working, cls.id, subject.id],
   );
 
-  const entered = parsedRows.filter((r) => r.parsed.state === "valid");
-  const invalidCount = parsedRows.filter((r) => r.parsed.state === "invalid").length;
-  const classAverage = averageOf(entered.map((r) => r.parsed.state === "valid" ? r.parsed.value : 0));
-  const enteredPct = students.length ? Math.round((entered.length / students.length) * 100) : 0;
+  const entered = rows.filter((r) => r.enrolled && r.mark.total !== null);
+  const invalidCount = rows.filter(
+    (r) => parseCell(r.cells.ca).state === "invalid" || parseCell(r.cells.exam).state === "invalid",
+  ).length;
+  const eligibleCount = useMemo(
+    () => eligibleStudentsFor(cls.id, subject.id).length,
+    [cls.id, subject.id],
+  );
+  const enteredPct = eligibleCount ? Math.round((entered.length / eligibleCount) * 100) : 0;
+  const classAverage = averageOf(entered.map((r) => r.mark.total as number));
 
   const dirtyCount = useMemo(
     () =>
       students.filter((s) => {
-        const p = parseMark(working[s.id] ?? "");
-        const base = baseline[s.id] ?? null;
-        if (p.state === "empty") return base !== null;
-        if (p.state === "invalid") return true;
-        return p.value !== base;
+        const base = baseline[s.id] ?? { ca: "", exam: "" };
+        const work = working[s.id] ?? { ca: "", exam: "" };
+        return (
+          work.ca.trim().toUpperCase() !== base.ca.trim().toUpperCase() ||
+          work.exam.trim().toUpperCase() !== base.exam.trim().toUpperCase()
+        );
       }).length,
     [students, working, baseline],
   );
@@ -148,17 +222,17 @@ export default function MarksEntryPage() {
         .sort((a, b) => b.avg - a.avg)[0],
     [cls.id],
   );
-  const topSubject = topSubjectStat ? subjects.find((s) => s.id === topSubjectStat.subjectId) : undefined;
+  const topSubject = topSubjectStat ? subjectById(topSubjectStat.subjectId) : undefined;
 
   const switchSubject = (id: string) => {
     setSubjectId(id);
-    const base = { ...getMarks(cls.id, id) };
+    const base = toBaseline(id);
     setBaseline(base);
-    setWorking(toWorking(base));
+    setWorking(base);
   };
 
   const reset = () => {
-    setWorking(toWorking(baseline));
+    setWorking(baseline);
     toast({ title: "Changes discarded", description: `The ${subject.name} sheet was restored to its last saved state.` });
   };
 
@@ -168,19 +242,20 @@ export default function MarksEntryPage() {
     const committed: Record<string, number | null> = {};
     let changed = 0;
     for (const s of students) {
-      const p = parseMark(working[s.id] ?? "");
-      const next = p.state === "valid" ? p.value : (baseline[s.id] ?? null);
-      if (next !== (baseline[s.id] ?? null)) changed += 1;
+      const prev = getMarks(cls.id, subject.id)[s.id] ?? null;
+      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }).total;
+      if (next !== prev) changed += 1;
       committed[s.id] = next;
     }
     window.setTimeout(() => {
-      setBaseline(committed);
-      setWorking(toWorking(committed));
+      const base = toBaseline(subject.id);
+      setBaseline(base);
+      setWorking(base);
       setSavedBySubject((prev) => ({ ...prev, [subject.id]: committed }));
       setSaving(false);
       toast({
         title: "Marks saved",
-        description: `Saved ${changed} marks for ${subject.name}: ${cls.name}.`,
+        description: `Saved ${changed} changed totals for ${subject.name}: ${cls.name}.`,
       });
     }, 700);
   };
@@ -189,7 +264,7 @@ export default function MarksEntryPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Marks entry: ${cls.name}`}
-        description={`${cycle.name} · keyboard-friendly sheet: Arrow keys move between cells · Enter saves and moves down · Esc clears.`}
+        description={`${cycle.name} · CA and Exam are entered out of 100 and weighted by the class subject (30 + 70). Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move between cells · Esc clears.`}
         actions={
           <>
             <Button
@@ -215,13 +290,13 @@ export default function MarksEntryPage() {
           value={`${enteredPct}%`}
           icon={ClipboardList}
           tone="primary"
-          hint={`${entered.length} of ${students.length} students · ${subject.name}`}
+          hint={`${entered.length} of ${eligibleCount} eligible students · ${subject.name}`}
         />
         <StatCard
           label="Class average"
           value={entered.length > 0 ? formatAvg(classAverage) : "-"}
           icon={Percent}
-          hint={`${subject.name} · entered marks only`}
+          hint={`${subject.name} · entered marks only, blanks excluded`}
         />
         <StatCard
           label="Highest subject so far"
@@ -235,24 +310,28 @@ export default function MarksEntryPage() {
       <SectionCard
         noPadding
         title="Mark sheet"
-        description={`${subject.name} (${subject.code}) · ${teacherName} · out of 100`}
+        description={`${subject.name} (${subject.code}) · ${teacherName} · CA ${classSubject.caMarks} + Exam ${classSubject.examMarks} = ${classSubject.fullMarks} · ${classSubject.examPapers} paper${classSubject.examPapers > 1 ? "s" : ""}`}
       >
-        {/* Subject selector */}
+        {/* Subject selector — order follows the Class subjects page */}
         <div className="border-b border-border/70 px-4 py-3">
           <div className="overflow-x-auto">
             <Tabs value={subjectId} onValueChange={switchSubject}>
               <TabsList className="h-9 w-max">
-                {subjects.map((s) => {
-                  const saved = savedBySubject[s.id] ?? {};
-                  const done = Object.values(saved).filter((v) => v !== null).length;
+                {classSubjects.map((cs) => {
+                  const saved = savedBySubject[cs.subjectId] ?? {};
+                  const eligible = eligibleStudentsFor(cls.id, cs.subjectId).length;
+                  const done = eligibleStudentsFor(cls.id, cs.subjectId).filter((s) => saved[s.id] !== null).length;
                   return (
-                    <TabsTrigger key={s.id} value={s.id} className="h-8 gap-1.5 px-3 text-xs">
-                      {s.name}
+                    <TabsTrigger key={cs.subjectId} value={cs.subjectId} className="h-8 gap-1.5 px-3 text-xs">
+                      {subjectById(cs.subjectId)?.name}
+                      {cs.type === "subsidiary" ? (
+                        <span className="text-3xs font-medium uppercase tracking-wide text-muted-foreground">subs</span>
+                      ) : null}
                       <Badge
                         variant="outline"
                         className="h-4.5 rounded-full px-1.5 text-3xs font-medium tabular text-muted-foreground"
                       >
-                        {done}/{students.length}
+                        {done}/{eligible}
                       </Badge>
                     </TabsTrigger>
                   );
@@ -260,6 +339,11 @@ export default function MarksEntryPage() {
               </TabsList>
             </Tabs>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {classSubject.type === "core"
+              ? "Core subject — compulsory for every student in the class."
+              : "Subsidiary (optional) subject — enrolled students only; students not taking it show “—”."}
+          </p>
         </div>
 
         {/* Sheet */}
@@ -272,48 +356,85 @@ export default function MarksEntryPage() {
                   Student
                 </TableHead>
                 <TableHead>Adm. no</TableHead>
-                <TableHead className="text-center">Mark /100</TableHead>
+                <TableHead className="text-center">CA /100</TableHead>
+                <TableHead className="text-center">Exam /100</TableHead>
+                <TableHead className="text-center">Total /100</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 <TableHead className="text-center">Points</TableHead>
-                <TableHead className="min-w-55">Remark</TableHead>
+                <TableHead className="min-w-55">Status / remark</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {parsedRows.map(({ student, parsed }, i) => {
-                const invalid = parsed.state === "invalid";
-                const g = parsed.state === "valid" ? gradeFor(parsed.value, defaultScheme) : undefined;
+              {rows.map(({ student, index, cells, enrolled, mark }) => {
+                const invalid =
+                  parseCell(cells.ca).state === "invalid" || parseCell(cells.exam).state === "invalid";
+                const g = mark.total !== null ? gradeFor(mark.total, defaultScheme) : undefined;
                 return (
-                  <TableRow key={student.id}>
+                  <TableRow key={student.id} className={cn(!enrolled && "opacity-55")}>
                     <TableCell className="sticky left-0 w-10 border-r border-border/40 bg-card text-center text-xs tabular text-muted-foreground">
-                      {i + 1}
+                      {index + 1}
                     </TableCell>
                     <TableCell className="sticky left-10 border-r border-border/40 bg-card pl-3">
                       <p className="whitespace-nowrap text-compact font-medium text-foreground">{student.name}</p>
+                      {!enrolled ? (
+                        <p className="text-2xs text-muted-foreground">Not enrolled</p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-xs tabular text-muted-foreground">{student.admissionNo}</TableCell>
                     <TableCell className="text-center">
                       <Input
-                        value={working[student.id] ?? ""}
-                        onChange={(e) =>
-                          setWorking((prev) => ({ ...prev, [student.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => onCellKeyDown(e, i)}
+                        value={enrolled ? cells.ca : ""}
+                        onChange={(e) => setCell(student.id, 0, e.target.value)}
+                        onKeyDown={(e) => onCellKeyDown(e, index, 0)}
                         ref={(el) => {
-                          const key = `${i}-0`;
+                          const key = `${index}-0`;
                           if (el) cellRefs.current.set(key, el);
                           else cellRefs.current.delete(key);
                         }}
-                        data-r={i}
+                        data-r={index}
                         data-c={0}
-                        inputMode="numeric"
-                        aria-invalid={invalid}
-                        aria-label={`Mark for ${student.name}`}
+                        disabled={!enrolled}
+                        aria-invalid={parseCell(cells.ca).state === "invalid"}
+                        aria-label={`CA mark for ${student.name}`}
                         placeholder="-"
                         className={cn(
                           "mx-auto h-8 w-16 text-center text-compact tabular",
-                          invalid && "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
+                          parseCell(cells.ca).state === "invalid" &&
+                            "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
                         )}
                       />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        value={enrolled ? cells.exam : ""}
+                        onChange={(e) => setCell(student.id, 1, e.target.value)}
+                        onKeyDown={(e) => onCellKeyDown(e, index, 1)}
+                        ref={(el) => {
+                          const key = `${index}-1`;
+                          if (el) cellRefs.current.set(key, el);
+                          else cellRefs.current.delete(key);
+                        }}
+                        data-r={index}
+                        data-c={1}
+                        disabled={!enrolled}
+                        aria-invalid={parseCell(cells.exam).state === "invalid"}
+                        aria-label={`Exam mark for ${student.name}`}
+                        placeholder="-"
+                        className={cn(
+                          "mx-auto h-8 w-16 text-center text-compact tabular",
+                          parseCell(cells.exam).state === "invalid" &&
+                            "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
+                        )}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center text-compact font-medium tabular">
+                      {!enrolled ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : mark.total !== null ? (
+                        fmtTotalMark(mark.total)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {g ? <GradePill grade={g.grade} /> : <span className="text-compact text-muted-foreground">-</span>}
@@ -325,8 +446,29 @@ export default function MarksEntryPage() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-compact text-muted-foreground">
-                      {g?.remark ?? "-"}
+                    <TableCell className="text-compact">
+                      {mark.status ? (
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title={STATUS_MEANING[mark.status]}
+                        >
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-5 px-1.5 font-mono text-2xs",
+                              mark.status === "DISQ"
+                                ? "border-destructive/40 text-destructive"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {mark.status === "DISQ" ? <ShieldOff className="size-3" /> : null}
+                            {mark.status}
+                          </Badge>
+                          <span className="text-2xs text-muted-foreground">{STATUS_MEANING[mark.status]}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{g?.remark ?? "-"}</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -338,14 +480,14 @@ export default function MarksEntryPage() {
         {/* Footer strip */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-compact text-muted-foreground">
           <span className="tabular">
-            Entered <span className="font-medium text-foreground">{entered.length}/{students.length}</span>
+            Entered <span className="font-medium text-foreground">{entered.length}/{eligibleCount}</span>
           </span>
           <span className="tabular">
             Class average{" "}
             <span className="font-medium text-foreground">
               {entered.length > 0 ? formatAvg(classAverage) : "-"}
             </span>{" "}
-            (entered marks)
+            (entered marks only)
           </span>
           {invalidCount > 0 ? (
             <span className="font-medium tabular text-destructive">

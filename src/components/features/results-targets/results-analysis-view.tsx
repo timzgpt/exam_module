@@ -80,7 +80,16 @@ export function ResultsAnalysisView() {
   const avgConfig = { avg: { label: "Average", color: BRAND_COLOR } } satisfies ChartConfig;
 
   const exportCsv = () => {
-    const header = ["Pos", "Student", "Adm. no", ...subjects.map((s) => s.code), "Total", "Average", "Grade"];
+    const header = [
+      "Pos",
+      "Student",
+      "Adm. no",
+      ...subjects.map((s) => s.code),
+      "Total",
+      "Average",
+      "Grade",
+      "Division",
+    ];
     const rows = results.map((r) => [
       String(r.rank),
       r.student.name,
@@ -92,6 +101,7 @@ export function ResultsAnalysisView() {
       r.count > 0 ? String(r.total) : "",
       r.count > 0 ? formatAvg(r.average) : "",
       r.grade,
+      r.division ? `Div ${r.division.division} (${r.division.pointsSum} pts)` : "",
     ]);
     downloadCsv(
       [header, ...rows],
@@ -158,7 +168,8 @@ export function ResultsAnalysisView() {
                 ))}
                 <TableHead className="text-center">Total</TableHead>
                 <TableHead className="text-center">Avg</TableHead>
-                <TableHead className="text-center pr-4">Grade</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center pr-4">Division</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,8 +203,19 @@ export function ResultsAnalysisView() {
                   <TableCell className="text-center text-compact tabular font-medium">
                     {r.count > 0 ? formatAvg(r.average) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="pr-4 text-center">
+                  <TableCell className="text-center">
                     {r.count > 0 ? <GradePill grade={r.grade} /> : <span className="text-muted-foreground">-</span>}
+                  </TableCell>
+                  <TableCell className="pr-4 text-center text-compact tabular">
+                    {r.division ? (
+                      <span title={`Best-7 points: ${r.division.pointsSum} · ${r.division.label}`}>
+                        Div {r.division.division}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground" title="Fewer than 7 graded subjects — no division">
+                        —
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -265,7 +287,8 @@ export function ResultsAnalysisView() {
           {allMarks.length} marks recorded
         </Badge>
         <span>
-          Averages only count subjects with entered marks; dashes mean the mark has not been submitted.
+          Averages only count subjects with entered marks; dashes mean the mark has not been submitted. Division is
+          computed from the best 7 graded subject points — students with fewer than 7 graded subjects show “—”.
         </span>
       </div>
     </div>

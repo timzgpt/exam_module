@@ -1,4 +1,4 @@
-import { DEFAULT_SCHEME_ID, gradeFor } from "./grading";
+import { DEFAULT_SCHEME_ID, divisionFor, gradeFor, subjectTotal, subjectsPassed } from "./grading";
 import { ACADEMIC_APPROVER, DEMO_IDS } from "./demo-config";
 import type {
   BookingSlot,
@@ -6,11 +6,14 @@ import type {
   ClassApproval,
   ClassRelease,
   ClassRoom,
+  ClassSubject,
   CommentRecord,
+  DivisionResult,
   Exam,
   GradeBoundary,
   GradingScheme,
   MarksDeadline,
+  MarkStatusCode,
   ReportCycle,
   Student,
   StudentTarget,
@@ -143,35 +146,44 @@ export const studentById = (id: string): Student | undefined =>
  * Grading scheme
  * ================================================================ */
 
+/**
+ * Secondary scheme (default): NECTA CSEE style bands. Lower points = better
+ * performance; subject points feed the division calculation (best 7).
+ */
 const boundaries: GradeBoundary[] = [
-  { grade: "A", min: 80, max: 100, points: 1, remark: "Excellent" },
-  { grade: "B", min: 70, max: 79, points: 2, remark: "Very good" },
-  { grade: "C", min: 60, max: 69, points: 3, remark: "Good" },
-  { grade: "D", min: 50, max: 59, points: 4, remark: "Satisfactory" },
-  { grade: "E", min: 40, max: 49, points: 5, remark: "Pass" },
-  { grade: "F", min: 0, max: 39, points: 7, remark: "Fail" },
+  { grade: "A", min: 75, max: 100, points: 1, remark: "Outstanding" },
+  { grade: "B", min: 65, max: 74, points: 2, remark: "Very Good" },
+  { grade: "C", min: 45, max: 64, points: 3, remark: "Good" },
+  { grade: "D", min: 30, max: 44, points: 4, remark: "Satisfactory" },
+  { grade: "F", min: 0, max: 29, points: 5, remark: "Can do better" },
+];
+
+/**
+ * Primary scheme (Standards 1-6). Points mirror the band scale for editor
+ * compatibility only — primary division is never computed from points.
+ */
+const primaryBoundaries: GradeBoundary[] = [
+  { grade: "A", min: 81, max: 100, points: 1, remark: "Outstanding" },
+  { grade: "B", min: 61, max: 80, points: 2, remark: "Very Good" },
+  { grade: "C", min: 41, max: 60, points: 3, remark: "Good" },
+  { grade: "D", min: 21, max: 40, points: 4, remark: "Satisfactory" },
+  { grade: "E", min: 0, max: 20, points: 5, remark: "Can do better" },
 ];
 
 export const gradingSchemes: GradingScheme[] = [
   {
     id: DEFAULT_SCHEME_ID,
-    name: "O-Level Scheme · 2026",
+    name: "Secondary Scheme · NECTA CSEE · 2026",
     academicYear: "2026",
-    passMark: 40,
+    passMark: 30,
     boundaries,
   },
   {
-    id: "gs-2025",
-    name: "O-Level Scheme · 2025",
-    academicYear: "2025",
-    passMark: 35,
-    boundaries: [
-      { grade: "A", min: 75, max: 100, points: 1, remark: "Excellent" },
-      { grade: "B", min: 65, max: 74, points: 2, remark: "Very good" },
-      { grade: "C", min: 45, max: 64, points: 3, remark: "Good" },
-      { grade: "D", min: 30, max: 44, points: 4, remark: "Satisfactory" },
-      { grade: "F", min: 0, max: 29, points: 7, remark: "Fail" },
-    ],
+    id: "gs-primary-2026",
+    name: "Primary Scheme · Standards 1-6 · 2026",
+    academicYear: "2026",
+    passMark: 21,
+    boundaries: primaryBoundaries,
   },
 ];
 
@@ -301,12 +313,35 @@ export const currentCycle = cycles.find((c) => c.id === DEMO_IDS.reportCycleId)!
  * Marks (seeded, consistent across every page)
  * ================================================================ */
 
+/** Subjects that are subsidiary (optional) for every class in the demo. */
+const SUBSIDIARY_SUBJECT_IDS = new Set(["s9"]);
+
+/** Students forced onto a subsidiary subject regardless of the seeded draw. */
+const ENROL_OVERRIDES = new Set(["st1|s9", "f1a-04|s9"]);
+
 /** Pairs with missing entries so deadline tracker / readiness look real. */
 const NULL_PATCHES: Record<string, string[] | "ALL"> = {
   "cls-4a|s5": ["f4a-03", "f4a-07", "f4a-10", "f4a-11"],
   "cls-2a|s7": "ALL",
-  "cls-1b|s9": ["f1b-05", "f1b-09"],
 };
+
+/** DISQ malpractice: a real zero that IS included in averages (0.0). */
+const DISQ_PATCHES = new Set(["cls-1a|s2|f1a-04"]);
+
+/**
+ * Is this student enrolled in the class subject? Core subjects are compulsory
+ * (every student takes them); subsidiaries are opt-in per student, seeded so
+ * every page sees the same enrolment.
+ */
+export function isEnrolledIn(
+  classId: string,
+  subjectId: string,
+  studentId: string,
+): boolean {
+  if (!SUBSIDIARY_SUBJECT_IDS.has(subjectId)) return true;
+  if (ENROL_OVERRIDES.has(`${studentId}|${subjectId}`)) return true;
+  return hashStr(`enrol|${classId}|${subjectId}|${studentId}`) % 10 < 6;
+}
 
 const marksCache = new Map<string, Record<string, number | null>>();
 
@@ -323,10 +358,16 @@ export function getMarks(
   const subjectOffset = (hashStr(subjectId) % 15) - 7;
   const result: Record<string, number | null> = {};
   for (const s of studentsInClass(classId)) {
+    if (!isEnrolledIn(classId, subjectId, s.id)) {
+      result[s.id] = null; // not taking a subsidiary subject — dash everywhere
+      continue;
+    }
     const ability = 44 + (hashStr(s.id) % 46); // 44-89 latent ability
     const jitter = rnd() * 18 - 9;
-    const mark = Math.round(ability + classOffset + subjectOffset + jitter);
-    result[s.id] = Math.max(14, Math.min(99, mark));
+    const ca = Math.max(0, Math.min(100, Math.round(ability + classOffset + jitter)));
+    const exam = Math.max(0, Math.min(100, ca + Math.round(rnd() * 16 - 8)));
+    // Subject total via the 30/70 weighting so components round-trip exactly.
+    result[s.id] = subjectTotal(ca, exam, 30, 70);
   }
   const patch = NULL_PATCHES[key];
   if (patch === "ALL") {
@@ -334,7 +375,84 @@ export function getMarks(
   } else if (patch) {
     for (const sid of patch) result[sid] = null;
   }
+  for (const sid of Object.keys(result)) {
+    if (DISQ_PATCHES.has(`${key}|${sid}`)) result[sid] = 0; // DISQ is a real zero
+  }
   marksCache.set(key, result);
+  return result;
+}
+
+/* ----------------------------------------------------------------
+ * Mark status codes and CA/Exam components
+ * ---------------------------------------------------------------- */
+
+/** Per-student status codes shown in the marks grid instead of a blank. */
+const STATUS_PATCHES: Record<string, Record<string, MarkStatusCode>> = {
+  "cls-4a|s5": { "f4a-03": "ABS", "f4a-07": "ABS", "f4a-10": "NA", "f4a-11": "NA" },
+};
+
+/**
+ * Status code typed in place of a mark. ABS/NA/NR/PENDING are treated as
+ * blank (null); DISQ is a real zero. Non-enrolled subsidiary students show
+ * "—" and never carry a status.
+ */
+export function markStatusOf(
+  classId: string,
+  subjectId: string,
+  studentId: string,
+): MarkStatusCode | null {
+  if (`${classId}|${subjectId}` === "cls-2a|s7") return "PENDING";
+  if (DISQ_PATCHES.has(`${classId}|${subjectId}|${studentId}`)) return "DISQ";
+  return STATUS_PATCHES[`${classId}|${subjectId}`]?.[studentId] ?? null;
+}
+
+export interface MarkComponents {
+  enrolled: boolean;
+  /** Continuous assessment, entered out of 100 (weighted 30%). */
+  ca: number | null;
+  /** End-of-term written exam, entered out of 100 (weighted 70%). */
+  exam: number | null;
+  status: MarkStatusCode | null;
+}
+
+const componentsCache = new Map<string, Record<string, MarkComponents>>();
+
+/**
+ * CA / Exam components per student. Components round-trip exactly to the
+ * stored subject total via subjectTotal(ca, exam, 30, 70).
+ */
+export function getComponents(
+  classId: string,
+  subjectId: string,
+): Record<string, MarkComponents> {
+  const key = `${classId}|${subjectId}`;
+  const cached = componentsCache.get(key);
+  if (cached) return cached;
+  const marks = getMarks(classId, subjectId);
+  const result: Record<string, MarkComponents> = {};
+  for (const [studentId, total] of Object.entries(marks)) {
+    const enrolled = isEnrolledIn(classId, subjectId, studentId);
+    const status = markStatusOf(classId, subjectId, studentId);
+    if (total === null || !enrolled) {
+      result[studentId] = { enrolled, ca: null, exam: null, status };
+      continue;
+    }
+    // Invert the weighting exactly: search integer CA/Exam pairs near the
+    // total until round(CA x 0.3 + Exam x 0.7, 2) reproduces the total.
+    let ca = Math.max(0, Math.min(100, Math.round(total)));
+    let exam = Math.max(0, Math.min(100, Math.round((total - 0.3 * ca) / 0.7)));
+    for (let c = Math.max(0, Math.round(total) - 10); c <= Math.min(100, Math.round(total) + 10); c++) {
+      const e = Math.round((total - 0.3 * c) / 0.7);
+      if (e < 0 || e > 100) continue;
+      if (Math.round((0.3 * c + 0.7 * e) * 100) / 100 === total) {
+        ca = c;
+        exam = e;
+        break;
+      }
+    }
+    result[studentId] = { enrolled, ca, exam, status };
+  }
+  componentsCache.set(key, result);
   return result;
 }
 
@@ -348,14 +466,55 @@ export function subjectTeacherOf(subjectId: string, classId: string): Teacher | 
 }
 
 /* ================================================================
+ * Class subjects (per-class allocation in report-card order)
+ * ================================================================ */
+
+const PERIODS_BY_SUBJECT = [5, 4, 4, 3, 3, 3, 2, 2, 2];
+
+const classSubjectsCache = new Map<string, ClassSubject[]>();
+
+/**
+ * Ordered class-subject allocation for a class. Array position IS the subject
+ * order used on the report card and in every marks-entry grid for the class.
+ * Core subjects are compulsory for every student; subsidiaries are opt-in per
+ * student (see isEnrolledIn).
+ */
+export function classSubjectsFor(classId: string): ClassSubject[] {
+  const cached = classSubjectsCache.get(classId);
+  if (cached) return cached;
+  const list: ClassSubject[] = subjects.map((sub, i) => ({
+    subjectId: sub.id,
+    classId,
+    type: SUBSIDIARY_SUBJECT_IDS.has(sub.id) ? "subsidiary" : "core",
+    chartLabel: sub.code,
+    teacherId:
+      subjectTeacherOf(sub.id, classId)?.id ??
+      classById(classId)?.classTeacherId ??
+      teachers[0].id,
+    periodsPerWeek: PERIODS_BY_SUBJECT[i % PERIODS_BY_SUBJECT.length],
+    examPapers: sub.department === "Sciences" ? 2 : 1,
+    caMarks: 30,
+    examMarks: 70,
+    fullMarks: 100,
+  }));
+  classSubjectsCache.set(classId, list);
+  return list;
+}
+
+/** Students eligible to sit this class subject (all for core, enrolled for subsidiary). */
+export function eligibleStudentsFor(classId: string, subjectId: string): Student[] {
+  return studentsInClass(classId).filter((s) => isEnrolledIn(classId, subjectId, s.id));
+}
+
+/* ================================================================
  * Marks deadlines (derived from actual marks for consistency)
  * ================================================================ */
 
 export const marksDeadlines: MarksDeadline[] = classes.flatMap((cls) =>
   subjects.map((sub) => {
     const marks = getMarks(cls.id, sub.id);
-    const values = Object.values(marks);
-    const done = values.filter((v): v is number => v !== null).length;
+    const eligible = eligibleStudentsFor(cls.id, sub.id);
+    const done = eligible.filter((s) => marks[s.id] !== null).length;
     const teacher = teachers.find((t) => t.subjectIds.includes(sub.id));
     return {
       id: `${cls.id}-${sub.id}`,
@@ -364,9 +523,9 @@ export const marksDeadlines: MarksDeadline[] = classes.flatMap((cls) =>
       subjectId: sub.id,
       dueDate: "2026-03-06",
       enteredBy: teacher?.name ?? null,
-      submittedAt: done === values.length ? "2026-03-04" : null,
+      submittedAt: done === eligible.length ? "2026-03-04" : null,
       entriesDone: done,
-      entriesTotal: values.length,
+      entriesTotal: eligible.length,
     };
   }),
 );
@@ -655,6 +814,12 @@ export interface StudentResult {
   average: number;
   grade: string;
   rank: number;
+  /** Sum of the best 7 subject points; null when fewer than 7 graded. */
+  bestSevenPoints: number | null;
+  /** NECTA division from the best 7 subject points; null when < 7 graded. */
+  division: DivisionResult | null;
+  /** Subjects whose grade letter is not E or F. */
+  passedCount: number;
 }
 
 const classResultsCache = new Map<string, StudentResult[]>();
@@ -664,6 +829,8 @@ export function classResults(classId: string): StudentResult[] {
   if (cached) return cached;
   const rows = studentsInClass(classId).map((student) => {
     const marks: Record<string, number | null> = {};
+    const points: (number | null)[] = [];
+    const grades: (string | null)[] = [];
     let total = 0;
     let count = 0;
     for (const sub of subjects) {
@@ -672,10 +839,28 @@ export function classResults(classId: string): StudentResult[] {
       if (m !== null) {
         total += m;
         count += 1;
+        const g = gradeFor(m, defaultScheme);
+        grades.push(g?.grade ?? null);
+        points.push(g?.points ?? null);
+      } else {
+        grades.push(null);
+        points.push(null);
       }
     }
     const average = count > 0 ? total / count : 0;
-    return { student, marks, total, count, average, grade: count > 0 ? gradeFor(average, defaultScheme)?.grade ?? "F" : "-", rank: 0 };
+    const division = divisionFor(points);
+    return {
+      student,
+      marks,
+      total,
+      count,
+      average,
+      grade: count > 0 ? gradeFor(average, defaultScheme)?.grade ?? "F" : "-",
+      rank: 0,
+      bestSevenPoints: division?.pointsSum ?? null,
+      division,
+      passedCount: subjectsPassed(grades),
+    };
   });
   rows.sort((a, b) => b.average - a.average);
   rows.forEach((r, i) => (r.rank = i + 1));

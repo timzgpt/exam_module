@@ -13,18 +13,20 @@ import { usePrintDownload } from "@/hooks/use-print-download";
 import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
 import {
+  classSubjectsFor,
   classNameOf,
   commentFor,
   defaultScheme,
+  isEnrolledIn,
   studentAttendance,
   studentById,
   studentEffort,
   studentResultOf,
   studentsInClass,
+  subjectById,
   subjectRemark,
-  subjects,
 } from "@/lib/demo-data";
-import { gradeFor } from "@/lib/grading";
+import { divisionFor, fmtTotalMark, gradeFor, subjectsPassed } from "@/lib/grading";
 import { fmtLongDate } from "@/lib/format";
 import { Download, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -43,13 +45,24 @@ export default function ReportCardPage() {
   const attendance = studentAttendance(student.id);
   const comment = commentFor(student.classId, student.id);
 
-  const rows = subjects.map((sub) => {
-    const mark = result?.marks[sub.id] ?? null;
+  const classSubjects = classSubjectsFor(student.classId);
+  const rows = classSubjects.map((cs) => {
+    const subject = subjectById(cs.subjectId)!;
+    const enrolled = isEnrolledIn(student.classId, cs.subjectId, student.id);
+    const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
     const grade = mark !== null ? gradeFor(mark, defaultScheme) : undefined;
-    return { subject: sub, mark, grade };
+    return { subject, enrolled, mark, grade };
   });
   const assessed = rows.filter((r) => r.mark !== null);
   const pointsTotal = assessed.reduce((a, r) => a + (r.grade?.points ?? 0), 0);
+  // Secondary division: best 7 subject points; null when fewer than 7 graded.
+  const division = divisionFor(assessed.map((r) => r.grade?.points ?? null));
+  const passed = subjectsPassed(assessed.map((r) => r.grade?.grade ?? null));
+  // Strongest subject: highest total; ties go to the first in subject order.
+  const strongest =
+    assessed.length > 0
+      ? assessed.reduce((best, r) => ((r.mark as number) > (best.mark as number) ? r : best))
+      : undefined;
 
   const switchStudent = (id: string) => {
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
@@ -173,30 +186,45 @@ export default function ReportCardPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ subject, mark, grade }) => (
+            {rows.map(({ subject, enrolled, mark, grade }) => (
               <tr key={subject.id} className="border-b border-border">
                 <td className="py-1.5 pr-2 font-medium">{subject.name}</td>
-                <td className="py-1.5 pr-2 text-right tabular">{mark !== null ? mark : "-"}</td>
-                <td className="py-1.5 pr-2 text-center font-semibold">{grade?.grade ?? "-"}</td>
-                <td className="py-1.5 pr-2 text-center tabular">{grade ? grade.points : "-"}</td>
+                <td className="py-1.5 pr-2 text-right tabular">
+                  {enrolled && mark !== null ? fmtTotalMark(mark) : "—"}
+                </td>
+                <td className="py-1.5 pr-2 text-center font-semibold">
+                  {enrolled && grade?.grade ? grade.grade : "—"}
+                </td>
+                <td className="py-1.5 pr-2 text-center tabular">
+                  {enrolled && grade ? grade.points : "—"}
+                </td>
                 <td className="py-1.5 pr-2 text-center">
-                  {mark !== null ? studentEffort(student.id, subject.id) : "-"}
+                  {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
                 </td>
                 <td className="py-1.5 text-muted-foreground">
-                  {mark !== null ? subjectRemark(mark) : "Not assessed"}
+                  {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark) : "Not assessed"}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
+        {strongest ? (
+          <p className="mt-2 text-2xs text-muted-foreground">
+            Strongest subject: <span className="font-medium text-foreground">{strongest.subject.name}</span> ·{" "}
+            {fmtTotalMark(strongest.mark as number)} (ties go to the first subject in report-card order)
+          </p>
+        ) : null}
+
         {/* Summary strip */}
-        <div className="mt-4 grid grid-cols-2 gap-px border border-border bg-muted sm:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-px border border-border bg-muted sm:grid-cols-4">
           {[
-            { label: "Total marks", value: result ? String(result.total) : "-" },
+            { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-" },
             { label: "Average", value: result ? result.average.toFixed(1) : "-" },
             { label: "Overall grade", value: result && result.count > 0 ? result.grade : "-" },
             { label: "Points total", value: assessed.length > 0 ? String(pointsTotal) : "-" },
+            { label: "Subjects passed", value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-" },
+            { label: "Division", value: division ? `Div ${division.division}` : "—" },
             { label: "Class size", value: String(classSize) },
           ].map((cell) => (
             <div key={cell.label} className="bg-white px-3 py-2 text-center">
@@ -205,6 +233,16 @@ export default function ReportCardPage() {
             </div>
           ))}
         </div>
+
+        <p className="mt-2 text-center text-2xs text-muted-foreground">
+          {division
+            ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
+                division.gapToDivisionI <= 0
+                  ? "Highest division achieved"
+                  : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
+              }`
+            : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
+        </p>
 
         {/* Remarks */}
         <div className="mt-5 grid gap-3 sm:grid-cols-2">

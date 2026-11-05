@@ -1,4 +1,4 @@
-import type { GradeBoundary, GradingScheme } from "./types";
+import type { DivisionResult, GradeBoundary, GradingScheme } from "./types";
 
 /** Default Josephian grading scheme (used when no scheme id is given). */
 export const DEFAULT_SCHEME_ID = "gs-2026";
@@ -13,11 +13,109 @@ export const GRADE_TONES: Record<string, string> = {
   F: "bg-destructive/12 text-destructive border-destructive/30",
 };
 
+/**
+ * Lower-bound inclusive grade lookup: bands are contiguous floors, so any
+ * decimal mark (e.g. 80.99 with an A floor of 81) resolves to exactly one
+ * grade. Boundaries are matched by the highest floor the mark reaches.
+ */
 export function gradeFor(
   mark: number,
   scheme: GradingScheme,
 ): GradeBoundary | undefined {
-  return scheme.boundaries.find((b) => mark >= b.min && mark <= b.max);
+  const floors = [...scheme.boundaries].sort((a, b) => b.min - a.min);
+  return floors.find((b) => mark >= b.min);
+}
+
+/**
+ * Subject total — the "100% rule":
+ * - both components present: round(CA x w1 + Exam x w2, 2)
+ * - one component missing:   the present component counts 100%
+ * - both missing (ABS/NA/NR/PENDING): null — subject omitted entirely
+ * Weights are given as marks out of 100 (e.g. caMarks 30, examMarks 70).
+ */
+export function subjectTotal(
+  ca: number | null,
+  exam: number | null,
+  caMarks: number,
+  examMarks: number,
+): number | null {
+  if (ca === null && exam === null) return null;
+  if (ca === null) return exam;
+  if (exam === null) return ca;
+  const w1 = caMarks / (caMarks + examMarks);
+  const w2 = examMarks / (caMarks + examMarks);
+  return Math.round((ca * w1 + exam * w2) * 100) / 100;
+}
+
+/**
+ * Overall class score: avg(CA) x w1 + avg(Exam) x w2. If one component has no
+ * entries at all the other counts 100%; null when neither has any entries.
+ */
+export function overallClassScore(
+  caValues: (number | null)[],
+  examValues: (number | null)[],
+  caMarks: number,
+  examMarks: number,
+): number | null {
+  const ca = caValues.filter((v): v is number => v !== null);
+  const exam = examValues.filter((v): v is number => v !== null);
+  if (ca.length === 0 && exam.length === 0) return null;
+  const w1 = caMarks / (caMarks + examMarks);
+  const w2 = examMarks / (caMarks + examMarks);
+  const caAvg = ca.length ? ca.reduce((a, b) => a + b, 0) / ca.length : null;
+  const examAvg = exam.length ? exam.reduce((a, b) => a + b, 0) / exam.length : null;
+  if (caAvg === null) return examAvg;
+  if (examAvg === null) return caAvg;
+  return Math.round((caAvg * w1 + examAvg * w2) * 100) / 100;
+}
+
+/** CSEE division bands: best-7 points sum mapped to a division. */
+const DIVISION_BANDS: {
+  division: DivisionResult["division"];
+  label: string;
+  min: number;
+  max: number;
+}[] = [
+  { division: "I", label: "Distinction", min: 7, max: 17 },
+  { division: "II", label: "Credit", min: 18, max: 21 },
+  { division: "III", label: "Merit", min: 22, max: 25 },
+  { division: "IV", label: "Pass", min: 26, max: 33 },
+  { division: "0", label: "Fail", min: 34, max: 35 },
+];
+
+export const DIVISION_I_CEILING = 17;
+
+/**
+ * Secondary division (NECTA style): sum of the best 7 graded subject points.
+ * Students with fewer than 7 graded subjects cannot be placed in a division
+ * (returns null — no division is printed).
+ */
+export function divisionFor(points: (number | null)[]): DivisionResult | null {
+  const graded = points.filter((p): p is number => p !== null);
+  if (graded.length < 7) return null;
+  const best7 = [...graded].sort((a, b) => a - b).slice(0, 7);
+  const pointsSum = best7.reduce((a, b) => a + b, 0);
+  const band = DIVISION_BANDS.find((b) => pointsSum >= b.min && pointsSum <= b.max);
+  if (!band) return null;
+  return {
+    division: band.division,
+    label: band.label,
+    pointsSum,
+    gapToDivisionI: pointsSum - DIVISION_I_CEILING,
+  };
+}
+
+/**
+ * Count of subjects passed: grade letter is NOT E or F.
+ * (Replaces the legacy hard-coded "All Passed".)
+ */
+export function subjectsPassed(grades: (string | null)[]): number {
+  return grades.filter((g) => g !== null && g !== "E" && g !== "F").length;
+}
+
+/** Display a weighted subject total: integers plain, decimals trimmed to 2dp. */
+export function fmtTotalMark(t: number): string {
+  return parseFloat(t.toFixed(2)).toString();
 }
 
 export function gradeToneClass(grade: string): string {
