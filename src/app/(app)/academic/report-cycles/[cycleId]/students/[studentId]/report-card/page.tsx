@@ -20,7 +20,6 @@ import {
   generateChartImage,
   type ChartVariant,
 } from "@/lib/chart/performance-chart";
-import { AttendanceSummaryCard } from "@/components/shared/attendance-summary";
 import {
   attendanceRecordFor,
   classById,
@@ -46,12 +45,34 @@ import {
   mostImprovedSubject,
   subjectsPassed,
 } from "@/lib/grading";
+import { ATTENDANCE_RATING_TEXT } from "@/lib/attendance";
 import { fmtDateRange, fmtLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Download, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
-const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+/**
+ * The card is printed as pure white paper laid out entirely with bordered
+ * tables (the school's requested "totally white, only table" design). The
+ * single accent colour is the brand maroon #5C0A14 — the exact maroon of
+ * the Josephian Schools shield — used for the title band and every table
+ * header row; all other fills are white.
+ */
+const BRAND = "#5C0A14";
+
+/* Shared chrome for the card's tables. */
+const TBL = "w-full table-fixed border-collapse";
+/** Full-width maroon section bar (first row of each section table). */
+const SECTION_BAR =
+  "border border-border bg-[#5C0A14] px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-white";
+/** Maroon column-heading cell. */
+const COL_HEAD =
+  "border border-border bg-[#5C0A14] px-2 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white";
+/** Standard bordered body cell (white). */
+const CELL = "border border-border bg-white px-2 py-1.5 align-middle";
+/** Tiny uppercase label used inside bordered cells. */
+const CELL_LABEL =
+  "text-3xs font-semibold uppercase tracking-[0.12em] text-muted-foreground";
 
 interface ChartRow {
   name: string;
@@ -73,10 +94,11 @@ interface PerformanceChartSectionProps {
 }
 
 /**
- * "Performance Charts" section (A4 section 6 / chart prompt §8): badge row,
- * the static grouped bar chart image, the Terminal HTML legend and a
- * visually hidden data table backing the chart for screen readers (B0:
- * charts include a table fallback).
+ * "Performance Charts" section (A4 section 6 / chart prompt §8) — also laid
+ * out as a table: a maroon section bar and a single bordered body cell
+ * holding the badge lines, the static grouped bar chart image, the Terminal
+ * HTML legend and a visually hidden data table backing the chart for screen
+ * readers (B0: charts include a table fallback).
  */
 function PerformanceChartSection({
   variant,
@@ -89,76 +111,78 @@ function PerformanceChartSection({
   // Section heading: "Performance Chart" on secondary terminal cards only.
   const heading = variant === "mid-term" || isPrimary ? "Performance Charts" : "Performance Chart";
   return (
-    <div className="mt-3 border border-border p-3">
-      <p className={CARD_LABEL}>{heading}</p>
-      {variant === "mid-term" ? (
-        <div className="mt-0.5">
-          <p className="text-compact font-medium">Subject Score Analysis</p>
-          <p className="text-2xs text-muted-foreground">
-            Student score vs class average across all subjects
-          </p>
-        </div>
-      ) : null}
-      {strongest || bestImprovement ? (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {strongest ? (
-            <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-2xs font-medium text-primary">
-              ★ Strongest Subject: {strongest.name} — {fmtTotalMark(strongest.score)} / 100
-            </span>
-          ) : null}
-          {bestImprovement ? (
-            <span className="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-2xs font-medium text-success-strong">
-              ▲ Best Improvement: {bestImprovement.name} — +{bestImprovement.value}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-      {chartImage ? (
-        <img
-          src={chartImage}
-          alt="Grouped bar chart comparing achieved marks with the class average and class topper for every assessed subject"
-          className="chart-img mt-2 w-full"
-        />
-      ) : (
-        <p className="mt-2 text-2xs text-muted-foreground">{CHART_FALLBACK_TEXT}</p>
-      )}
-      {variant === "terminal" ? (
-        // Terminal legend is rendered in HTML, not in the chart image (§9).
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-sm" style={{ background: "#E74C3C" }} /> Achieved Marks
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-sm" style={{ background: "#3498DB" }} /> Class Avg
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-sm" style={{ background: "#2ECC71" }} /> Class Topper
-          </span>
-        </div>
-      ) : null}
-      {/* Chart data-table fallback (B0: charts include a table fallback). */}
-      <table className="sr-only">
-        <caption>Subject totals against the class average and class top</caption>
-        <thead>
-          <tr>
-            <th scope="col">Subject</th>
-            <th scope="col">Achieved</th>
-            <th scope="col">Class average</th>
-            <th scope="col">Class top</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.name}>
-              <th scope="row">{row.name}</th>
-              <td>{fmtTotalMark(row.achieved)}</td>
-              <td>{fmtTotalMark(row.classAvg)}</td>
-              <td>{fmtTotalMark(row.classTop)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <table className={cn(TBL, "mt-4")}>
+      <tbody>
+        <tr>
+          <th scope="colgroup" className={SECTION_BAR}>
+            {heading}
+          </th>
+        </tr>
+        <tr>
+          <td className={CELL}>
+            {strongest || bestImprovement ? (
+              <div className="mb-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-2xs font-semibold">
+                {strongest ? (
+                  <span style={{ color: BRAND }}>
+                    ★ Strongest Subject: {strongest.name} — {fmtTotalMark(strongest.score)} / 100
+                  </span>
+                ) : null}
+                {bestImprovement ? (
+                  <span className="text-[#2D6A4E]">
+                    ▲ Best Improvement: {bestImprovement.name} — +{bestImprovement.value}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {chartImage ? (
+              <img
+                src={chartImage}
+                alt="Grouped bar chart comparing achieved marks with the class average and class topper for every assessed subject"
+                className="chart-img w-full"
+              />
+            ) : (
+              <p className="text-2xs text-muted-foreground">{CHART_FALLBACK_TEXT}</p>
+            )}
+            {variant === "terminal" ? (
+              // Terminal legend is rendered in HTML, not in the chart image (§9).
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <span className="size-2 rounded-sm" style={{ background: "#E74C3C" }} /> Achieved Marks
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="size-2 rounded-sm" style={{ background: "#3498DB" }} /> Class Avg
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="size-2 rounded-sm" style={{ background: "#2ECC71" }} /> Class Topper
+                </span>
+              </div>
+            ) : null}
+            {/* Chart data-table fallback (B0: charts include a table fallback). */}
+            <table className="sr-only">
+              <caption>Subject totals against the class average and class top</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Subject</th>
+                  <th scope="col">Achieved</th>
+                  <th scope="col">Class average</th>
+                  <th scope="col">Class top</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.name}>
+                    <th scope="row">{row.name}</th>
+                    <td>{fmtTotalMark(row.achieved)}</td>
+                    <td>{fmtTotalMark(row.classAvg)}</td>
+                    <td>{fmtTotalMark(row.classTop)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
@@ -273,6 +297,61 @@ export default function ReportCardPage() {
     "Use 'Save as PDF' in the print dialog to download the report card.",
   );
 
+  // Performance summary cells; the points/division pair appears only where
+  // points are printed (secondary classes without the No-Division flag).
+  const summaryCells = [
+    { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-", accent: false },
+    { label: "Average", value: result ? result.average.toFixed(1) : "-", accent: false },
+    {
+      label: "Overall grade",
+      value: result && result.count > 0 ? result.grade : "-",
+      accent: true,
+    },
+    ...(showPoints
+      ? [
+          {
+            label: "Points total",
+            value: assessed.length > 0 ? String(pointsTotal) : "-",
+            accent: false,
+          },
+          {
+            label: "Division",
+            value: division ? `Div ${division.division}` : "—",
+            accent: true,
+          },
+        ]
+      : []),
+    {
+      label: "Subjects passed",
+      value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-",
+      accent: false,
+    },
+    { label: "Class size", value: String(classSize), accent: false },
+  ];
+
+  // Attendance row cells; "Not recorded" appears only when > 0 (A3.8).
+  const rateText = attendance.rate === null ? "–" : `${attendance.rate.toFixed(1)}%`;
+  const attRatingText =
+    attendance.rating === "none" ? null : ATTENDANCE_RATING_TEXT[attendance.rating];
+  const attCells = [
+    {
+      label: "Days attended / recorded",
+      value: `${attendance.daysAttended} / ${attendance.daysRecorded}`,
+    },
+    { label: "Attendance rate", value: rateText },
+    { label: "Late", value: String(attendance.late) },
+    { label: "Absent", value: String(attendance.absent) },
+    { label: "Excused", value: String(attendance.excused) },
+    ...(attendance.notRecorded > 0
+      ? [
+          {
+            label: "Not recorded",
+            value: `${attendance.notRecorded} day${attendance.notRecorded === 1 ? "" : "s"}`,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -317,79 +396,124 @@ export default function ReportCardPage() {
         </div>
       ) : null}
 
-      {/* The printable card: scrollable on a phone, exact A4 sheet in print */}
+      {/* The printable card: scrollable on a phone, exact A4 sheet in print.
+          Totally white paper; every section is a bordered table. */}
       <div className="overflow-x-auto print:overflow-visible">
-        <div
-          className="print-area mx-auto w-full max-w-205 border border-border bg-white p-8 font-serif text-foreground shadow-sm"
-        >
-        {/* School header */}
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.35em]">
-          {SCHOOL.name}
-        </p>
-        <p className="mt-1 text-center text-xs italic text-muted-foreground">{SCHOOL.motto}</p>
-        <p className="mt-1 text-center text-2xs text-muted-foreground">
-          {SCHOOL.address} · {SCHOOL.phone}
-        </p>
-        <div className="mx-auto mt-3 h-1 max-w-md border-y border-input" />
+        <div className="print-area mx-auto w-full max-w-205 border border-border bg-white p-8 font-serif text-foreground shadow-sm">
+          {/* School header: logo + school block on white */}
+          <div className="flex items-center gap-4">
+            <img
+              src="/josephian-logo.png"
+              alt="Josephian Schools logo"
+              className="h-20 w-20 shrink-0"
+            />
+            <div className="min-w-0 flex-1 text-center">
+              <p
+                className="text-lg font-bold uppercase tracking-[0.2em]"
+                style={{ color: BRAND }}
+              >
+                {SCHOOL.name}
+              </p>
+              <p className="mt-0.5 text-xs italic text-muted-foreground">{SCHOOL.motto}</p>
+              <p className="mt-0.5 text-2xs text-muted-foreground">
+                {SCHOOL.address} · {SCHOOL.phone} · {SCHOOL.email}
+              </p>
+            </div>
+            <div aria-hidden className="h-20 w-20 shrink-0" />
+          </div>
 
-        <h2 className="mt-5 text-center text-base font-bold uppercase tracking-[0.18em]">
-          Student Report Card
-        </h2>
-        <p className="mt-0.5 text-center text-xs text-muted-foreground">
-          {cycle.term} · {cycle.academicYear} Academic Year
-        </p>
-        {/* Report date + school opens badges (A4 header; never hard-coded). */}
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          <span className="rounded border border-border px-2.5 py-1 text-2xs">
-            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">Report date</span>{" "}
-            <span className="font-medium tabular">{fmtLongDate(cycle.reportDate)}</span>
-          </span>
-          <span className="rounded border border-border px-2.5 py-1 text-2xs">
-            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">School opens</span>{" "}
-            <span className="font-medium tabular">{fmtLongDate(cycle.schoolOpensDate)}</span>
-          </span>
-        </div>
+          {/* Title band — maroon table header row */}
+          <table className={cn(TBL, "mt-4")}>
+            <tbody>
+              <tr>
+                <th scope="colgroup" className="bg-[#5C0A14] px-3 py-2 text-center">
+                  <span className="block text-sm font-bold uppercase tracking-[0.3em] text-white">
+                    Student Report Card
+                  </span>
+                  <span className="mt-0.5 block text-2xs font-medium tracking-[0.1em] text-white/85">
+                    {cycle.term} · {cycle.academicYear} Academic Year · {cycle.name}
+                  </span>
+                </th>
+              </tr>
+            </tbody>
+          </table>
 
-        {/* Student info grid */}
-        <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-3 text-compact sm:grid-cols-3">
-          <div>
-            <p className={CARD_LABEL}>Name</p>
-            <p className="mt-0.5 font-medium">{student.name}</p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Admission No</p>
-            <p className="mt-0.5 font-medium tabular">{student.admissionNo}</p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Class</p>
-            <p className="mt-0.5 font-medium">{classNameOf(student.classId)}</p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Class Teacher</p>
-            <p className="mt-0.5 font-medium">{classTeacherName}</p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Academic Year</p>
-            <p className="mt-0.5 font-medium tabular">{cycle.academicYear}</p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Position</p>
-            <p className="mt-0.5 font-medium tabular">
-              {result ? `${result.rank} of ${classSize}` : "-"}
-            </p>
-          </div>
-          <div>
-            <p className={CARD_LABEL}>Cycle</p>
-            <p className="mt-0.5 font-medium">{cycle.name}</p>
-          </div>
-        </div>
+          {/* Student particulars */}
+          <table className={cn(TBL, "mt-4")}>
+            <colgroup>
+              <col className="w-[17%]" />
+              <col className="w-[33%]" />
+              <col className="w-[17%]" />
+              <col className="w-[33%]" />
+            </colgroup>
+            <tbody>
+              <tr>
+                <th colSpan={4} scope="colgroup" className={SECTION_BAR}>
+                  Student Particulars
+                </th>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Student name
+                </th>
+                <td className={cn(CELL, "font-medium")}>{student.name}</td>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Admission no
+                </th>
+                <td className={cn(CELL, "font-medium tabular")}>{student.admissionNo}</td>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Class
+                </th>
+                <td className={cn(CELL, "font-medium")}>{classNameOf(student.classId)}</td>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Class teacher
+                </th>
+                <td className={cn(CELL, "font-medium")}>{classTeacherName}</td>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Academic year
+                </th>
+                <td className={cn(CELL, "font-medium tabular")}>{cycle.academicYear}</td>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Position
+                </th>
+                <td className={cn(CELL, "font-medium tabular")}>
+                  {result ? `${result.rank} of ${classSize}` : "-"}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Report cycle
+                </th>
+                <td colSpan={3} className={cn(CELL, "font-medium")}>
+                  {cycle.name}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Report date
+                </th>
+                <td className={cn(CELL, "font-medium tabular")}>
+                  {fmtLongDate(cycle.reportDate)}
+                </td>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  School opens
+                </th>
+                <td className={cn(CELL, "font-medium tabular")}>
+                  {fmtLongDate(cycle.schoolOpensDate)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        {/* Subjects table — the school's maroon ledger design: monthly and
-            terminal components with their assessment weights, weighted total,
-            grade badge and exam-vs-CA progress, with the subject teacher's
-            remark quoted beneath each subject row. */}
-        <div className="mt-6 overflow-hidden rounded-lg bg-[#F7F2E9] font-sans">
-          <table className="w-full table-fixed border-collapse">
+          {/* Subject results — the card's core table: monthly and terminal
+              components with their assessment weights, weighted total, grade
+              badge and exam-vs-CA progress, with the subject teacher's remark
+              quoted in a full-width row beneath each subject. */}
+          <table className={cn(TBL, "mt-4")}>
             <colgroup>
               <col className="w-[5%]" />
               <col className="w-[29%]" />
@@ -400,32 +524,37 @@ export default function ReportCardPage() {
               <col className="w-[12%]" />
             </colgroup>
             <thead>
-              <tr className="bg-gradient-to-r from-[#5B1117] to-[#3D0B10] text-white">
-                <th className="py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+              <tr>
+                <th colSpan={7} scope="colgroup" className={SECTION_BAR}>
+                  Subject Results
+                </th>
+              </tr>
+              <tr>
+                <th scope="col" className={COL_HEAD}>
                   #
                 </th>
-                <th className="py-3 pl-6 text-left text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={cn(COL_HEAD, "pl-4 text-left")}>
                   Subject
                 </th>
-                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={COL_HEAD}>
                   Monthly
-                  <span className="block text-[10px] font-semibold tracking-[0.08em] text-white/70">
+                  <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
                     {caPct} %
                   </span>
                 </th>
-                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={COL_HEAD}>
                   Terminal
-                  <span className="block text-[10px] font-semibold tracking-[0.08em] text-white/70">
+                  <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
                     {examPct} %
                   </span>
                 </th>
-                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={COL_HEAD}>
                   Total
                 </th>
-                <th className="border-l border-white/10 py-3 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={COL_HEAD}>
                   Grade
                 </th>
-                <th className="border-l border-white/10 py-3 pr-2 text-center text-[11px] font-bold uppercase tracking-[0.14em]">
+                <th scope="col" className={COL_HEAD}>
                   Progress
                 </th>
               </tr>
@@ -440,61 +569,58 @@ export default function ReportCardPage() {
                 return (
                   <Fragment key={subject.id}>
                     <tr>
-                      <td className="bg-[#F3ECDD] pb-2 pl-0.5 pr-0.5 pt-2 text-center align-top text-2xs tabular text-[#9D8E7D]">
+                      <td
+                        className={cn(
+                          CELL,
+                          "text-center text-2xs tabular text-muted-foreground",
+                        )}
+                      >
                         {rowIndex + 1}
                       </td>
-                      <td className="bg-[#F3ECDD] px-5 py-4">
-                        <p className="text-[15px] font-semibold leading-tight text-[#5C1217]">
-                          {subject.name}
-                        </p>
-                        {mark !== null ? (
-                          <div className="mt-2 h-1.5 w-[210px] max-w-full overflow-hidden rounded-full bg-[#ECE3D1]">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${Math.min(100, Math.max(0, mark))}%`,
-                                background: "linear-gradient(90deg, #5E1519, #C8A64C)",
-                              }}
-                            />
-                          </div>
-                        ) : null}
+                      <td className={cn(CELL, "pl-4 text-[15px] font-semibold")}>
+                        {subject.name}
                       </td>
                       <td
                         className={cn(
-                          "bg-[#F3ECDD] text-center text-[15px] tabular text-[#3B291A]",
-                          ca === null && "text-[#9D8E7D]",
+                          CELL,
+                          "text-center text-[15px] tabular",
+                          ca === null && "text-muted-foreground",
                         )}
                       >
                         {ca ?? "—"}
                       </td>
                       <td
                         className={cn(
-                          "bg-[#F3ECDD] text-center text-[15px] tabular text-[#3B291A]",
-                          exam === null && "text-[#9D8E7D]",
+                          CELL,
+                          "text-center text-[15px] tabular",
+                          exam === null && "text-muted-foreground",
                         )}
                       >
                         {exam ?? "—"}
                       </td>
-                      <td className="bg-[#F3ECDD] text-center text-[15px] font-bold tabular text-[#1B0F08]">
+                      <td className={cn(CELL, "text-center text-[15px] font-bold tabular")}>
                         {enrolled && mark !== null ? mark.toFixed(2) : "—"}
                       </td>
-                      <td className="bg-[#F3ECDD] text-center">
+                      <td className={cn(CELL, "text-center")}>
                         {enrolled && grade?.grade ? (
                           <span
                             className={cn(
-                              "inline-flex size-8 items-center justify-center rounded-full text-sm font-bold",
+                              "inline-flex size-7 items-center justify-center rounded-full text-sm font-bold",
                               grade.grade === topGrade
-                                ? "bg-[#5C1217] text-[#DFC775]"
-                                : "border border-[#5C1217]/30 bg-[#ECE3D1] text-[#5C1217]",
+                                ? "text-white"
+                                : "border border-border bg-white text-foreground",
                             )}
+                            style={
+                              grade.grade === topGrade ? { backgroundColor: BRAND } : undefined
+                            }
                           >
                             {grade.grade}
                           </span>
                         ) : (
-                          <span className="text-[15px] text-[#9D8E7D]">—</span>
+                          <span className="text-[15px] text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="bg-[#F3ECDD] pr-2 text-center">
+                      <td className={cn(CELL, "text-center")}>
                         {delta !== null ? (
                           <span
                             className={cn(
@@ -503,34 +629,27 @@ export default function ReportCardPage() {
                                 ? "text-[#2D6A4E]"
                                 : delta < 0
                                   ? "text-[#C0392B]"
-                                  : "text-[#9D8E7D]",
+                                  : "text-muted-foreground",
                             )}
                           >
                             {delta > 0 ? "+" : delta < 0 ? "-" : ""}
                             {Math.abs(delta).toFixed(2)}
                           </span>
                         ) : (
-                          <span className="text-[15px] text-[#9D8E7D]">—</span>
+                          <span className="text-[15px] text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
                     <tr>
-                      <td colSpan={7} className="p-0">
-                        <div className="mx-4 my-2.5 flex items-start gap-2.5 border-l-4 border-[#C8A74B] bg-[#F2EAD9] py-3 pl-4 pr-5">
-                          <span
-                            aria-hidden
-                            className="font-serif text-[22px] leading-none text-[#C0A66E]"
-                          >
-                            “
-                          </span>
-                          <p className="text-compact italic leading-relaxed text-[#3B291A]">
-                            {!enrolled
-                              ? "Not taking this subject."
-                              : mark !== null
-                                ? subjectRemark(mark, scheme)
-                                : "Not assessed."}
-                          </p>
-                        </div>
+                      <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
+                        <span className={cn(CELL_LABEL, "mr-2")}>Teacher&apos;s remark</span>
+                        <span className="text-compact italic leading-relaxed text-foreground/80">
+                          {!enrolled
+                            ? "Not taking this subject."
+                            : mark !== null
+                              ? subjectRemark(mark, scheme)
+                              : "Not assessed."}
+                        </span>
                       </td>
                     </tr>
                   </Fragment>
@@ -538,162 +657,312 @@ export default function ReportCardPage() {
               })}
             </tbody>
           </table>
-        </div>
 
-        {assessed.length > 0 ? (
-          <PerformanceChartSection
-            variant={variant}
-            chartImage={chartImage}
-            rows={chartRows}
-            strongest={strongest ? { name: strongest.subject.name, score: strongest.mark as number } : null}
-            bestImprovement={chartBestImprovement}
-            isPrimary={isPrimary}
-          />
-        ) : null}
-        {/* The Best-Improvement badge carries the improvement info on
-            mid-term primary cards; the explainer line covers the rest. */}
-        {mostImproved && mostImprovedSubjectRow && !chartBestImprovement ? (
-          <p className="mt-1 text-2xs text-muted-foreground">
-            Most improved: <span className="font-medium text-foreground">{mostImprovedSubjectRow.subject.name}</span> · CA up{" "}
-            {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject with a single recorded term
-            counts as 0)
+          <p className="mt-1.5 text-2xs text-muted-foreground">
+            A subject with only one assessment sat carries that mark at 100%; a subject with no
+            marks at all is omitted and the remaining rows renumber continuously.
           </p>
-        ) : null}
-        <p className="mt-1.5 text-2xs text-muted-foreground">
-          A subject with only one assessment sat carries that mark at 100%; a subject with no marks at all is omitted
-          and the remaining rows renumber continuously.
-        </p>
 
-        {/* Summary strip */}
-        <div className="mt-4 grid grid-cols-2 gap-px border border-border bg-muted sm:grid-cols-4">
-          {[
-            { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-" },
-            { label: "Average", value: result ? result.average.toFixed(1) : "-" },
-            { label: "Overall grade", value: result && result.count > 0 ? result.grade : "-" },
-            ...(showPoints
-              ? [{ label: "Points total", value: assessed.length > 0 ? String(pointsTotal) : "-" }]
-              : []),
-            { label: "Subjects passed", value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-" },
-            ...(showPoints
-              ? [{ label: "Division", value: division ? `Div ${division.division}` : "—" }]
-              : []),
-            { label: "Class size", value: String(classSize) },
-          ].map((cell) => (
-            <div key={cell.label} className="bg-white px-3 py-2 text-center">
-              <p className={CARD_LABEL}>{cell.label}</p>
-              <p className="mt-0.5 text-sm font-semibold tabular">{cell.value}</p>
-            </div>
-          ))}
-        </div>
+          {/* Most improved (primary): the Best-Improvement line above the
+              chart carries it on mid-term cards; this line covers the rest. */}
+          {mostImproved && mostImprovedSubjectRow && !chartBestImprovement ? (
+            <p className="mt-1 text-2xs text-muted-foreground">
+              Most improved:{" "}
+              <span className="font-medium text-foreground">
+                {mostImprovedSubjectRow.subject.name}
+              </span>{" "}
+              · CA up {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject
+              with a single recorded term counts as 0)
+            </p>
+          ) : null}
 
-        {/* Attendance (A3.8): after the performance summary, before the scales. */}
-        <AttendanceSummaryCard variant="print" summary={attendance} className="mt-4" />
-
-        {/* Grade scale chips (A4 section 7) — rendered from the class scheme. */}
-        <div className="mt-4">
-          <p className={CARD_LABEL}>Grade scale</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {scheme.boundaries.map((b) => (
-              <span
-                key={b.grade}
-                className="rounded border border-border px-2 py-1 text-2xs text-muted-foreground"
-              >
-                <span className="font-bold text-foreground">{b.grade}</span> {b.min}–{b.max} · {b.remark}
-                {showPoints ? ` · ${b.points} pt${b.points === 1 ? "" : "s"}` : ""}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Division scale chips + gap text (A4 section 8); C6 wording when
-            the student has fewer than 7 graded subjects. */}
-        {showPoints ? (
-          <div className="mt-3">
-            <p className={CARD_LABEL}>Division scale</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DIVISION_BANDS.map((b) => {
-                const achieved = division?.division === b.division;
-                return (
-                  <span
-                    key={b.division}
-                    className={cn(
-                      "rounded border px-2 py-1 text-2xs",
-                      achieved
-                        ? "border-primary bg-primary font-semibold text-primary-foreground"
-                        : "border-border text-muted-foreground",
-                    )}
+          {/* Performance summary */}
+          <table className={cn(TBL, "mt-4")}>
+            <tbody>
+              <tr>
+                <th colSpan={summaryCells.length} scope="colgroup" className={SECTION_BAR}>
+                  Performance Summary
+                </th>
+              </tr>
+              <tr>
+                {summaryCells.map((cell) => (
+                  <th key={cell.label} scope="col" className={cn(CELL, "text-center", CELL_LABEL)}>
+                    {cell.label}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {summaryCells.map((cell) => (
+                  <td
+                    key={cell.label}
+                    className={cn(CELL, "text-center text-sm font-bold tabular")}
+                    style={cell.accent ? { color: BRAND } : undefined}
                   >
-                    Div {b.division} · {b.min}–{b.max} · {b.label}
-                    {achieved && division ? ` \u25B2 ${division.pointsSum} pts` : ""}
-                  </span>
+                    {cell.value}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Attendance (A3.8): after the performance summary, before the scales. */}
+          <table className={cn(TBL, "mt-4")}>
+            <tbody>
+              <tr>
+                <th colSpan={attCells.length} scope="colgroup" className={SECTION_BAR}>
+                  Attendance · Mahudhurio
+                </th>
+              </tr>
+              {attendance.daysRecorded === 0 ? (
+                <tr>
+                  <td colSpan={attCells.length} className={cn(CELL, "text-center text-compact")}>
+                    No attendance recorded for this period.
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  <tr>
+                    {attCells.map((cell) => (
+                      <th
+                        key={cell.label}
+                        scope="col"
+                        className={cn(CELL, "text-center", CELL_LABEL)}
+                      >
+                        {cell.label}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    {attCells.map((cell) => (
+                      <td
+                        key={cell.label}
+                        className={cn(CELL, "text-center text-sm font-bold tabular")}
+                      >
+                        {cell.value}
+                      </td>
+                    ))}
+                  </tr>
+                </>
+              )}
+              <tr>
+                <td colSpan={attCells.length} className={cn(CELL, "text-2xs text-muted-foreground")}>
+                  Period covered: {fmtDateRange(attendance.from, attendance.to)}
+                  {attRatingText ? ` — ${attRatingText}` : ""}
+                  {attendance.notRecorded > 0
+                    ? " · Days not recorded have no counted register and are never counted as absent."
+                    : ""}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Grade scale — rendered from the class scheme. */}
+          <table className={cn(TBL, "mt-4")}>
+            <colgroup>
+              <col className="w-[12%]" />
+              <col className="w-[18%]" />
+              <col />
+              {showPoints ? <col className="w-[12%]" /> : null}
+            </colgroup>
+            <thead>
+              <tr>
+                <th
+                  colSpan={showPoints ? 4 : 3}
+                  scope="colgroup"
+                  className={SECTION_BAR}
+                >
+                  Grading Scale
+                </th>
+              </tr>
+              <tr>
+                <th scope="col" className={COL_HEAD}>
+                  Grade
+                </th>
+                <th scope="col" className={COL_HEAD}>
+                  Marks
+                </th>
+                <th scope="col" className={COL_HEAD}>
+                  Remark
+                </th>
+                {showPoints ? (
+                  <th scope="col" className={COL_HEAD}>
+                    Points
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {scheme.boundaries.map((b) => {
+                const achieved = result?.grade === b.grade;
+                return (
+                  <tr key={b.grade}>
+                    <td
+                      className={cn(CELL, "text-center font-bold")}
+                      style={achieved ? { color: BRAND } : undefined}
+                    >
+                      {b.grade}
+                      {achieved ? " ▲" : ""}
+                    </td>
+                    <td className={cn(CELL, "text-center tabular")}>
+                      {b.min}–{b.max}
+                    </td>
+                    <td className={CELL}>{b.remark}</td>
+                    {showPoints ? (
+                      <td className={cn(CELL, "text-center tabular")}>{b.points}</td>
+                    ) : null}
+                  </tr>
                 );
               })}
-            </div>
-            <p className="mt-1.5 text-2xs text-muted-foreground">
-              {division
-                ? division.gapToDivisionI <= 0
-                  ? "Highest division achieved — computed from the best 7 graded subject points."
-                  : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I — computed from the best 7 graded subject points.`
-                : "Division: not computed (fewer than 7 graded subjects)."}
+            </tbody>
+          </table>
+
+          {/* Division scale + gap text (A4 section 8); C6 wording when the
+              student has fewer than 7 graded subjects. Primary and no-division
+              classes print the explanatory line instead. */}
+          {showPoints ? (
+            <table className={cn(TBL, "mt-4")}>
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[22%]" />
+                <col />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th colSpan={3} scope="colgroup" className={SECTION_BAR}>
+                    Division Scale
+                  </th>
+                </tr>
+                <tr>
+                  <th scope="col" className={COL_HEAD}>
+                    Division
+                  </th>
+                  <th scope="col" className={COL_HEAD}>
+                    Points
+                  </th>
+                  <th scope="col" className={COL_HEAD}>
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {DIVISION_BANDS.map((b) => {
+                  const achieved = division?.division === b.division;
+                  return (
+                    <tr key={b.division}>
+                      <td
+                        className={cn(CELL, "text-center font-bold")}
+                        style={achieved ? { color: BRAND } : undefined}
+                      >
+                        Div {b.division}
+                        {achieved ? " ▲" : ""}
+                      </td>
+                      <td className={cn(CELL, "text-center tabular")}>
+                        {b.min}–{b.max}
+                      </td>
+                      <td className={CELL}>
+                        {b.label}
+                        {achieved && division ? ` — ${division.pointsSum} pts` : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td colSpan={3} className={cn(CELL, "text-2xs text-muted-foreground")}>
+                    {division
+                      ? division.gapToDivisionI <= 0
+                        ? "Highest division achieved — computed from the best 7 graded subject points."
+                        : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I — computed from the best 7 graded subject points.`
+                      : "Division: not computed (fewer than 7 graded subjects)."}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <p className="mt-3 text-center text-2xs text-muted-foreground">
+              {isPrimary
+                ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
+                : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
             </p>
-          </div>
-        ) : (
-          <p className="mt-3 text-center text-2xs text-muted-foreground">
-            {isPrimary
-              ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
-              : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
+          )}
+
+          {/* Performance chart section (table-wrapped) */}
+          {assessed.length > 0 ? (
+            <PerformanceChartSection
+              variant={variant}
+              chartImage={chartImage}
+              rows={chartRows}
+              strongest={
+                strongest ? { name: strongest.subject.name, score: strongest.mark as number } : null
+              }
+              bestImprovement={chartBestImprovement}
+              isPrimary={isPrimary}
+            />
+          ) : null}
+
+          {/* Remarks */}
+          <table className={cn(TBL, "mt-4")}>
+            <colgroup>
+              <col className="w-[22%]" />
+              <col />
+            </colgroup>
+            <tbody>
+              <tr>
+                <th colSpan={2} scope="colgroup" className={SECTION_BAR}>
+                  Remarks
+                </th>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Class teacher&apos;s remark
+                </th>
+                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+                  {comment.classTeacher ?? "Awaiting remark"}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Parental involvement
+                </th>
+                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+                  {comment.parentalInvolvement ?? "Awaiting input"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Footer: parents' day + signatures */}
+          <p className="mt-5 text-center text-xs text-muted-foreground">
+            Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
           </p>
-        )}
+          {/* Three signature slots (A4 section 10): Class Teacher · Academic
+              Dean · Principal. A real sign-off adds images and timestamps. */}
+          <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
+            <div>
+              <div className="mx-auto w-40 border-t border-foreground/30" />
+              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Class Teacher
+              </p>
+            </div>
+            <div>
+              <div className="mx-auto w-40 border-t border-foreground/30" />
+              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Academic Dean
+              </p>
+            </div>
+            <div>
+              <div className="mx-auto w-40 border-t border-foreground/30" />
+              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Principal
+              </p>
+            </div>
+          </div>
 
-        {/* Remarks */}
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="border border-border p-3">
-            <p className={CARD_LABEL}>Class teacher&apos;s remark</p>
-            <p className="mt-1 text-compact leading-relaxed text-foreground/80">
-              {comment.classTeacher ?? "Awaiting remark"}
-            </p>
-          </div>
-          <div className="border border-border p-3">
-            <p className={CARD_LABEL}>Parental involvement</p>
-            <p className="mt-1 text-compact leading-relaxed text-foreground/80">
-              {comment.parentalInvolvement ?? "Awaiting input"}
-            </p>
-          </div>
+          {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
+              literal character printed as "?" on old cards). */}
+          <p className="mt-6 text-center text-2xs text-muted-foreground">
+            {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
+          </p>
         </div>
-
-        {/* Footer: parents' day + signatures */}
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
-        </p>
-        {/* Three signature slots (A4 section 10): Class Teacher · Academic
-            Dean · Principal. A real sign-off adds images and timestamps. */}
-        <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
-          <div>
-            <div className="mx-auto w-40 border-t border-foreground/30" />
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Class Teacher
-            </p>
-          </div>
-          <div>
-            <div className="mx-auto w-40 border-t border-foreground/30" />
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Academic Dean
-            </p>
-          </div>
-          <div>
-            <div className="mx-auto w-40 border-t border-foreground/30" />
-            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Principal
-            </p>
-          </div>
-        </div>
-
-        {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
-            literal character printed as "?" on old cards). */}
-        <p className="mt-6 text-center text-2xs text-muted-foreground">
-          {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
-        </p>
-      </div>
       </div>
     </div>
   );

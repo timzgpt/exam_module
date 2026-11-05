@@ -93,7 +93,15 @@ export function ReportCardView({ child }: { child: Student }) {
       {/* The printable report card */}
       <div className="print-area">
         <div className="border-b border-border pb-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+          <img
+            src="/josephian-logo.png"
+            alt="Josephian Schools logo"
+            className="mx-auto h-14 w-14"
+          />
+          <p
+            className="mt-1 text-xs font-semibold uppercase tracking-[0.22em]"
+            style={{ color: "#5C0A14" }}
+          >
             {SCHOOL.name.toUpperCase()}
           </p>
           <p className="mt-1 text-sm font-medium text-foreground">

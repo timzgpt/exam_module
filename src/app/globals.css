@@ -198,7 +198,7 @@
   .print-area,
   .print-area * {
     visibility: visible;
-    /* The maroon table header and cream bands must print as coloured. */
+    /* The maroon (#5C0A14) table headers must print as coloured. */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
