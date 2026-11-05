@@ -18,7 +18,7 @@ export const DEMO_IDS = {
 
 export const SCHOOL = {
   name: "Josephian Schools",
-  motto: "Knowledge · Discipline · Service",
+  motto: "Character Building, Active Learning, Inclusivity, Skill Building",
   address: "Mbwenkulu Road, Mbezi Beach, Dar es Salaam",
   phone: "+255 754 000 210",
   email: "info@josephian.ac.tz",
