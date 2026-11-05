@@ -1,0 +1,612 @@
+     1→"use client";
+     2→
+     3→import { PageHeader } from "@/components/shared/page-header";
+     4→import { Button } from "@/components/ui/button";
+     5→import {
+     6→  Select,
+     7→  SelectContent,
+     8→  SelectItem,
+     9→  SelectTrigger,
+    10→  SelectValue,
+    11→} from "@/components/ui/select";
+    12→import { usePrintDownload } from "@/hooks/use-print-download";
+    13→import { useCycleContext } from "@/hooks/use-academic-context";
+    14→import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
+    15→import {
+    16→  buildChartSeries,
+    17→  CHART_FALLBACK_TEXT,
+    18→  classScoreFor,
+    19→  generateChartImage,
+    20→  type ChartVariant,
+    21→} from "@/lib/chart/performance-chart";
+    22→import { AttendanceSummaryCard } from "@/components/shared/attendance-summary";
+    23→import {
+    24→  attendanceRecordFor,
+    25→  classById,
+    26→  classSubjectsFor,
+    27→  classNameOf,
+    28→  commentFor,
+    29→  getComponents,
+    30→  isPrimaryClass,
+    31→  prevCaOf,
+    32→  schemeForClass,
+    33→  studentById,
+    34→  studentEffort,
+    35→  studentResultOf,
+    36→  studentsInClass,
+    37→  subjectById,
+    38→  subjectRemark,
+    39→  teacherById,
+    40→} from "@/lib/demo-data";
+    41→import {
+    42→  DIVISION_BANDS,
+    43→  divisionFor,
+    44→  fmtTotalMark,
+    45→  gradeFor,
+    46→  mostImprovedSubject,
+    47→  subjectsPassed,
+    48→} from "@/lib/grading";
+    49→import { fmtDateRange, fmtLongDate } from "@/lib/format";
+    50→import { cn } from "@/lib/utils";
+    51→import { AlertTriangle, Download, Printer, TrendingUp } from "lucide-react";
+    52→import { useParams, useRouter } from "next/navigation";
+    53→
+    54→const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+    55→
+    56→interface ChartRow {
+    57→  name: string;
+    58→  achieved: number;
+    59→  classAvg: number;
+    60→  classTop: number;
+    61→}
+    62→
+    63→interface PerformanceChartSectionProps {
+    64→  /** Which report engine printed this card (mid-term vs terminal rules). */
+    65→  variant: ChartVariant;
+    66→  /** Static data-URI chart image; null renders the fallback paragraph. */
+    67→  chartImage: string | null;
+    68→  rows: ChartRow[];
+    69→  strongest: { name: string; score: number } | null;
+    70→  /** Mid-Term primary cards only (chart prompt §8). */
+    71→  bestImprovement: { name: string; value: number } | null;
+    72→  isPrimary: boolean;
+    73→}
+    74→
+    75→/**
+    76→ * "Performance Charts" section (A4 section 6 / chart prompt §8): badge row,
+    77→ * the static grouped bar chart image, the Terminal HTML legend and a
+    78→ * visually hidden data table backing the chart for screen readers (B0:
+    79→ * charts include a table fallback).
+    80→ */
+    81→function PerformanceChartSection({
+    82→  variant,
+    83→  chartImage,
+    84→  rows,
+    85→  strongest,
+    86→  bestImprovement,
+    87→  isPrimary,
+    88→}: PerformanceChartSectionProps) {
+    89→  // Section heading: "Performance Chart" on secondary terminal cards only.
+    90→  const heading = variant === "mid-term" || isPrimary ? "Performance Charts" : "Performance Chart";
+    91→  return (
+    92→    <div className="mt-3 border border-border p-3">
+    93→      <p className={CARD_LABEL}>{heading}</p>
+    94→      {variant === "mid-term" ? (
+    95→        <div className="mt-0.5">
+    96→          <p className="text-compact font-medium">Subject Score Analysis</p>
+    97→          <p className="text-2xs text-muted-foreground">
+    98→            Student score vs class average across all subjects
+    99→          </p>
+   100→        </div>
+   101→      ) : null}
+   102→      {strongest || bestImprovement ? (
+   103→        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+   104→          {strongest ? (
+   105→            <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-2xs font-medium text-primary">
+   106→              ★ Strongest Subject: {strongest.name} — {fmtTotalMark(strongest.score)} / 100
+   107→            </span>
+   108→          ) : null}
+   109→          {bestImprovement ? (
+   110→            <span className="inline-flex items-center rounded-full border border-success/30 bg-success/10 px-3 py-1 text-2xs font-medium text-success-strong">
+   111→              ▲ Best Improvement: {bestImprovement.name} — +{bestImprovement.value}
+   112→            </span>
+   113→          ) : null}
+   114→        </div>
+   115→      ) : null}
+   116→      {chartImage ? (
+   117→        <img
+   118→          src={chartImage}
+   119→          alt="Grouped bar chart comparing achieved marks with the class average and class topper for every assessed subject"
+   120→          className="chart-img mt-2 w-full"
+   121→        />
+   122→      ) : (
+   123→        <p className="mt-2 text-2xs text-muted-foreground">{CHART_FALLBACK_TEXT}</p>
+   124→      )}
+   125→      {variant === "terminal" ? (
+   126→        // Terminal legend is rendered in HTML, not in the chart image (§9).
+   127→        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+   128→          <span className="inline-flex items-center gap-1">
+   129→            <span className="size-2 rounded-sm" style={{ background: "#E74C3C" }} /> Achieved Marks
+   130→          </span>
+   131→          <span className="inline-flex items-center gap-1">
+   132→            <span className="size-2 rounded-sm" style={{ background: "#3498DB" }} /> Class Avg
+   133→          </span>
+   134→          <span className="inline-flex items-center gap-1">
+   135→            <span className="size-2 rounded-sm" style={{ background: "#2ECC71" }} /> Class Topper
+   136→          </span>
+   137→        </div>
+   138→      ) : null}
+   139→      {/* Chart data-table fallback (B0: charts include a table fallback). */}
+   140→      <table className="sr-only">
+   141→        <caption>Subject totals against the class average and class top</caption>
+   142→        <thead>
+   143→          <tr>
+   144→            <th scope="col">Subject</th>
+   145→            <th scope="col">Achieved</th>
+   146→            <th scope="col">Class average</th>
+   147→            <th scope="col">Class top</th>
+   148→          </tr>
+   149→        </thead>
+   150→        <tbody>
+   151→          {rows.map((row) => (
+   152→            <tr key={row.name}>
+   153→              <th scope="row">{row.name}</th>
+   154→              <td>{fmtTotalMark(row.achieved)}</td>
+   155→              <td>{fmtTotalMark(row.classAvg)}</td>
+   156→              <td>{fmtTotalMark(row.classTop)}</td>
+   157→            </tr>
+   158→          ))}
+   159→        </tbody>
+   160→      </table>
+   161→    </div>
+   162→  );
+   163→}
+   164→
+   165→export default function ReportCardPage() {
+   166→  const params = useParams<{ studentId?: string }>();
+   167→  const router = useRouter();
+   168→  const { cycle } = useCycleContext();
+   169→  const student = studentById(params.studentId ?? "") ?? studentById(DEMO_IDS.studentId)!;
+   170→
+   171→  const result = studentResultOf(student.id);
+   172→  const classmates = studentsInClass(student.classId);
+   173→  const classSize = classmates.length;
+   174→  const attendance = attendanceRecordFor(student.id);
+   175→  const comment = commentFor(student.classId, student.id);
+   176→  const classTeacherName =
+   177→    teacherById(classById(student.classId)?.classTeacherId)?.name ?? "\u2014";
+   178→
+   179→  const classSubjects = classSubjectsFor(student.classId);
+   180→  const scheme = schemeForClass(student.classId);
+   181→  const isPrimary = isPrimaryClass(student.classId);
+   182→  const allRows = classSubjects.map((cs) => {
+   183→    const subject = subjectById(cs.subjectId)!;
+   184→    const comp = getComponents(student.classId, cs.subjectId)[student.id];
+   185→    const enrolled = comp?.enrolled ?? true;
+   186→    const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
+   187→    const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
+   188→    return { subject, enrolled, mark, grade };
+   189→  });
+   190→  // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
+   191→  // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
+   192→  // Remaining rows renumber continuously after any omitted subject (the #
+   193→  // column below).
+   194→  const rows = allRows.filter((r) => !r.enrolled || r.mark !== null);
+   195→  const assessed = allRows.filter((r) => r.mark !== null);
+   196→  const pointsTotal = assessed.reduce((a, r) => a + (r.grade?.points ?? 0), 0);
+   197→  // Secondary division: best 7 subject points; null when fewer than 7 graded
+   198→  // (and always null for primary classes — divisions are a NECTA outcome).
+   199→  const division = isPrimary ? null : divisionFor(assessed.map((r) => r.grade?.points ?? null));
+   200→  const passed = subjectsPassed(assessed.map((r) => r.grade?.grade ?? null));
+   201→  // Strongest subject: highest total; ties go to the first in subject order.
+   202→  const strongest =
+   203→    assessed.length > 0
+   204→      ? assessed.reduce((best, r) => ((r.mark as number) > (best.mark as number) ? r : best))
+   205→      : undefined;
+   206→  // Points and division are hidden on primary cards (Primary A–E bands carry
+   207→  // no points) and on any secondary class whose teacher set the Report
+   208→  // Overview "No Division" flag to Yes.
+   209→  const noDivision = !isPrimary && (classById(student.classId)?.noDivision ?? false);
+   210→  const showPoints = !isPrimary && !noDivision;
+   211→  // Most improved (primary only): largest CA delta C2 − C1 per subject; a
+   212→  // single recorded term counts as 0. Ties go to the first subject in order.
+   213→  const mostImproved = (() => {
+   214→    if (!isPrimary) return null;
+   215→    const deltas = classSubjects.map((cs) => {
+   216→      const comp = getComponents(student.classId, cs.subjectId)[student.id];
+   217→      const cur = comp?.enrolled ? comp.ca ?? null : null;
+   218→      const prev = prevCaOf(student.classId, cs.subjectId)[student.id] ?? null;
+   219→      return { subjectId: cs.subjectId, delta: cur !== null && prev !== null ? cur - prev : 0 };
+   220→    });
+   221→    const best = mostImprovedSubject(deltas);
+   222→    return best && best.delta > 0 ? best : null;
+   223→  })();
+   224→  const mostImprovedSubjectRow = mostImproved
+   225→    ? rows.find((r) => r.subject.id === mostImproved.subjectId)
+   226→    : undefined;
+   227→
+   228→  // Chart data (A4 section 6 / chart prompt §3–§4): achieved total vs class
+   229→  // average and class top per assessed subject, over the student's enrolled
+   230→  // classmates. Class stats follow the cycle's engine: mid-term counts a
+   231→  // student with a single assessment at 100%; terminal only counts students
+   232→  // with BOTH components (chart prompt §4/§9).
+   233→  const variant: ChartVariant = cycle.kind === "mid-term" ? "mid-term" : "terminal";
+   234→  const chartRows: ChartRow[] = assessed.map((r) => {
+   235→    const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
+   236→    const comps = getComponents(student.classId, r.subject.id);
+   237→    const scores = Object.values(comps)
+   238→      .filter((c) => c.enrolled)
+   239→      .map((c) => classScoreFor(variant, c.ca, c.exam, cs?.caMarks ?? 25, cs?.examMarks ?? 75))
+   240→      .filter((t): t is number => t !== null);
+   241→    return {
+   242→      name: r.subject.name,
+   243→      achieved: r.mark ?? 0,
+   244→      classAvg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+   245→      classTop: scores.length ? Math.max(...scores) : 0,
+   246→    };
+   247→  });
+   248→  // Series + static chart image (chart prompt §7 call sequence).
+   249→  const chartSeries = buildChartSeries(
+   250→    chartRows.map((r) => ({ name: r.name, achieved: r.achieved })),
+   251→    chartRows.map((r) => r.classAvg),
+   252→    chartRows.map((r) => r.classTop),
+   253→    strongest?.subject.name ?? "",
+   254→    variant,
+   255→  );
+   256→  const chartImage = generateChartImage(chartSeries, variant);
+   257→  // Best-Improvement badge: Mid-Term primary cards only (chart prompt §8).
+   258→  const chartBestImprovement =
+   259→    variant === "mid-term" && mostImproved && mostImprovedSubjectRow
+   260→      ? { name: mostImprovedSubjectRow.subject.name, value: mostImproved.delta }
+   261→      : null;
+   262→
+   263→  const switchStudent = (id: string) => {
+   264→    router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
+   265→  };
+   266→
+   267→  const downloadPdf = usePrintDownload(
+   268→    "Use 'Save as PDF' in the print dialog to download the report card.",
+   269→  );
+   270→
+   271→  return (
+   272→    <div className="space-y-5">
+   273→      <PageHeader
+   274→        title="Report card"
+   275→        description={`${student.name} · ${classNameOf(student.classId)} · ${cycle.name}`}
+   276→      />
+   277→
+   278→      {/* Toolbar: screen only, never printed */}
+   279→      <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-white p-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+   280→        <div className="flex flex-wrap items-center gap-2">
+   281→          <span className="text-xs font-medium text-muted-foreground">Student</span>
+   282→          {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
+   283→          <Select value={student.id} onValueChange={switchStudent}>
+   284→            <SelectTrigger className="h-8 w-full text-compact sm:w-65">
+   285→              <SelectValue />
+   286→            </SelectTrigger>
+   287→            <SelectContent>
+   288→              {classmates.map((s) => (
+   289→                <SelectItem key={s.id} value={s.id}>
+   290→                  {s.name}
+   291→                </SelectItem>
+   292→              ))}
+   293→            </SelectContent>
+   294→          </Select>
+   295→        </div>
+   296→        <div className="flex items-center gap-2">
+   297→          <Button size="sm" className="gap-1.5" onClick={downloadPdf}>
+   298→            <Download className="size-4" /> Download PDF
+   299→          </Button>
+   300→          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.print()}>
+   301→            <Printer className="size-4" /> Print
+   302→          </Button>
+   303→        </div>
+   304→      </div>
+   305→
+   306→      {/* Legacy rule 7: a student with no marks at all renders an empty
+   307→          subject table — warn before printing instead of generating. */}
+   308→      {assessed.length === 0 ? (
+   309→        <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-compact text-destructive print:hidden">
+   310→          <AlertTriangle className="size-4 shrink-0" />
+   311→          No marks have been entered for this student yet — report cards are generated only after marks exist.
+   312→        </div>
+   313→      ) : null}
+   314→
+   315→      {/* The printable card: scrollable on a phone, exact A4 sheet in print */}
+   316→      <div className="overflow-x-auto print:overflow-visible">
+   317→        <div
+   318→          className="print-area mx-auto w-full max-w-205 border border-border bg-white p-8 font-serif text-foreground shadow-sm"
+   319→        >
+   320→        {/* School header */}
+   321→        <p className="text-center text-xs font-semibold uppercase tracking-[0.35em]">
+   322→          {SCHOOL.name}
+   323→        </p>
+   324→        <p className="mt-1 text-center text-xs italic text-muted-foreground">{SCHOOL.motto}</p>
+   325→        <p className="mt-1 text-center text-2xs text-muted-foreground">
+   326→          {SCHOOL.address} · {SCHOOL.phone}
+   327→        </p>
+   328→        <div className="mx-auto mt-3 h-1 max-w-md border-y border-input" />
+   329→
+   330→        <h2 className="mt-5 text-center text-base font-bold uppercase tracking-[0.18em]">
+   331→          Student Report Card
+   332→        </h2>
+   333→        <p className="mt-0.5 text-center text-xs text-muted-foreground">
+   334→          {cycle.term} · {cycle.academicYear} Academic Year
+   335→        </p>
+   336→        {/* Report date + school opens badges (A4 header; never hard-coded). */}
+   337→        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+   338→          <span className="rounded border border-border px-2.5 py-1 text-2xs">
+   339→            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">Report date</span>{" "}
+   340→            <span className="font-medium tabular">{fmtLongDate(cycle.reportDate)}</span>
+   341→          </span>
+   342→          <span className="rounded border border-border px-2.5 py-1 text-2xs">
+   343→            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">School opens</span>{" "}
+   344→            <span className="font-medium tabular">{fmtLongDate(cycle.schoolOpensDate)}</span>
+   345→          </span>
+   346→        </div>
+   347→
+   348→        {/* Student info grid */}
+   349→        <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-3 text-compact sm:grid-cols-3">
+   350→          <div>
+   351→            <p className={CARD_LABEL}>Name</p>
+   352→            <p className="mt-0.5 font-medium">{student.name}</p>
+   353→          </div>
+   354→          <div>
+   355→            <p className={CARD_LABEL}>Admission No</p>
+   356→            <p className="mt-0.5 font-medium tabular">{student.admissionNo}</p>
+   357→          </div>
+   358→          <div>
+   359→            <p className={CARD_LABEL}>Class</p>
+   360→            <p className="mt-0.5 font-medium">{classNameOf(student.classId)}</p>
+   361→          </div>
+   362→          <div>
+   363→            <p className={CARD_LABEL}>Class Teacher</p>
+   364→            <p className="mt-0.5 font-medium">{classTeacherName}</p>
+   365→          </div>
+   366→          <div>
+   367→            <p className={CARD_LABEL}>Academic Year</p>
+   368→            <p className="mt-0.5 font-medium tabular">{cycle.academicYear}</p>
+   369→          </div>
+   370→          <div>
+   371→            <p className={CARD_LABEL}>Position</p>
+   372→            <p className="mt-0.5 font-medium tabular">
+   373→              {result ? `${result.rank} of ${classSize}` : "-"}
+   374→            </p>
+   375→          </div>
+   376→          <div>
+   377→            <p className={CARD_LABEL}>Cycle</p>
+   378→            <p className="mt-0.5 font-medium">{cycle.name}</p>
+   379→          </div>
+   380→        </div>
+   381→
+   382→        {/* Subjects table */}
+   383→        <table className="mt-6 w-full table-fixed border-collapse text-compact">
+   384→          <thead>
+   385→            <tr className="border-y border-input text-left">
+   386→              <th className="w-6 py-1.5 pr-1 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   387→                #
+   388→              </th>
+   389→              <th className="py-1.5 pr-2 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   390→                Subject
+   391→              </th>
+   392→              <th className="py-1.5 pr-2 text-right text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   393→                Mark
+   394→              </th>
+   395→              <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   396→                Grade
+   397→              </th>
+   398→              {showPoints ? (
+   399→                <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   400→                  Points
+   401→                </th>
+   402→              ) : null}
+   403→              <th className="py-1.5 pr-2 text-center text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   404→                Effort
+   405→              </th>
+   406→              <th className="py-1.5 text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   407→                Teacher&apos;s Remark
+   408→              </th>
+   409→            </tr>
+   410→          </thead>
+   411→          <tbody>
+   412→            {rows.map(({ subject, enrolled, mark, grade }, rowIndex) => {
+   413→              const improved = mostImproved?.subjectId === subject.id;
+   414→              return (
+   415→                <tr
+   416→                  key={subject.id}
+   417→                  className={cn("border-b border-border", improved && "bg-success/8")}
+   418→                >
+   419→                  <td className="py-1.5 pr-1 text-center tabular text-muted-foreground">
+   420→                    {rowIndex + 1}
+   421→                  </td>
+   422→                  <td className="py-1.5 pr-2 font-medium">
+   423→                    {subject.name}
+   424→                    {improved ? (
+   425→                      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 align-middle text-2xs font-semibold text-success-strong">
+   426→                        <TrendingUp className="size-2.5" /> Most improved +{mostImproved?.delta}
+   427→                      </span>
+   428→                    ) : null}
+   429→                  </td>
+   430→                  <td className="py-1.5 pr-2 text-right tabular">
+   431→                    {enrolled && mark !== null ? fmtTotalMark(mark) : "—"}
+   432→                  </td>
+   433→                  <td className="py-1.5 pr-2 text-center font-semibold">
+   434→                    {enrolled && grade?.grade ? grade.grade : "—"}
+   435→                  </td>
+   436→                  {showPoints ? (
+   437→                    <td className="py-1.5 pr-2 text-center tabular">
+   438→                      {enrolled && grade ? grade.points : "—"}
+   439→                    </td>
+   440→                  ) : null}
+   441→                  <td className="py-1.5 pr-2 text-center">
+   442→                    {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
+   443→                  </td>
+   444→                  <td className="py-1.5 text-muted-foreground">
+   445→                    {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark, scheme) : "Not assessed"}
+   446→                  </td>
+   447→                </tr>
+   448→              );
+   449→            })}
+   450→          </tbody>
+   451→        </table>
+   452→
+   453→        {assessed.length > 0 ? (
+   454→          <PerformanceChartSection
+   455→            variant={variant}
+   456→            chartImage={chartImage}
+   457→            rows={chartRows}
+   458→            strongest={strongest ? { name: strongest.subject.name, score: strongest.mark as number } : null}
+   459→            bestImprovement={chartBestImprovement}
+   460→            isPrimary={isPrimary}
+   461→          />
+   462→        ) : null}
+   463→        {/* The Best-Improvement badge carries the improvement info on
+   464→            mid-term primary cards; the explainer line covers the rest. */}
+   465→        {mostImproved && mostImprovedSubjectRow && !chartBestImprovement ? (
+   466→          <p className="mt-1 text-2xs text-muted-foreground">
+   467→            Most improved: <span className="font-medium text-foreground">{mostImprovedSubjectRow.subject.name}</span> · CA up{" "}
+   468→            {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject with a single recorded term
+   469→            counts as 0)
+   470→          </p>
+   471→        ) : null}
+   472→        <p className="mt-1.5 text-2xs text-muted-foreground">
+   473→          Subject totals weight Monthly CA at {classSubjects[0]?.caMarks ?? 25}% and the exam at{" "}
+   474→          {classSubjects[0]?.examMarks ?? 75}%. A subject with only one assessment sat carries that mark at 100%; a
+   475→          subject with no marks at all is omitted and the remaining rows renumber continuously.
+   476→        </p>
+   477→
+   478→        {/* Summary strip */}
+   479→        <div className="mt-4 grid grid-cols-2 gap-px border border-border bg-muted sm:grid-cols-4">
+   480→          {[
+   481→            { label: "Total marks", value: result ? fmtTotalMark(result.total) : "-" },
+   482→            { label: "Average", value: result ? result.average.toFixed(1) : "-" },
+   483→            { label: "Overall grade", value: result && result.count > 0 ? result.grade : "-" },
+   484→            ...(showPoints
+   485→              ? [{ label: "Points total", value: assessed.length > 0 ? String(pointsTotal) : "-" }]
+   486→              : []),
+   487→            { label: "Subjects passed", value: assessed.length > 0 ? `${passed} of ${assessed.length}` : "-" },
+   488→            ...(showPoints
+   489→              ? [{ label: "Division", value: division ? `Div ${division.division}` : "—" }]
+   490→              : []),
+   491→            { label: "Class size", value: String(classSize) },
+   492→          ].map((cell) => (
+   493→            <div key={cell.label} className="bg-white px-3 py-2 text-center">
+   494→              <p className={CARD_LABEL}>{cell.label}</p>
+   495→              <p className="mt-0.5 text-sm font-semibold tabular">{cell.value}</p>
+   496→            </div>
+   497→          ))}
+   498→        </div>
+   499→
+   500→        {/* Attendance (A3.8): after the performance summary, before the scales. */}
+   501→        <AttendanceSummaryCard variant="print" summary={attendance} className="mt-4" />
+   502→
+   503→        {/* Grade scale chips (A4 section 7) — rendered from the class scheme. */}
+   504→        <div className="mt-4">
+   505→          <p className={CARD_LABEL}>Grade scale</p>
+   506→          <div className="mt-1.5 flex flex-wrap gap-1.5">
+   507→            {scheme.boundaries.map((b) => (
+   508→              <span
+   509→                key={b.grade}
+   510→                className="rounded border border-border px-2 py-1 text-2xs text-muted-foreground"
+   511→              >
+   512→                <span className="font-bold text-foreground">{b.grade}</span> {b.min}–{b.max} · {b.remark}
+   513→                {showPoints ? ` · ${b.points} pt${b.points === 1 ? "" : "s"}` : ""}
+   514→              </span>
+   515→            ))}
+   516→          </div>
+   517→        </div>
+   518→
+   519→        {/* Division scale chips + gap text (A4 section 8); C6 wording when
+   520→            the student has fewer than 7 graded subjects. */}
+   521→        {showPoints ? (
+   522→          <div className="mt-3">
+   523→            <p className={CARD_LABEL}>Division scale</p>
+   524→            <div className="mt-1.5 flex flex-wrap gap-1.5">
+   525→              {DIVISION_BANDS.map((b) => {
+   526→                const achieved = division?.division === b.division;
+   527→                return (
+   528→                  <span
+   529→                    key={b.division}
+   530→                    className={cn(
+   531→                      "rounded border px-2 py-1 text-2xs",
+   532→                      achieved
+   533→                        ? "border-primary bg-primary font-semibold text-primary-foreground"
+   534→                        : "border-border text-muted-foreground",
+   535→                    )}
+   536→                  >
+   537→                    Div {b.division} · {b.min}–{b.max} · {b.label}
+   538→                    {achieved && division ? ` \u25B2 ${division.pointsSum} pts` : ""}
+   539→                  </span>
+   540→                );
+   541→              })}
+   542→            </div>
+   543→            <p className="mt-1.5 text-2xs text-muted-foreground">
+   544→              {division
+   545→                ? division.gapToDivisionI <= 0
+   546→                  ? "Highest division achieved — computed from the best 7 graded subject points."
+   547→                  : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I — computed from the best 7 graded subject points.`
+   548→                : "Division: not computed (fewer than 7 graded subjects)."}
+   549→            </p>
+   550→          </div>
+   551→        ) : (
+   552→          <p className="mt-3 text-center text-2xs text-muted-foreground">
+   553→            {isPrimary
+   554→              ? "Primary cards show no points and no division — performance is reported with the Primary A–E bands and the most-improved subject."
+   555→              : "No division printed — the class teacher set “No Division” to Yes in the report overview for this class."}
+   556→          </p>
+   557→        )}
+   558→
+   559→        {/* Remarks */}
+   560→        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+   561→          <div className="border border-border p-3">
+   562→            <p className={CARD_LABEL}>Class teacher&apos;s remark</p>
+   563→            <p className="mt-1 text-compact leading-relaxed text-foreground/80">
+   564→              {comment.classTeacher ?? "Awaiting remark"}
+   565→            </p>
+   566→          </div>
+   567→          <div className="border border-border p-3">
+   568→            <p className={CARD_LABEL}>Parental involvement</p>
+   569→            <p className="mt-1 text-compact leading-relaxed text-foreground/80">
+   570→              {comment.parentalInvolvement ?? "Awaiting input"}
+   571→            </p>
+   572→          </div>
+   573→        </div>
+   574→
+   575→        {/* Footer: parents' day + signatures */}
+   576→        <p className="mt-6 text-center text-xs text-muted-foreground">
+   577→          Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
+   578→        </p>
+   579→        {/* Three signature slots (A4 section 10): Class Teacher · Academic
+   580→            Dean · Principal. A real sign-off adds images and timestamps. */}
+   581→        <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
+   582→          <div>
+   583→            <div className="mx-auto w-40 border-t border-foreground/30" />
+   584→            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   585→              Class Teacher
+   586→            </p>
+   587→          </div>
+   588→          <div>
+   589→            <div className="mx-auto w-40 border-t border-foreground/30" />
+   590→            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   591→              Academic Dean
+   592→            </p>
+   593→          </div>
+   594→          <div>
+   595→            <div className="mx-auto w-40 border-t border-foreground/30" />
+   596→            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+   597→              Principal
+   598→            </p>
+   599→          </div>
+   600→        </div>
+   601→
+   602→        {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
+   603→            literal character printed as "?" on old cards). */}
+   604→        <p className="mt-6 text-center text-2xs text-muted-foreground">
+   605→          {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
+   606→        </p>
+   607→      </div>
+   608→      </div>
+   609→    </div>
+   610→  );
+   611→}
+   612→

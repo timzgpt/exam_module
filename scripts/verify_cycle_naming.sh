@@ -31,7 +31,7 @@ agent-browser screenshot /tmp/render/cycle-dialog.png
 echo "--- report card header (mid-term) ---"
 agent-browser open "http://127.0.0.1:3000/academic/report-cycles/cy1m/students/p5a-01/report-card"
 sleep 3
-agent-browser eval "document.body.innerText.includes('Mid-Term - 2026') ? 'card shows Mid-Term - 2026' : 'name missing'"
+agent-browser eval "document.body.innerText.includes('Mid term - 2026') ? 'card shows Mid term - 2026' : 'name missing'"
 
 agent-browser close
 echo done
