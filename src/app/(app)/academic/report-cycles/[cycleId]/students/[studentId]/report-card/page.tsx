@@ -219,9 +219,9 @@ export default function ReportCardPage() {
             </p>
           </div>
           <div className="border border-border p-3">
-            <p className={CARD_LABEL}>Head of School&apos;s remark</p>
+            <p className={CARD_LABEL}>Parental involvement</p>
             <p className="mt-1 text-compact leading-relaxed text-foreground/80">
-              {comment.headTeacher ?? "Awaiting remark"}
+              {comment.parentalInvolvement ?? "Awaiting input"}
             </p>
           </div>
         </div>

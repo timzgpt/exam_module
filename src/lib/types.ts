@@ -124,7 +124,11 @@ export interface MarksDeadline {
 export interface CommentRecord {
   studentId: string;
   classTeacher: string | null;
-  headTeacher: string | null;
+  /**
+   * Required summary of the parent/guardian's involvement this term.
+   * Not optional: a comment record is only complete when this is filled in.
+   */
+  parentalInvolvement: string | null;
   status: "draft" | "submitted";
   updatedAt: string;
 }

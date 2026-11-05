@@ -29,6 +29,10 @@ import { useMemo, useState } from "react";
 
 const REMARK_MAX = 240;
 
+/** A comment record is complete only when BOTH required parts are present. */
+const isComplete = (rec: CommentRecord | undefined): rec is CommentRecord =>
+  !!rec && rec.classTeacher !== null && rec.parentalInvolvement !== null;
+
 export default function CommentsPage() {
   const { toast } = useToast();
   const { klass: cls } = useClassContext();
@@ -52,7 +56,7 @@ export default function CommentsPage() {
       s.admissionNo.toLowerCase().includes(query.toLowerCase()),
   );
 
-  const doneCount = students.filter((s) => comments[s.id]?.classTeacher !== null).length;
+  const doneCount = students.filter((s) => isComplete(comments[s.id])).length;
   const missingCount = students.length - doneCount;
 
   const updateSelected = (patch: Partial<CommentRecord>) => {
@@ -88,7 +92,24 @@ export default function CommentsPage() {
   };
 
   const markSubmitted = () => {
-    if (!selected || !selected.classTeacher?.trim()) return;
+    if (!selected) return;
+    if (!selected.classTeacher?.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Class teacher's remark required",
+        description: "Write the class teacher's remark before submitting.",
+      });
+      return;
+    }
+    if (!selected.parentalInvolvement?.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Parental involvement required",
+        description:
+          "Parental involvement is not optional — describe the guardian's involvement before submitting.",
+      });
+      return;
+    }
     updateSelected({ status: "submitted" });
     toast({
       title: "Comment submitted",
@@ -100,32 +121,32 @@ export default function CommentsPage() {
     const start = students.findIndex((s) => s.id === selectedId);
     for (let k = 1; k <= students.length; k++) {
       const cand = students[(start + k) % students.length];
-      if (cand && comments[cand.id]?.classTeacher === null) {
+      if (cand && !isComplete(comments[cand.id])) {
         setSelectedId(cand.id);
         return;
       }
     }
     toast({
       title: "All remarks complete",
-      description: `Every student in ${cls.name} has a class teacher's remark.`,
+      description: `Every student in ${cls.name} has a complete comment record.`,
     });
   };
 
   const dotClass = (rec: CommentRecord | undefined) =>
-    !rec || rec.classTeacher === null
+    !isComplete(rec)
       ? "bg-destructive ring-2 ring-destructive/25"
       : rec.status === "draft"
         ? "bg-warning"
         : "bg-success";
 
   const statusLabel = (rec: CommentRecord | undefined) =>
-    !rec || rec.classTeacher === null ? "Missing" : rec.status === "draft" ? "Draft" : "Submitted";
+    !isComplete(rec) ? "Incomplete" : rec.status === "draft" ? "Draft" : "Submitted";
 
   return (
     <div className="space-y-5">
       <PageHeader
         title={`Comments: ${cls.name}`}
-        description={`${cycle.name} · write the class teacher's remark per student, insert templates and submit for report generation.`}
+        description={`${cycle.name} · write the class teacher's remark and parental involvement per student, insert templates and submit for report generation.`}
       />
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
@@ -181,7 +202,7 @@ export default function CommentsPage() {
                     <span
                       className={cn(
                         "shrink-0 text-2xs font-medium",
-                        !rec || rec.classTeacher === null
+                        !isComplete(rec)
                           ? "text-destructive"
                           : rec.status === "draft"
                             ? "text-warning"
@@ -202,11 +223,11 @@ export default function CommentsPage() {
           <SectionCard
             noPadding
             title={selectedStudent.name}
-            description={`Adm. ${selectedStudent.admissionNo} · ${selected.classTeacher === null ? "No remark yet" : `Last updated ${selected.updatedAt}`}`}
+            description={`Adm. ${selectedStudent.admissionNo} · ${!isComplete(selected) ? "Incomplete record" : `Last updated ${selected.updatedAt}`}`}
             actions={
               <StatusBadge
                 tone={
-                  selected.classTeacher === null
+                  !isComplete(selected)
                     ? "destructive"
                     : selected.status === "draft"
                       ? "warning"
@@ -248,19 +269,24 @@ export default function CommentsPage() {
 
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="head-remark">Head of School&apos;s remark (optional)</Label>
+                  <Label htmlFor="parental-involvement">
+                    Parental involvement <span className="text-destructive" aria-hidden>*</span>
+                  </Label>
                   <span className="text-xs tabular text-muted-foreground">
-                    {(selected.headTeacher ?? "").length}/{REMARK_MAX}
+                    {(selected.parentalInvolvement ?? "").length}/{REMARK_MAX}
                   </span>
                 </div>
                 <Textarea
-                  id="head-remark"
+                  id="parental-involvement"
                   rows={2}
                   maxLength={REMARK_MAX}
-                  value={selected.headTeacher ?? ""}
-                  onChange={(e) => updateSelected({ headTeacher: e.target.value })}
-                  placeholder="Optional remark from the Head of School…"
+                  value={selected.parentalInvolvement ?? ""}
+                  onChange={(e) => updateSelected({ parentalInvolvement: e.target.value })}
+                  placeholder="Describe how involved the parent/guardian is in this student's learning…"
                 />
+                <p className="text-2xs text-muted-foreground">
+                  Required for every student before a report card can be released.
+                </p>
               </div>
 
               <div className="grid gap-1.5">
@@ -284,20 +310,15 @@ export default function CommentsPage() {
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={saveDraft}>
                   <PenLine className="size-4" /> Save draft
                 </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={markSubmitted}
-                  disabled={!selected.classTeacher?.trim()}
-                >
+                <Button size="sm" className="gap-1.5" onClick={markSubmitted}>
                   <Send className="size-4" /> Mark as submitted
                 </Button>
                 <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <MessageSquareText className="size-3.5" />
                   {edited.has(selectedStudent.id)
                     ? "Edited this session"
-                    : selected.classTeacher === null
-                      ? "Awaiting remark"
+                    : !isComplete(selected)
+                      ? "Awaiting required fields"
                       : "Loaded from draft records"}
                 </span>
               </div>

@@ -387,6 +387,21 @@ export const commentTemplates: string[] = [
   "Should make greater use of the library and attempt more past examination papers.",
 ];
 
+/**
+ * Parental involvement is a REQUIRED part of every comment record, so the
+ * demo generator always provides a note for every non-missing student.
+ */
+const parentalInvolvementNotes: string[] = [
+  "Parents attend all consultation sessions and review homework daily.",
+  "Guardian communicates regularly with the class teacher and follows up on assignments.",
+  "Strong home support; the reading log is signed and returned every week.",
+  "Parent visits the school each month and supports the study plan at home.",
+  "Guardian responds promptly to teacher calls and monitors revision closely.",
+  "Parents attended both PTA meetings this term and support home revision.",
+  "Grandparent is the primary guardian and supervises study time consistently.",
+  "Home follow-up is consistent; parents volunteer in class activities.",
+];
+
 const COMMENTS_MISSING = new Set(["f1a-02", "f1a-06", "f1a-08", "f1a-11", "f1b-03"]);
 const COMMENTS_DRAFT = new Set(["f3a-04", "f3a-09", "cls-2a|f2a-05"]);
 
@@ -395,24 +410,29 @@ export function commentFor(classId: string, studentId: string): CommentRecord {
   const missing = COMMENTS_MISSING.has(studentId);
   const draft = COMMENTS_DRAFT.has(studentId);
   const idx = Math.floor(rnd() * commentTemplates.length);
-  const second = Math.floor(rnd() * commentTemplates.length);
+  const pIdx = Math.floor(rnd() * parentalInvolvementNotes.length);
   return {
     studentId,
     classTeacher: missing ? null : commentTemplates[idx],
-    headTeacher: missing || rnd() > 0.75 ? null : commentTemplates[second],
+    parentalInvolvement: missing ? null : parentalInvolvementNotes[pIdx],
     status: missing ? "draft" : draft ? "draft" : "submitted",
     updatedAt: `2026-03-0${1 + Math.floor(rnd() * 8)}`,
   };
 }
 
+/**
+ * A comment record is complete only when BOTH required parts are present:
+ * the class teacher's remark and the parental involvement note.
+ */
 export function commentProgress(classId: string): {
   done: number;
   total: number;
 } {
   const list = studentsInClass(classId);
-  const done = list.filter(
-    (s) => commentFor(classId, s.id).classTeacher !== null,
-  ).length;
+  const done = list.filter((s) => {
+    const c = commentFor(classId, s.id);
+    return c.classTeacher !== null && c.parentalInvolvement !== null;
+  }).length;
   return { done, total: list.length };
 }
 
