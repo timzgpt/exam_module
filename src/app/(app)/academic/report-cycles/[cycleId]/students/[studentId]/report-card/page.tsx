@@ -16,8 +16,10 @@ import {
   classSubjectsFor,
   classNameOf,
   commentFor,
-  defaultScheme,
-  isEnrolledIn,
+  getComponents,
+  isPrimaryClass,
+  prevCaOf,
+  schemeForClass,
   studentAttendance,
   studentById,
   studentEffort,
@@ -26,9 +28,10 @@ import {
   subjectById,
   subjectRemark,
 } from "@/lib/demo-data";
-import { divisionFor, fmtTotalMark, gradeFor, subjectsPassed } from "@/lib/grading";
+import { divisionFor, fmtTotalMark, gradeFor, mostImprovedSubject, subjectsPassed } from "@/lib/grading";
 import { fmtLongDate } from "@/lib/format";
-import { Download, Printer } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Download, Printer, TrendingUp } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 const CARD_LABEL = "text-3xs font-semibold uppercase tracking-[0.14em] text-muted-foreground";
@@ -46,23 +49,46 @@ export default function ReportCardPage() {
   const comment = commentFor(student.classId, student.id);
 
   const classSubjects = classSubjectsFor(student.classId);
-  const rows = classSubjects.map((cs) => {
+  const scheme = schemeForClass(student.classId);
+  const isPrimary = isPrimaryClass(student.classId);
+  const allRows = classSubjects.map((cs) => {
     const subject = subjectById(cs.subjectId)!;
-    const enrolled = isEnrolledIn(student.classId, cs.subjectId, student.id);
+    const comp = getComponents(student.classId, cs.subjectId)[student.id];
+    const enrolled = comp?.enrolled ?? true;
     const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
-    const grade = mark !== null ? gradeFor(mark, defaultScheme) : undefined;
+    const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
     return { subject, enrolled, mark, grade };
   });
-  const assessed = rows.filter((r) => r.mark !== null);
+  // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
+  // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
+  const rows = allRows.filter((r) => !r.enrolled || r.mark !== null);
+  const assessed = allRows.filter((r) => r.mark !== null);
   const pointsTotal = assessed.reduce((a, r) => a + (r.grade?.points ?? 0), 0);
-  // Secondary division: best 7 subject points; null when fewer than 7 graded.
-  const division = divisionFor(assessed.map((r) => r.grade?.points ?? null));
+  // Secondary division: best 7 subject points; null when fewer than 7 graded
+  // (and always null for primary classes — divisions are a NECTA outcome).
+  const division = isPrimary ? null : divisionFor(assessed.map((r) => r.grade?.points ?? null));
   const passed = subjectsPassed(assessed.map((r) => r.grade?.grade ?? null));
   // Strongest subject: highest total; ties go to the first in subject order.
   const strongest =
     assessed.length > 0
       ? assessed.reduce((best, r) => ((r.mark as number) > (best.mark as number) ? r : best))
       : undefined;
+  // Most improved (primary only): largest CA delta C2 − C1 per subject; a
+  // single recorded term counts as 0. Ties go to the first subject in order.
+  const mostImproved = (() => {
+    if (!isPrimary) return null;
+    const deltas = classSubjects.map((cs) => {
+      const comp = getComponents(student.classId, cs.subjectId)[student.id];
+      const cur = comp?.enrolled ? comp.ca ?? null : null;
+      const prev = prevCaOf(student.classId, cs.subjectId)[student.id] ?? null;
+      return { subjectId: cs.subjectId, delta: cur !== null && prev !== null ? cur - prev : 0 };
+    });
+    const best = mostImprovedSubject(deltas);
+    return best && best.delta > 0 ? best : null;
+  })();
+  const mostImprovedSubjectRow = mostImproved
+    ? rows.find((r) => r.subject.id === mostImproved.subjectId)
+    : undefined;
 
   const switchStudent = (id: string) => {
     router.push(`/academic/report-cycles/${cycle.id}/students/${id}/report-card`);
@@ -186,26 +212,39 @@ export default function ReportCardPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ subject, enrolled, mark, grade }) => (
-              <tr key={subject.id} className="border-b border-border">
-                <td className="py-1.5 pr-2 font-medium">{subject.name}</td>
-                <td className="py-1.5 pr-2 text-right tabular">
-                  {enrolled && mark !== null ? fmtTotalMark(mark) : "—"}
-                </td>
-                <td className="py-1.5 pr-2 text-center font-semibold">
-                  {enrolled && grade?.grade ? grade.grade : "—"}
-                </td>
-                <td className="py-1.5 pr-2 text-center tabular">
-                  {enrolled && grade ? grade.points : "—"}
-                </td>
-                <td className="py-1.5 pr-2 text-center">
-                  {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
-                </td>
-                <td className="py-1.5 text-muted-foreground">
-                  {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark) : "Not assessed"}
-                </td>
-              </tr>
-            ))}
+            {rows.map(({ subject, enrolled, mark, grade }) => {
+              const improved = mostImproved?.subjectId === subject.id;
+              return (
+                <tr
+                  key={subject.id}
+                  className={cn("border-b border-border", improved && "bg-success/8")}
+                >
+                  <td className="py-1.5 pr-2 font-medium">
+                    {subject.name}
+                    {improved ? (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 align-middle text-2xs font-semibold text-success-strong">
+                        <TrendingUp className="size-2.5" /> Most improved +{mostImproved?.delta}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="py-1.5 pr-2 text-right tabular">
+                    {enrolled && mark !== null ? fmtTotalMark(mark) : "—"}
+                  </td>
+                  <td className="py-1.5 pr-2 text-center font-semibold">
+                    {enrolled && grade?.grade ? grade.grade : "—"}
+                  </td>
+                  <td className="py-1.5 pr-2 text-center tabular">
+                    {enrolled && grade ? grade.points : "—"}
+                  </td>
+                  <td className="py-1.5 pr-2 text-center">
+                    {enrolled && mark !== null ? studentEffort(student.id, subject.id) : "—"}
+                  </td>
+                  <td className="py-1.5 text-muted-foreground">
+                    {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark, scheme) : "Not assessed"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -213,6 +252,13 @@ export default function ReportCardPage() {
           <p className="mt-2 text-2xs text-muted-foreground">
             Strongest subject: <span className="font-medium text-foreground">{strongest.subject.name}</span> ·{" "}
             {fmtTotalMark(strongest.mark as number)} (ties go to the first subject in report-card order)
+          </p>
+        ) : null}
+        {mostImproved && mostImprovedSubjectRow ? (
+          <p className="mt-1 text-2xs text-muted-foreground">
+            Most improved: <span className="font-medium text-foreground">{mostImprovedSubjectRow.subject.name}</span> · CA up{" "}
+            {mostImproved.delta} marks from last term (largest C2 − C1 gain; a subject with a single recorded term
+            counts as 0)
           </p>
         ) : null}
 
@@ -235,13 +281,15 @@ export default function ReportCardPage() {
         </div>
 
         <p className="mt-2 text-center text-2xs text-muted-foreground">
-          {division
-            ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
-                division.gapToDivisionI <= 0
-                  ? "Highest division achieved"
-                  : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
-              }`
-            : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
+          {isPrimary
+            ? "Divisions are not computed for primary classes — performance is reported with the Primary A–E bands and the most-improved subject."
+            : division
+              ? `Division ${division.division} — ${division.label} · ${division.pointsSum} points from the best 7 graded subjects · ${
+                  division.gapToDivisionI <= 0
+                    ? "Highest division achieved"
+                    : `${division.gapToDivisionI} point${division.gapToDivisionI === 1 ? "" : "s"} from Division I`
+                }`
+              : "No division printed — fewer than 7 graded subjects (pending Deo confirmation before release)."}
         </p>
 
         {/* Remarks */}

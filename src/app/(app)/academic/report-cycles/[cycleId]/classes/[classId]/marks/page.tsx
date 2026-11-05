@@ -20,17 +20,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
   classSubjectsFor,
-  defaultScheme,
   eligibleStudentsFor,
   getComponents,
   getMarks,
   markStatusOf,
+  schemeForClass,
   studentsInClass,
   subjectAveragesFor,
   subjectById,
   subjectTeacherOf,
 } from "@/lib/demo-data";
-import type { MarkStatusCode } from "@/lib/types";
+import type { ClassSubject, MarkStatusCode } from "@/lib/types";
 import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import {
@@ -76,8 +76,11 @@ interface RowCells {
   exam: string;
 }
 
-/** Subject total + status for a row of the working grid. */
-function rowMark(cells: RowCells): { total: number | null; status: MarkStatusCode | null } {
+/** Subject total + status for a row of the working grid, weighted by the class subject. */
+function rowMark(
+  cells: RowCells,
+  cs: ClassSubject,
+): { total: number | null; status: MarkStatusCode | null } {
   const ca = parseCell(cells.ca);
   const exam = parseCell(cells.exam);
   const codeCell = ca.state === "code" ? ca : exam.state === "code" ? exam : null;
@@ -86,7 +89,7 @@ function rowMark(cells: RowCells): { total: number | null; status: MarkStatusCod
   }
   const caVal = ca.state === "valid" ? ca.value : null;
   const examVal = exam.state === "valid" ? exam.value : null;
-  return { total: subjectTotal(caVal, examVal, 30, 70), status: null };
+  return { total: subjectTotal(caVal, examVal, cs.caMarks, cs.examMarks), status: null };
 }
 
 export default function MarksEntryPage() {
@@ -124,6 +127,7 @@ export default function MarksEntryPage() {
 
   const classSubject = classSubjects.find((c) => c.subjectId === subjectId) ?? first;
   const subject = subjectById(classSubject.subjectId)!;
+  const scheme = schemeForClass(cls.id);
   const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
 
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -181,24 +185,17 @@ export default function MarksEntryPage() {
       [studentId]: { ...prev[studentId], [col === 0 ? "ca" : "exam"]: value },
     }));
 
-  const rows = useMemo(
-    () =>
-      students.map((s, i) => {
-        const cells = working[s.id] ?? { ca: "", exam: "" };
-        const enrolled = getComponents(cls.id, subject.id)[s.id]?.enrolled ?? true;
-        return { student: s, index: i, cells, enrolled, mark: rowMark(cells) };
-      }),
-    [students, working, cls.id, subject.id],
-  );
+  const rows = students.map((s, i) => {
+    const cells = working[s.id] ?? { ca: "", exam: "" };
+    const enrolled = getComponents(cls.id, classSubject.subjectId)[s.id]?.enrolled ?? true;
+    return { student: s, index: i, cells, enrolled, mark: rowMark(cells, classSubject) };
+  });
 
   const entered = rows.filter((r) => r.enrolled && r.mark.total !== null);
   const invalidCount = rows.filter(
     (r) => parseCell(r.cells.ca).state === "invalid" || parseCell(r.cells.exam).state === "invalid",
   ).length;
-  const eligibleCount = useMemo(
-    () => eligibleStudentsFor(cls.id, subject.id).length,
-    [cls.id, subject.id],
-  );
+  const eligibleCount = eligibleStudentsFor(cls.id, classSubject.subjectId).length;
   const enteredPct = eligibleCount ? Math.round((entered.length / eligibleCount) * 100) : 0;
   const classAverage = averageOf(entered.map((r) => r.mark.total as number));
 
@@ -243,7 +240,7 @@ export default function MarksEntryPage() {
     let changed = 0;
     for (const s of students) {
       const prev = getMarks(cls.id, subject.id)[s.id] ?? null;
-      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }).total;
+      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }, classSubject).total;
       if (next !== prev) changed += 1;
       committed[s.id] = next;
     }
@@ -264,7 +261,7 @@ export default function MarksEntryPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Marks entry: ${cls.name}`}
-        description={`${cycle.name} · CA and Exam are entered out of 100 and weighted by the class subject (30 + 70). Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move between cells · Esc clears.`}
+        description={`${cycle.name} · CA and Exam are entered out of 100 and weighted by the class subject (${classSubject.caMarks} + ${classSubject.examMarks}). Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move between cells · Esc clears.`}
         actions={
           <>
             <Button
@@ -368,7 +365,7 @@ export default function MarksEntryPage() {
               {rows.map(({ student, index, cells, enrolled, mark }) => {
                 const invalid =
                   parseCell(cells.ca).state === "invalid" || parseCell(cells.exam).state === "invalid";
-                const g = mark.total !== null ? gradeFor(mark.total, defaultScheme) : undefined;
+                const g = mark.total !== null ? gradeFor(mark.total, scheme) : undefined;
                 return (
                   <TableRow key={student.id} className={cn(!enrolled && "opacity-55")}>
                     <TableCell className="sticky left-0 w-10 border-r border-border/40 bg-card text-center text-xs tabular text-muted-foreground">

@@ -10,6 +10,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -18,12 +19,23 @@ import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
   classResults,
-  defaultScheme,
+  classSubjectsFor,
+  getComponents,
+  isPrimaryClass,
+  schemeForClass,
   subjectAveragesFor,
   subjectById,
-  subjects,
 } from "@/lib/demo-data";
-import { averageOf, formatAvg, gradeFor, gradeToneClass, passRateOf } from "@/lib/grading";
+import {
+  averageOf,
+  componentAverage,
+  fmtTotalMark,
+  formatAvg,
+  gradeFor,
+  gradeToneClass,
+  overallClassScore,
+  passRateOf,
+} from "@/lib/grading";
 import { downloadCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
@@ -40,6 +52,9 @@ export function ResultsAnalysisView() {
 
   const results = useMemo(() => classResults(cls.id), [cls.id]);
   const subjectStats = useMemo(() => subjectAveragesFor(cls.id), [cls.id]);
+  const classSubjects = useMemo(() => classSubjectsFor(cls.id), [cls.id]);
+  const scheme = schemeForClass(cls.id);
+  const isPrimary = isPrimaryClass(cls.id);
 
   const allMarks = useMemo(
     () =>
@@ -49,7 +64,7 @@ export function ResultsAnalysisView() {
     [results],
   );
   const classAverage = averageOf(allMarks);
-  const passRate = passRateOf(allMarks, defaultScheme.passMark);
+  const passRate = passRateOf(allMarks, scheme.passMark);
   const topStudent = results[0];
   const lowestSubjectStat = useMemo(
     () => [...subjectStats].filter((s) => s.avg > 0).sort((a, b) => a.avg - b.avg)[0],
@@ -59,13 +74,13 @@ export function ResultsAnalysisView() {
 
   const distribution = useMemo(() => {
     const dist: Record<string, number> = {};
-    for (const b of defaultScheme.boundaries) dist[b.grade] = 0;
+    for (const b of scheme.boundaries) dist[b.grade] = 0;
     for (const m of allMarks) {
-      const g = gradeFor(m, defaultScheme);
+      const g = gradeFor(m, scheme);
       if (g) dist[g.grade] += 1;
     }
-    return defaultScheme.boundaries.map((b) => ({ grade: b.grade, students: dist[b.grade] ?? 0 }));
-  }, [allMarks]);
+    return scheme.boundaries.map((b) => ({ grade: b.grade, students: dist[b.grade] ?? 0 }));
+  }, [allMarks, scheme]);
 
   const subjectChartData = useMemo(
     () =>
@@ -79,23 +94,46 @@ export function ResultsAnalysisView() {
   const distConfig = { students: { label: "Students", color: BRAND_COLOR } } satisfies ChartConfig;
   const avgConfig = { avg: { label: "Average", color: BRAND_COLOR } } satisfies ChartConfig;
 
+  /**
+   * Footer statistics per class subject. Component averages count entered
+   * marks only (blanks doubly excluded); the class total is
+   * avg(CA) × w1 + avg(Exam) × w2 with the 100% rule when one component has
+   * no entries at all.
+   */
+  const footerStats = useMemo(
+    () =>
+      classSubjects.map((cs) => {
+        const comps = getComponents(cls.id, cs.subjectId);
+        const enrolledComps = Object.values(comps).filter((c) => c.enrolled);
+        const caVals = enrolledComps.map((c) => c.ca);
+        const examVals = enrolledComps.map((c) => c.exam);
+        return {
+          cs,
+          caAvg: componentAverage(caVals),
+          examAvg: componentAverage(examVals),
+          classTotal: overallClassScore(caVals, examVals, cs.caMarks, cs.examMarks),
+        };
+      }),
+    [cls.id, classSubjects],
+  );
+
   const exportCsv = () => {
     const header = [
       "Pos",
       "Student",
       "Adm. no",
-      ...subjects.map((s) => s.code),
+      ...classSubjects.map((cs) => cs.chartLabel),
       "Total",
       "Average",
       "Grade",
       "Division",
     ];
-    const rows = results.map((r) => [
+    const studentRows = results.map((r) => [
       String(r.rank),
       r.student.name,
       r.student.admissionNo,
-      ...subjects.map((s) => {
-        const m = r.marks[s.id];
+      ...classSubjects.map((cs) => {
+        const m = r.marks[cs.subjectId];
         return m === null || m === undefined ? "" : String(m);
       }),
       r.count > 0 ? String(r.total) : "",
@@ -103,8 +141,40 @@ export function ResultsAnalysisView() {
       r.grade,
       r.division ? `Div ${r.division.division} (${r.division.pointsSum} pts)` : "",
     ]);
+    const summaryRows = [
+      [
+        "",
+        "CA average (entered only)",
+        "",
+        ...footerStats.map((f) => (f.caAvg !== null ? fmtTotalMark(f.caAvg) : "")),
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "",
+        "Exam average (entered only)",
+        "",
+        ...footerStats.map((f) => (f.examAvg !== null ? fmtTotalMark(f.examAvg) : "")),
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "",
+        "Class total (avg CA x w1 + avg Exam x w2)",
+        "",
+        ...footerStats.map((f) => (f.classTotal !== null ? fmtTotalMark(f.classTotal) : "")),
+        "",
+        "",
+        "",
+        "",
+      ],
+    ];
     downloadCsv(
-      [header, ...rows],
+      [header, ...studentRows, ...summaryRows],
       `results-${cls.name.toLowerCase().replace(/\s+/g, "-")}-${cycle.term.toLowerCase().replace(/\s+/g, "")}.csv`,
     );
     toast({ title: "Results exported", description: `The ${cls.name} results table was downloaded as CSV.` });
@@ -125,7 +195,7 @@ export function ResultsAnalysisView() {
           value={`${passRate}%`}
           icon={CheckCircle2}
           tone="success"
-          hint={`Pass mark ${defaultScheme.passMark} · ${defaultScheme.name}`}
+          hint={`Pass mark ${scheme.passMark} · ${scheme.name}`}
         />
         <StatCard
           label="Highest average"
@@ -161,11 +231,21 @@ export function ResultsAnalysisView() {
                   Student
                 </TableHead>
                 <TableHead>Adm. no</TableHead>
-                {subjects.map((s) => (
-                  <TableHead key={s.id} className="text-center" title={s.name}>
-                    {s.code}
-                  </TableHead>
-                ))}
+                {classSubjects.map((cs) => {
+                  const subject = subjectById(cs.subjectId);
+                  return (
+                    <TableHead
+                      key={cs.subjectId}
+                      className="text-center"
+                      title={`${subject?.name ?? cs.subjectId} · ${cs.type === "core" ? "Core (compulsory)" : "Subsidiary (enrolled students only)"} · CA ${cs.caMarks} + Exam ${cs.examMarks}`}
+                    >
+                      {cs.chartLabel}
+                      {cs.type === "subsidiary" ? (
+                        <span className="ml-0.5 text-3xs text-muted-foreground">*</span>
+                      ) : null}
+                    </TableHead>
+                  );
+                })}
                 <TableHead className="text-center">Total</TableHead>
                 <TableHead className="text-center">Avg</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
@@ -182,16 +262,18 @@ export function ResultsAnalysisView() {
                     <p className="whitespace-nowrap text-compact font-medium text-foreground">{r.student.name}</p>
                   </TableCell>
                   <TableCell className="text-xs tabular text-muted-foreground">{r.student.admissionNo}</TableCell>
-                  {subjects.map((s) => {
-                    const m = r.marks[s.id];
-                    const g = m !== null && m !== undefined ? gradeFor(m, defaultScheme) : undefined;
+                  {classSubjects.map((cs) => {
+                    const m = r.marks[cs.subjectId];
+                    const g = m !== null && m !== undefined ? gradeFor(m, scheme) : undefined;
                     return (
-                      <TableCell key={s.id} className="text-center text-compact tabular">
+                      <TableCell key={cs.subjectId} className="text-center text-compact tabular">
                         {m === null || m === undefined ? (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground" title="No mark entered">
+                            —
+                          </span>
                         ) : (
                           <span className={cn("rounded px-1.5 py-0.5 font-medium", gradeToneClass(g?.grade ?? "F"))}>
-                            {m}
+                            {fmtTotalMark(m)}
                           </span>
                         )}
                       </TableCell>
@@ -212,7 +294,13 @@ export function ResultsAnalysisView() {
                         Div {r.division.division}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground" title="Fewer than 7 graded subjects — no division">
+                      <span
+                        title={
+                          isPrimary
+                            ? "Divisions apply to secondary (NECTA CSEE) classes only"
+                            : "Fewer than 7 graded subjects — no division printed"
+                        }
+                      >
                         —
                       </span>
                     )}
@@ -220,13 +308,48 @@ export function ResultsAnalysisView() {
                 </TableRow>
               ))}
             </TableBody>
+            <TableFooter>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableCell
+                  colSpan={3}
+                  className="sticky left-0 z-20 border-r border-border/40 bg-muted/95 pl-3 text-2xs uppercase tracking-wide text-muted-foreground"
+                >
+                  Component averages · entered marks only
+                </TableCell>
+                {footerStats.map(({ cs, caAvg, examAvg }) => (
+                  <TableCell key={cs.subjectId} className="text-center text-2xs leading-tight tabular text-muted-foreground">
+                    {caAvg !== null ? fmtTotalMark(caAvg) : "—"}
+                    <span className="mx-0.5 text-border">/</span>
+                    {examAvg !== null ? fmtTotalMark(examAvg) : "—"}
+                  </TableCell>
+                ))}
+                <TableCell colSpan={4} />
+              </TableRow>
+              <TableRow className="border-t-2 border-border/70 bg-muted/60 hover:bg-muted/60">
+                <TableCell
+                  colSpan={3}
+                  className="sticky left-0 z-20 border-r border-border/40 bg-muted/95 pl-3 text-xs font-medium text-foreground"
+                  title="avg(CA) × w1 + avg(Exam) × w2 — with the 100% rule when one component has no entries"
+                >
+                  Class total
+                </TableCell>
+                {footerStats.map(({ cs, classTotal }) => (
+                  <TableCell key={cs.subjectId} className="text-center text-compact font-semibold tabular text-foreground">
+                    {classTotal !== null ? fmtTotalMark(classTotal) : <span className="font-normal text-muted-foreground">—</span>}
+                  </TableCell>
+                ))}
+                <TableCell colSpan={4} className="pr-4 text-2xs text-muted-foreground">
+                  CA avg / Exam avg
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
         </div>
 
         {/* Grade legend */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Grade legend</span>
-          {defaultScheme.boundaries.map((b) => (
+          {scheme.boundaries.map((b) => (
             <span key={b.grade} className="inline-flex items-center gap-1.5">
               <span className={cn("size-2.5 rounded-full border", gradeToneClass(b.grade))} />
               <span className="tabular">
@@ -278,7 +401,7 @@ export function ResultsAnalysisView() {
       {/* Entry coverage note */}
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="outline" className="font-normal">
-          {subjects.length} subjects
+          {classSubjects.length} subjects
         </Badge>
         <Badge variant="outline" className="font-normal">
           {results.length} students
@@ -287,8 +410,10 @@ export function ResultsAnalysisView() {
           {allMarks.length} marks recorded
         </Badge>
         <span>
-          Averages only count subjects with entered marks; dashes mean the mark has not been submitted. Division is
-          computed from the best 7 graded subject points — students with fewer than 7 graded subjects show “—”.
+          Columns follow the class subject order (set on the Class subjects page); <span className="font-medium">*</span> marks a
+          subsidiary subject taken by enrolled students only — everyone else shows “—”. Averages count entered marks only
+          (blanks excluded from both sum and count); class total = avg(CA) × w1 + avg(Exam) × w2. Division is computed
+          from the best 7 graded subject points — students with fewer than 7 graded subjects show “—”.
         </span>
       </div>
     </div>

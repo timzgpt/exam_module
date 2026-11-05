@@ -9,18 +9,20 @@ import { routes } from "@/lib/demo-config";
 import {
   classById,
   classNameOf,
+  classSubjectsFor,
   currentCycle,
-  defaultScheme,
+  getComponents,
+  schemeForClass,
   studentResultOf,
+  subjectById,
   subjectRemark,
-  subjects,
   studentsInClass,
   targetFor,
   teacherById,
 } from "@/lib/demo-data";
 import { formatAvg, gradeFor } from "@/lib/grading";
 import { firstName } from "@/lib/format";
-import type { Student, Subject } from "@/lib/types";
+import type { Student } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   ArrowDownRight,
@@ -57,10 +59,19 @@ export function ProgressView({ child }: { child: Student }) {
   const target = targetFor(child.id);
   const classTeacher = teacherById(classById(child.classId)?.classTeacherId);
   const classSize = studentsInClass(child.classId).length;
+  const scheme = schemeForClass(child.classId);
 
-  const marked: { sub: Subject; mark: number }[] = subjects
-    .map((sub) => ({ sub, mark: result ? result.marks[sub.id] ?? null : null }))
-    .filter((row): row is { sub: Subject; mark: number } => row.mark !== null)
+  // Class-subject order (set on the Class subjects page); non-enrolled
+  // subsidiaries stay in the list with "—".
+  const subjectRows = classSubjectsFor(child.classId).map((cs) => ({
+    sub: subjectById(cs.subjectId)!,
+    enrolled: getComponents(child.classId, cs.subjectId)[child.id]?.enrolled ?? true,
+    mark: result ? result.marks[cs.subjectId] ?? null : null,
+  }));
+
+  const marked = subjectRows
+    .filter((row) => row.mark !== null)
+    .map((row) => ({ sub: row.sub, mark: row.mark as number }))
     .sort((a, b) => a.mark - b.mark);
 
   const lowest = marked[0];
@@ -115,9 +126,8 @@ export function ProgressView({ child }: { child: Student }) {
         description="This term's mark, the change from last term and progress toward the target average."
       >
         <div className="divide-y divide-border/70">
-          {subjects.map((sub) => {
-            const mark = result ? result.marks[sub.id] ?? null : null;
-            const grade = mark !== null ? gradeFor(mark, defaultScheme)?.grade ?? null : null;
+          {subjectRows.map(({ sub, enrolled, mark }) => {
+            const grade = mark !== null ? gradeFor(mark, scheme)?.grade ?? null : null;
             const delta = mark !== null ? prevTermDelta(sub.id, child.id) : 0;
             const up = delta > 0;
             const pct =
@@ -128,7 +138,11 @@ export function ProgressView({ child }: { child: Student }) {
                   <div className="min-w-0">
                     <p className="text-compact font-medium text-foreground">{sub.name}</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {mark !== null ? subjectRemark(mark) : "Not assessed yet"}
+                      {!enrolled
+                        ? "Not taking this subject"
+                        : mark !== null
+                          ? subjectRemark(mark, scheme)
+                          : "Not assessed yet"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -155,7 +169,7 @@ export function ProgressView({ child }: { child: Student }) {
                       )
                     ) : null}
                     <span className="w-7 text-right text-sm font-semibold tabular text-foreground">
-                      {mark ?? "-"}
+                      {enrolled && mark !== null ? mark : <span className="font-normal text-muted-foreground">—</span>}
                     </span>
                     {grade ? (
                       <GradePill grade={grade} />

@@ -16,17 +16,19 @@ import { SCHOOL } from "@/lib/demo-config";
 import {
   classById,
   classNameOf,
+  classSubjectsFor,
   commentFor,
   currentCycle,
-  defaultScheme,
+  getComponents,
+  schemeForClass,
   studentAttendance,
   studentResultOf,
+  subjectById,
   subjectRemark,
-  subjects,
   studentsInClass,
   teacherById,
 } from "@/lib/demo-data";
-import { formatAvg, gradeFor } from "@/lib/grading";
+import { fmtTotalMark, formatAvg, gradeFor } from "@/lib/grading";
 import { firstName } from "@/lib/format";
 import type { Student } from "@/lib/types";
 import { Download } from "lucide-react";
@@ -45,6 +47,18 @@ export function ReportCardView({ child }: { child: Student }) {
   const comment = commentFor(child.classId, child.id);
   const classTeacher = teacherById(classById(child.classId)?.classTeacherId);
   const classSize = studentsInClass(child.classId).length;
+  const scheme = schemeForClass(child.classId);
+  // Class-subject order (set on the Class subjects page). A subject with no
+  // mark at all is omitted entirely; non-enrolled subsidiaries stay with "—".
+  const rows = classSubjectsFor(child.classId)
+    .map((cs) => {
+      const subject = subjectById(cs.subjectId)!;
+      const enrolled = getComponents(child.classId, cs.subjectId)[child.id]?.enrolled ?? true;
+      const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
+      const grade = mark !== null ? gradeFor(mark, scheme)?.grade : null;
+      return { subject, enrolled, mark, grade };
+    })
+    .filter((r) => !r.enrolled || r.mark !== null);
 
   return (
     <SectionCard>
@@ -92,26 +106,24 @@ export function ReportCardView({ child }: { child: Student }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {subjects.map((sub) => {
-                const mark = result ? result.marks[sub.id] ?? null : null;
-                const grade = mark !== null ? gradeFor(mark, defaultScheme)?.grade : null;
-                return (
-                  <TableRow key={sub.id}>
-                    <TableCell className="font-medium text-foreground">{sub.name}</TableCell>
-                    <TableCell className="text-right tabular">{mark ?? "-"}</TableCell>
-                    <TableCell className="text-center">
-                      {grade ? (
-                        <GradePill grade={grade} className="mx-auto" />
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-compact text-muted-foreground">
-                      {mark !== null ? subjectRemark(mark) : "Not assessed"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {rows.map(({ subject, enrolled, mark, grade }) => (
+                <TableRow key={subject.id}>
+                  <TableCell className="font-medium text-foreground">{subject.name}</TableCell>
+                  <TableCell className="text-right tabular">
+                    {enrolled && mark !== null ? fmtTotalMark(mark) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {enrolled && grade ? (
+                      <GradePill grade={grade} className="mx-auto" />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-compact text-muted-foreground">
+                    {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark, scheme) : "Not assessed"}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>

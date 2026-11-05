@@ -18,12 +18,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
   classResults,
-  defaultScheme,
+  schemeForClass,
   subjectAveragesFor,
   subjectById,
   targetFor,
 } from "@/lib/demo-data";
-import { averageOf, formatAvg } from "@/lib/grading";
+import { averageOf, formatAvg, gradeFor } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import { ArrowDownRight, ArrowUpRight, Lightbulb, Save, Target, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -75,6 +75,7 @@ export function TargetsView() {
     [cls.id],
   );
   const lowestSubject = lowestSubjectStat ? subjectById(lowestSubjectStat.subjectId) : undefined;
+  const scheme = schemeForClass(cls.id);
   const focusCount = useMemo(() => {
     const counts = new Map<string, number>();
     for (const r of rows) counts.set(r.focus, (counts.get(r.focus) ?? 0) + 1);
@@ -86,7 +87,7 @@ export function TargetsView() {
     if (lowestSubject && lowestSubjectStat) {
       list.push({
         icon: Lightbulb,
-        text: `Prioritise ${lowestSubject.name} remedials. Class mean ${formatAvg(lowestSubjectStat.avg)} is the weakest subject against a ${defaultScheme.passMark} pass mark.`,
+        text: `Prioritise ${lowestSubject.name} remedials. Class mean ${formatAvg(lowestSubjectStat.avg)} is the weakest subject against a ${scheme.passMark} pass mark.`,
       });
     }
     const needsPush = rows.length - onTrack.length;
@@ -131,7 +132,7 @@ export function TargetsView() {
               <span className="text-2xl font-semibold tabular tracking-tight text-foreground">
                 {formatAvg(currentAvg)}
               </span>
-              <GradePill grade={defaultScheme.boundaries.find((b) => currentAvg >= b.min && currentAvg <= b.max)?.grade ?? "F"} />
+              <GradePill grade={gradeFor(currentAvg, scheme)?.grade ?? "-"} />
             </div>
           </div>
           <div>

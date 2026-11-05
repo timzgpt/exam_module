@@ -69,6 +69,33 @@ export function overallClassScore(
   return Math.round((caAvg * w1 + examAvg * w2) * 100) / 100;
 }
 
+/**
+ * Component average (formula 2): sum of the entered values divided by the
+ * number of entered values. Blanks are doubly excluded — they count towards
+ * neither the sum nor the denominator (the legacy system divided by the full
+ * class size, which depressed averages whenever a mark was missing).
+ * Returns null when nothing has been entered at all.
+ */
+export function componentAverage(values: (number | null)[]): number | null {
+  const entered = values.filter((v): v is number => v !== null);
+  if (entered.length === 0) return null;
+  return entered.reduce((a, b) => a + b, 0) / entered.length;
+}
+
+/**
+ * Most-improved subject (Primary report cards, formula 8): the largest
+ * per-subject CA delta C2 − C1 between this term's and last term's
+ * continuous-assessment mark. A subject with a single recorded term counts
+ * as 0 (not an improvement). Ties go to the first subject in report-card
+ * order — the caller passes deltas already sorted in that order.
+ */
+export function mostImprovedSubject(
+  deltas: { subjectId: string; delta: number }[],
+): { subjectId: string; delta: number } | null {
+  if (deltas.length === 0) return null;
+  return deltas.reduce((best, d) => (d.delta > best.delta ? d : best));
+}
+
 /** CSEE division bands: best-7 points sum mapped to a division. */
 const DIVISION_BANDS: {
   division: DivisionResult["division"];

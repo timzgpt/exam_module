@@ -81,6 +81,7 @@ export const teacherById = (id: string | null | undefined): Teacher | undefined 
   teachers.find((t) => t.id === id);
 
 export const classes: ClassRoom[] = [
+  { id: "cls-p5", name: "Standard 5A", level: "Standard 5", classTeacherId: "t7", room: "A2" },
   { id: "cls-1a", name: "Form 1A", level: "Form 1", classTeacherId: "t3", room: "B2" },
   { id: "cls-1b", name: "Form 1B", level: "Form 1", classTeacherId: "t8", room: "B4" },
   { id: "cls-2a", name: "Form 2A", level: "Form 2", classTeacherId: "t6", room: "B7" },
@@ -88,6 +89,21 @@ export const classes: ClassRoom[] = [
   { id: "cls-3b", name: "Form 3B", level: "Form 3", classTeacherId: "t5", room: "C3" },
   { id: "cls-4a", name: "Form 4A", level: "Form 4", classTeacherId: "t1", room: "A5" },
 ];
+
+/** Level strings starting with "Form" are secondary (NECTA CSEE); the rest are primary. */
+export function isPrimaryClass(classId: string): boolean {
+  const level = classById(classId)?.level ?? "";
+  return !level.startsWith("Form");
+}
+
+/**
+ * Grading scheme for a class: the Primary A-E bands for Standard classes,
+ * the NECTA CSEE bands otherwise. Every grade lookup, distribution and pass
+ * rate goes through this so a class is never graded with the wrong bands.
+ */
+export function schemeForClass(classId: string): GradingScheme {
+  return isPrimaryClass(classId) ? schemeById("gs-primary-2026") : defaultScheme;
+}
 
 export const classById = (id: string): ClassRoom | undefined =>
   classes.find((c) => c.id === id);
@@ -102,6 +118,7 @@ const MIDDLE_NAMES = ["Joseph", "John", "Charles", "Adam", "Robert", "Martin", "
 const SURNAMES = ["Mwakalinga", "Kimaro", "Mushi", "Ndaki", "Mahenge", "Lyimo", "Kiwanga", "Kayombo", "Msigwa", "Mrisho", "Nyoni", "Chacha", "Ndosi", "Massawe", "Shirima", "Kessy", "Mbwana", "Sengo", "Temba", "Mlaki", "Swai", "Macha", "Kalinga", "Nyoni"];
 
 const CLASS_SHORT: Record<string, string> = {
+  "cls-p5": "p5a",
   "cls-1a": "f1a",
   "cls-1b": "f1b",
   "cls-2a": "f2a",
@@ -463,6 +480,40 @@ export function subjectTeacherOf(subjectId: string, classId: string): Teacher | 
     teachers.find((t) => t.subjectIds.includes(subjectId)) ??
     teacherById(classById(classId)?.classTeacherId)
   );
+}
+
+/* ----------------------------------------------------------------
+ * Previous-term CA (C1) — feeds the Primary most-improved highlight
+ * ---------------------------------------------------------------- */
+
+const prevCaCache = new Map<string, Record<string, number | null>>();
+
+/**
+ * Last term's continuous-assessment mark (C1) per student, used by the
+ * Primary report card's most-improved calculation (C2 − C1). Seeded around
+ * this term's CA so the delta lands in a plausible −10…+18 band. Students
+ * without a previous record (new arrivals) get null — their delta counts as
+ * 0, never as an improvement.
+ */
+export function prevCaOf(
+  classId: string,
+  subjectId: string,
+): Record<string, number | null> {
+  const key = `prevca|${classId}|${subjectId}`;
+  const cached = prevCaCache.get(key);
+  if (cached) return cached;
+  const comps = getComponents(classId, subjectId);
+  const result: Record<string, number | null> = {};
+  for (const [studentId, comp] of Object.entries(comps)) {
+    if (!comp.enrolled || comp.ca === null) {
+      result[studentId] = null;
+      continue;
+    }
+    const delta = (hashStr(`prev|${key}|${studentId}`) % 29) - 10; // −10…+18
+    result[studentId] = Math.max(0, Math.min(100, comp.ca - delta));
+  }
+  prevCaCache.set(key, result);
+  return result;
 }
 
 /* ================================================================
@@ -827,6 +878,9 @@ const classResultsCache = new Map<string, StudentResult[]>();
 export function classResults(classId: string): StudentResult[] {
   const cached = classResultsCache.get(classId);
   if (cached) return cached;
+  const scheme = schemeForClass(classId);
+  // Divisions are a secondary (NECTA CSEE) outcome — never computed for primary.
+  const allowDivision = !isPrimaryClass(classId);
   const rows = studentsInClass(classId).map((student) => {
     const marks: Record<string, number | null> = {};
     const points: (number | null)[] = [];
@@ -839,7 +893,7 @@ export function classResults(classId: string): StudentResult[] {
       if (m !== null) {
         total += m;
         count += 1;
-        const g = gradeFor(m, defaultScheme);
+        const g = gradeFor(m, scheme);
         grades.push(g?.grade ?? null);
         points.push(g?.points ?? null);
       } else {
@@ -848,14 +902,14 @@ export function classResults(classId: string): StudentResult[] {
       }
     }
     const average = count > 0 ? total / count : 0;
-    const division = divisionFor(points);
+    const division = allowDivision ? divisionFor(points) : null;
     return {
       student,
       marks,
       total,
       count,
       average,
-      grade: count > 0 ? gradeFor(average, defaultScheme)?.grade ?? "F" : "-",
+      grade: count > 0 ? gradeFor(average, scheme)?.grade ?? scheme.boundaries[scheme.boundaries.length - 1].grade : "-",
       rank: 0,
       bestSevenPoints: division?.pointsSum ?? null,
       division,
@@ -874,6 +928,11 @@ export function studentResultOf(studentId: string): StudentResult | undefined {
   return classResults(student.classId).find((r) => r.student.id === studentId);
 }
 
+/**
+ * Per-subject class statistics, in CLASS-SUBJECT order (the order set on the
+ * Class subjects page — not the catalogue order) and graded with the class's
+ * own scheme. Marks not entered are doubly excluded from every average.
+ */
 export function subjectAveragesFor(classId: string): {
   subjectId: string;
   avg: number;
@@ -882,21 +941,22 @@ export function subjectAveragesFor(classId: string): {
   lowest: number;
   distribution: Record<string, number>;
 }[] {
-  return subjects.map((sub) => {
-    const marks = Object.values(getMarks(classId, sub.id)).filter(
+  const scheme = schemeForClass(classId);
+  return classSubjectsFor(classId).map((cs) => {
+    const marks = Object.values(getMarks(classId, cs.subjectId)).filter(
       (v): v is number => v !== null,
     );
     const avg = marks.length ? marks.reduce((a, b) => a + b, 0) / marks.length : 0;
     const distribution: Record<string, number> = {};
-    for (const b of boundaries) distribution[b.grade] = 0;
+    for (const b of scheme.boundaries) distribution[b.grade] = 0;
     for (const m of marks) {
-      const g = gradeFor(m, defaultScheme)?.grade;
+      const g = gradeFor(m, scheme)?.grade;
       if (g) distribution[g] += 1;
     }
     return {
-      subjectId: sub.id,
+      subjectId: cs.subjectId,
       avg,
-      passRate: marks.length ? Math.round((marks.filter((m) => m >= defaultScheme.passMark).length / marks.length) * 100) : 0,
+      passRate: marks.length ? Math.round((marks.filter((m) => m >= scheme.passMark).length / marks.length) * 100) : 0,
       highest: marks.length ? Math.max(...marks) : 0,
       lowest: marks.length ? Math.min(...marks) : 0,
       distribution,
@@ -924,11 +984,21 @@ export function cycleStatsFor(cycleId: string): CycleStats {
   const all = classes.flatMap((c) => classResults(c.id));
   const allMarks = all.flatMap((r) => Object.values(r.marks).filter((v): v is number => v !== null));
   const average = allMarks.length ? allMarks.reduce((a, b) => a + b, 0) / allMarks.length : 0;
+  // Grade each class's marks with THAT class's scheme (primary A-E vs NECTA
+  // CSEE A-F) so the school-wide distribution never mis-files a primary mark.
   const gradeDistribution: Record<string, number> = {};
-  for (const b of boundaries) gradeDistribution[b.grade] = 0;
-  for (const m of allMarks) {
-    const g = gradeFor(m, defaultScheme)?.grade;
-    if (g) gradeDistribution[g] += 1;
+  for (const s of gradingSchemes) for (const b of s.boundaries) gradeDistribution[b.grade] = 0;
+  let passedEntries = 0;
+  for (const c of classes) {
+    const scheme = schemeForClass(c.id);
+    for (const r of classResults(c.id)) {
+      for (const m of Object.values(r.marks)) {
+        if (m === null) continue;
+        const g = gradeFor(m, scheme)?.grade;
+        if (g) gradeDistribution[g] = (gradeDistribution[g] ?? 0) + 1;
+        if (m >= scheme.passMark) passedEntries += 1;
+      }
+    }
   }
   const totalEntries = marksDeadlines.reduce((a, d) => a + d.entriesTotal, 0);
   const doneEntries = marksDeadlines.reduce((a, d) => a + d.entriesDone, 0);
@@ -942,7 +1012,7 @@ export function cycleStatsFor(cycleId: string): CycleStats {
   const stats: CycleStats = {
     totalStudents: all.length,
     average,
-    passRate: allMarks.length ? Math.round((allMarks.filter((m) => m >= defaultScheme.passMark).length / allMarks.length) * 100) : 0,
+    passRate: allMarks.length ? Math.round((passedEntries / allMarks.length) * 100) : 0,
     gradeDistribution,
     classAverages: classes.map((c) => ({
       classId: c.id,
@@ -950,15 +1020,24 @@ export function cycleStatsFor(cycleId: string): CycleStats {
       avg: classResults(c.id).reduce((a, r) => a + r.average, 0) / classResults(c.id).length,
     })),
     subjectAverages: subjects.map((sub) => {
-      const ms = classes.flatMap((c) =>
-        Object.values(getMarks(c.id, sub.id)).filter((v): v is number => v !== null),
-      );
+      let entered = 0;
+      let passed = 0;
+      let sum = 0;
+      for (const c of classes) {
+        const scheme = schemeForClass(c.id);
+        for (const m of Object.values(getMarks(c.id, sub.id))) {
+          if (m === null) continue;
+          entered += 1;
+          sum += m;
+          if (m >= scheme.passMark) passed += 1;
+        }
+      }
       return {
         subjectId: sub.id,
         name: sub.name,
         department: sub.department,
-        avg: ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0,
-        passRate: ms.length ? Math.round((ms.filter((m) => m >= defaultScheme.passMark).length / ms.length) * 100) : 0,
+        avg: entered ? sum / entered : 0,
+        passRate: entered ? Math.round((passed / entered) * 100) : 0,
       };
     }),
     marksCompletion: totalEntries ? Math.round((doneEntries / totalEntries) * 100) : 0,
@@ -988,14 +1067,24 @@ export function departmentStats(): DepartmentStat[] {
   return deptNames.map((dept) => {
     const deptSubjects = subjects.filter((s) => s.department === dept);
     const rows = deptSubjects.map((sub) => {
-      const ms = classes.flatMap((c) =>
-        Object.values(getMarks(c.id, sub.id)).filter((v): v is number => v !== null),
-      );
+      // Pass rate is judged against each class's own scheme pass mark.
+      let entered = 0;
+      let passed = 0;
+      let sum = 0;
+      for (const c of classes) {
+        const scheme = schemeForClass(c.id);
+        for (const m of Object.values(getMarks(c.id, sub.id))) {
+          if (m === null) continue;
+          entered += 1;
+          sum += m;
+          if (m >= scheme.passMark) passed += 1;
+        }
+      }
       return {
         subjectId: sub.id,
         name: sub.name,
-        avg: ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0,
-        passRate: ms.length ? Math.round((ms.filter((m) => m >= defaultScheme.passMark).length / ms.length) * 100) : 0,
+        avg: entered ? sum / entered : 0,
+        passRate: entered ? Math.round((passed / entered) * 100) : 0,
       };
     });
     const teacherRows = deptSubjects.flatMap((sub) => {
@@ -1037,8 +1126,8 @@ export function studentEffort(studentId: string, subjectId: string): string {
   return ["A", "A", "B", "B", "C"][Math.floor(rnd() * 5)];
 }
 
-export function subjectRemark(mark: number): string {
-  const g = gradeFor(mark, defaultScheme)?.grade ?? "F";
+export function subjectRemark(mark: number, scheme: GradingScheme = defaultScheme): string {
+  const g = gradeFor(mark, scheme)?.grade ?? scheme.boundaries[scheme.boundaries.length - 1].grade;
   if (g === "A") return "Excellent understanding of the topic.";
   if (g === "B") return "Very good performance. Keep improving.";
   if (g === "C") return "Good effort; revise weaker areas.";
