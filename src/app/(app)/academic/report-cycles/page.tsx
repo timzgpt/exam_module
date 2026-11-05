@@ -4,25 +4,8 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge, toneForStatus, labelForStatus } from "@/components/shared/status-badge";
+import { CreateCycleDialog } from "@/components/features/report-cycles/create-cycle-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,9 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
 import { cycles as demoCycles, currentCycle, parentsDayEvent } from "@/lib/demo-data";
+import { useAppContext } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   CalendarCheck,
@@ -51,8 +34,8 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import type { CycleStatus, ReportCycle } from "@/lib/types";
+import { useMemo, useState } from "react";
+import type { CycleStatus } from "@/lib/types";
 import { ACADEMIC_APPROVER, DEMO_TODAY } from "@/lib/demo-config";
 
 const CYCLE_STEPS: CycleStatus[] = ["preparation", "marks-entry", "review", "approved", "released"];
@@ -64,23 +47,10 @@ const STEP_LABELS: Record<CycleStatus, string> = {
   released: "Released",
 };
 
-/** The three report-cycle exams — the cycle name is always "{exam} - {year}". */
-const EXAM_OPTIONS = [
-  { label: "Mid term", kind: "mid-term" },
-  { label: "Terminal Exam", kind: "terminal" },
-  { label: "Annual Exam", kind: "annual" },
-] as const;
-
 function daysUntil(dateStr: string): number {
   const ms =
     new Date(`${dateStr}T00:00:00Z`).getTime() - new Date(`${DEMO_TODAY}T00:00:00Z`).getTime();
   return Math.round(ms / 86_400_000);
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 /** Five-dot progress indicator: preparation → marks entry → review → approved → released. */
@@ -109,65 +79,17 @@ function CycleSteps({ status }: { status: CycleStatus }) {
 }
 
 export default function ReportCyclesPage() {
-  const { toast } = useToast();
-  const [cycles, setCycles] = useState<ReportCycle[]>(demoCycles);
+  const createdCycles = useAppContext((s) => s.createdCycles);
   const [selectedId, setSelectedId] = useState<string>(DEMO_IDS.reportCycleId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState<{
-    exam: string;
-    term: string;
-    year: string;
-    startDate: string;
-    endDate: string;
-  }>({
-    exam: "Terminal Exam",
-    term: "Term 1",
-    year: SCHOOL.academicYear,
-    startDate: "",
-    endDate: "",
-  });
+
+  // Built-in demo cycles plus every cycle created through the dialog —
+  // created cycles persist in the context store, so they survive reloads.
+  const cycles = useMemo(() => [...demoCycles, ...createdCycles], [createdCycles]);
 
   const active = cycles.find((c) => c.id === DEMO_IDS.reportCycleId) ?? currentCycle;
   const selected = cycles.find((c) => c.id === selectedId) ?? active;
   const daysToClose = daysUntil(active.closingDate);
-
-  const createCycle = () => {
-    if (!form.year.trim() || !form.startDate || !form.endDate) return;
-    const kind = EXAM_OPTIONS.find((o) => o.label === form.exam)?.kind ?? "terminal";
-    const cycle: ReportCycle = {
-      id: `cy-${Date.now()}`,
-      // Naming convention: "{Exam} - {year}" — e.g. "Terminal Exam - 2026".
-      name: `${form.exam} - ${form.year.trim()}`,
-      term: form.term,
-      academicYear: form.year.trim(),
-      // The engine follows the exam: Mid-Term runs the mid-term engine;
-      // Terminal and Annual exams run the terminal engine.
-      kind,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      status: "preparation",
-      closingDate: form.endDate,
-      releaseDate: addDays(form.endDate, 14),
-      parentsDayDate: addDays(form.endDate, -7),
-      reportDate: addDays(form.endDate, 3),
-      schoolOpensDate: addDays(form.endDate, 24),
-      attendanceFrom: form.startDate,
-      attendanceTo: form.endDate,
-    };
-    setCycles((prev) => [cycle, ...prev]);
-    setCreateOpen(false);
-    setForm({
-      exam: "Terminal Exam",
-      term: "Term 1",
-      year: SCHOOL.academicYear,
-      startDate: "",
-      endDate: "",
-    });
-    toast({
-      title: "Cycle created",
-      description: `${cycle.name} was added in preparation. Set its closing and release dates next.`,
-    });
-  };
 
   return (
     <div className="space-y-5">
@@ -175,106 +97,15 @@ export default function ReportCyclesPage() {
         title="Report cycles"
         description="Term reporting windows. Prepare, collect marks, review, approve and release report cards."
         actions={
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5">
-                <Plus className="size-4" /> New cycle
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create a report cycle</DialogTitle>
-                <DialogDescription>
-                  The cycle starts in preparation; marks entry, review and release follow.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-3.5 py-1">
-                <div className="grid gap-1.5">
-                  <Label>Exam</Label>
-                  {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
-                  <Select value={form.exam} onValueChange={(v) => setForm({ ...form, exam: v })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXAM_OPTIONS.map((o) => (
-                        <SelectItem key={o.label} value={o.label}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label>Term</Label>
-                    {/* ds-allow-native-select: shadcn Select is a Radix listbox trigger, not a native select */}
-                    <Select value={form.term} onValueChange={(v) => setForm({ ...form, term: v })}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["Term 1", "Term 2", "Term 3"].map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="cycle-year">Academic year</Label>
-                    <Input
-                      id="cycle-year"
-                      type="number"
-                      min={2000}
-                      max={2100}
-                      value={form.year}
-                      onChange={(e) => setForm({ ...form, year: e.target.value })}
-                    />
-                  </div>
-                </div>
-                {/* The name is derived, never free-typed: "{Exam} - {year}". */}
-                <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                  Cycle name ·{" "}
-                  <span className="font-semibold text-foreground">
-                    {form.exam} - {form.year.trim() || "…"}
-                  </span>
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="cycle-start">Start date</Label>
-                    <Input
-                      id="cycle-start"
-                      type="date"
-                      value={form.startDate}
-                      onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="cycle-end">End date</Label>
-                    <Input
-                      id="cycle-end"
-                      type="date"
-                      value={form.endDate}
-                      onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={createCycle}
-                  disabled={!form.year.trim() || !form.startDate || !form.endDate}
-                >
-                  Create cycle
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <>
+            <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" /> New cycle
+            </Button>
+            {/* Redesigned creation flow: a cycle combines exams into one
+                report card (components with labels + weights; the Annual
+                Exam always runs on its own). */}
+            <CreateCycleDialog open={createOpen} onOpenChange={setCreateOpen} />
+          </>
         }
       />
 
@@ -328,6 +159,7 @@ export default function ReportCyclesPage() {
             <TableBody>
               {cycles.map((cycle) => {
                 const isActive = cycle.id === DEMO_IDS.reportCycleId;
+                const isCreated = cycle.id.startsWith("cy-");
                 return (
                   <TableRow
                     key={cycle.id}
@@ -344,6 +176,11 @@ export default function ReportCyclesPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {cycle.term} · {cycle.academicYear}
+                        {cycle.components && cycle.components.length > 1
+                          ? ` · ${cycle.components
+                              .map((c) => `${c.label} ${c.weight}%`)
+                              .join(" + ")}`
+                          : ""}
                       </p>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-compact tabular text-muted-foreground">
@@ -378,6 +215,21 @@ export default function ReportCyclesPage() {
                             <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" asChild>
                               <Link href={`/academic/report-cycles/${cycle.id}/release`}>
                                 <Send className="size-3.5" /> Release
+                              </Link>
+                            </Button>
+                          </>
+                        ) : isCreated ? (
+                          <>
+                            <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" asChild>
+                              <Link href={`/academic/report-cycles/${cycle.id}/dashboard`}>
+                                <LayoutDashboard className="size-3.5" /> Open
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-xs" asChild>
+                              <Link
+                                href={`/academic/report-cycles/${cycle.id}/classes/${DEMO_IDS.classId}/marks`}
+                              >
+                                <ListChecks className="size-3.5" /> Marks
                               </Link>
                             </Button>
                           </>

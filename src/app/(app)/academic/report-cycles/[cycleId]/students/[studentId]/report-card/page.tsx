@@ -216,6 +216,13 @@ export default function ReportCardPage() {
   // Assessment split shown in the table header (25 % monthly / 75 % terminal).
   const caPct = classSubjects[0]?.caMarks ?? 25;
   const examPct = classSubjects[0]?.examMarks ?? 75;
+  // COMBINED cycles (two exam components, e.g. Monthly + Mid-Term) label the
+  // two mark columns after their own exams and weights; plain cycles keep
+  // the classic Monthly / Terminal captions.
+  const combined =
+    cycle.components && cycle.components.length === 2 ? cycle.components : null;
+  const firstCol = { label: combined?.[0].label ?? "Monthly", pct: combined?.[0].weight ?? caPct };
+  const secondCol = { label: combined?.[1].label ?? "Terminal", pct: combined?.[1].weight ?? examPct };
   // Top band of the class scheme — rendered as the filled grade badge.
   const topGrade = scheme.boundaries[0]?.grade;
   const allRows = classSubjects.map((cs) => {
@@ -269,10 +276,13 @@ export default function ReportCardPage() {
   // classmates. Class stats follow the cycle's engine: mid-term counts a
   // student with a single assessment at 100%; terminal only counts students
   // with BOTH components (chart prompt §4/§9).
-  const variant: ChartVariant = cycle.kind === "mid-term" ? "mid-term" : "terminal";
-  // Terminal and annual reports print without the "Teacher's remark"
-  // captions (school rule): the remark text stands alone and the caption
-  // space is left blank. Mid-term cards keep the captions.
+  // Monthly Test and Mid-Term cycles run the mid-term chart engine (a
+  // single assessment carries at 100%); terminal and annual run terminal.
+  const variant: ChartVariant =
+    cycle.kind === "terminal" || cycle.kind === "annual" ? "terminal" : "mid-term";
+  // Terminal and annual cards carry the subject teacher's remark as a
+  // full-width row beneath each subject, with no caption (school rule):
+  // Mid-Term and Monthly templates have NO subject comments at all.
   const isTerminalLike = cycle.kind === "terminal" || cycle.kind === "annual";
   const chartRows: ChartRow[] = assessed.map((r) => {
     const cs = classSubjects.find((c) => c.subjectId === r.subject.id);
@@ -542,8 +552,9 @@ export default function ReportCardPage() {
 
           {/* Subject results — the card's core table: monthly and terminal
               components with their assessment weights, weighted total, grade
-              badge and exam-vs-CA progress, with the subject teacher's remark
-              quoted in a full-width row beneath each subject. */}
+              badge and exam-vs-CA progress. Terminal and annual cards quote
+              the subject teacher's remark in a full-width row beneath each
+              subject; mid-term cards carry no subject comments. */}
           <table className={cn(TBL, "mt-4")}>
             <colgroup>
               <col className="w-[5%]" />
@@ -568,15 +579,15 @@ export default function ReportCardPage() {
                   Subject
                 </th>
                 <th scope="col" className={COL_HEAD}>
-                  Monthly
+                  {firstCol.label}
                   <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
-                    {caPct} %
+                    {firstCol.pct} %
                   </span>
                 </th>
                 <th scope="col" className={COL_HEAD}>
-                  Terminal
+                  {secondCol.label}
                   <span className="block text-[10px] font-semibold tracking-[0.06em] text-white/80">
-                    {examPct} %
+                    {secondCol.pct} %
                   </span>
                 </th>
                 <th scope="col" className={COL_HEAD}>
@@ -671,21 +682,22 @@ export default function ReportCardPage() {
                         )}
                       </td>
                     </tr>
-                    <tr>
-                      <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
-                        {/* Terminal/annual: no caption — the remark prints alone. */}
-                        {!isTerminalLike ? (
-                          <span className={cn(CELL_LABEL, "mr-2")}>Teacher&apos;s remark</span>
-                        ) : null}
-                        <span className="text-compact italic leading-relaxed text-foreground/80">
-                          {!enrolled
-                            ? "Not taking this subject."
-                            : mark !== null
-                              ? subjectRemark(mark, scheme)
-                              : "Not assessed."}
-                        </span>
-                      </td>
-                    </tr>
+                    {/* Subject teacher's remark — terminal/annual cards only
+                        (mid-term and monthly templates have no subject
+                        comments), printed without a caption. */}
+                    {isTerminalLike ? (
+                      <tr>
+                        <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
+                          <span className="text-compact italic leading-relaxed text-foreground/80">
+                            {!enrolled
+                              ? "Not taking this subject."
+                              : mark !== null
+                                ? subjectRemark(mark, scheme)
+                                : "Not assessed."}
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null}
                   </Fragment>
                 );
               })}

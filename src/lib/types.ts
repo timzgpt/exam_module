@@ -186,6 +186,23 @@ export type CycleStatus =
   | "approved"
   | "released";
 
+/** An exam that can feed a report cycle's card (mark-sheet column / card column). */
+export type CycleExamKind = "monthly" | "mid-term" | "terminal" | "annual";
+
+/**
+ * One exam combined into a cycle's report card. A cycle carries a single
+ * exam (weight 100) or a combination of two — the school's combinations are
+ * "Monthly + Mid-Term" and "Mid-Term + Terminal". The Annual Exam always
+ * runs on its own: combining it (e.g. Mid-Term + Annual) is not allowed.
+ */
+export interface CycleComponent {
+  /** Column label on the mark sheet and card, e.g. "Monthly", "Mid-Term". */
+  label: string;
+  exam: CycleExamKind;
+  /** Percentage weight — a cycle's components always sum to 100. */
+  weight: number;
+}
+
 export interface ReportCycle {
   id: string;
   name: string;
@@ -197,12 +214,13 @@ export interface ReportCycle {
    * stats and shows the Best-Improvement badge on primary cards; the
    * Terminal engine only counts students with BOTH components in class
    * stats and never shows the improvement badge (chart prompt §4/§8).
-   * Annual Exams run the same Terminal engine.
+   * Monthly Test cycles run the Mid-Term engine; Annual Exams run the
+   * same Terminal engine.
    *
    * Cycle naming convention: "{Exam} - {year}" — "Mid term - 2026",
    * "Terminal Exam - 2026", "Annual Exam - 2026".
    */
-  kind: "mid-term" | "terminal" | "annual";
+  kind: CycleExamKind;
   startDate: string;
   endDate: string;
   status: CycleStatus;
@@ -217,6 +235,15 @@ export interface ReportCycle {
   attendanceFrom: string;
   /** Last day of the attendance period. */
   attendanceTo: string;
+  /**
+   * Exams combined into this cycle's card. Omitted (or a single entry) for
+   * plain single-exam cycles, which keep the classic CA/Exam mark sheet;
+   * two entries make it a COMBINED cycle — the mark sheet shows one column
+   * per exam and the total weights them (e.g. Monthly 25 % + Mid-Term 75 %).
+   */
+  components?: CycleComponent[];
+  /** Classes the cycle was set up for in the creation dialog (demo bookkeeping). */
+  classIds?: string[];
 }
 
 /* ---------------- Marks / comments / results ---------------- */

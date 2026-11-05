@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { DEMO_IDS } from "@/lib/demo-config";
 import { classById, cycleById, currentCycle } from "@/lib/demo-data";
+import { useAppContext } from "@/lib/store";
 import type { ClassRoom, ReportCycle } from "@/lib/types";
 
 /**
@@ -17,7 +18,12 @@ import type { ClassRoom, ReportCycle } from "@/lib/types";
 export function useCycleContext(): { cycleId: string; cycle: ReportCycle } {
   const params = useParams<{ cycleId?: string }>();
   const cycleId = params?.cycleId ?? DEMO_IDS.reportCycleId;
-  const cycle = cycleById(cycleId) ?? currentCycle;
+  // Cycles created through the "New report cycle" dialog live in the
+  // context store (persisted), so their marks / dashboard / card routes
+  // resolve exactly like the built-in demo cycles.
+  const createdCycles = useAppContext((s) => s.createdCycles);
+  const cycle =
+    cycleById(cycleId) ?? createdCycles.find((c) => c.id === cycleId) ?? currentCycle;
   return { cycleId, cycle };
 }
 

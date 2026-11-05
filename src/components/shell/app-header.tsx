@@ -28,8 +28,11 @@ import { usePathname, useRouter } from "next/navigation";
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { cycleId, classId, setCycle, setClass, setStudent } = useAppContext();
+  const { cycleId, classId, setCycle, setClass, setStudent, createdCycles } = useAppContext();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
+  // The cycle picker also lists cycles created through the "New report
+  // cycle" dialog, so a combined cycle is selectable app-wide.
+  const allCycles = [...cycles, ...createdCycles];
 
   // The cycle/class pickers define the browsing context. Pages under a
   // [cycleId], [classId] or [studentId] route segment are URL-driven, so a
@@ -132,7 +135,7 @@ export function AppHeader() {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Report cycle context
             </DropdownMenuLabel>
-            {cycles.map((c) => (
+            {allCycles.map((c) => (
               <SelectItem key={c.id} value={c.id} className="text-compact">
                 {c.name}
               </SelectItem>

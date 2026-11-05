@@ -42,6 +42,14 @@ import { Download } from "lucide-react";
 const REMARK_CAPTIONS_OFF = currentCycle.kind === "terminal" || currentCycle.kind === "annual";
 
 /**
+ * Subject comments print on Terminal and Annual cards only — the Mid-Term
+ * and Monthly templates have no subject comments at all (school rule).
+ * The portal renders the current cycle, so the remark column follows it.
+ */
+const SHOW_SUBJECT_REMARKS =
+  currentCycle.kind === "terminal" || currentCycle.kind === "annual";
+
+/**
  * Printable report card view of the parent hub, for one child. Rendered only
  * when the child's card is not on hold (held cards show the hold panel).
  *
@@ -130,12 +138,11 @@ export function ReportCardView({ child }: { child: Student }) {
                 <TableHead>Subject</TableHead>
                 <TableHead className="text-right">Mark</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
-                <TableHead
-                  className="min-w-50"
-                  aria-label="Teacher's remark"
-                >
-                  {REMARK_CAPTIONS_OFF ? "" : "Teacher\u2019s remark"}
-                </TableHead>
+                {SHOW_SUBJECT_REMARKS ? (
+                  <TableHead className="min-w-50" aria-label="Subject remark">
+                    {""}
+                  </TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,9 +159,15 @@ export function ReportCardView({ child }: { child: Student }) {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-compact text-muted-foreground">
-                    {!enrolled ? "Not taking this subject" : mark !== null ? subjectRemark(mark, scheme) : "Not assessed"}
-                  </TableCell>
+                  {SHOW_SUBJECT_REMARKS ? (
+                    <TableCell className="text-compact text-muted-foreground">
+                      {!enrolled
+                        ? "Not taking this subject"
+                        : mark !== null
+                          ? subjectRemark(mark, scheme)
+                          : "Not assessed"}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>

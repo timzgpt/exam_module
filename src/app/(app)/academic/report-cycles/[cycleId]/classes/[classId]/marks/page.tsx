@@ -18,6 +18,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
+import { combinedComponents } from "@/lib/cycle-components";
 import {
   classSubjectsFor,
   eligibleStudentsFor,
@@ -31,7 +32,7 @@ import {
   subjectById,
   subjectTeacherOf,
 } from "@/lib/demo-data";
-import type { ClassSubject, MarkStatusCode } from "@/lib/types";
+import type { MarkStatusCode } from "@/lib/types";
 import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import {
@@ -77,10 +78,15 @@ interface RowCells {
   exam: string;
 }
 
-/** Subject total + status for a row of the working grid, weighted by the class subject. */
+/**
+ * Subject total + status for a row of the working grid. Weights come from
+ * the cycle: combined cycles weight their two exams (e.g. Monthly 25 +
+ * Mid-Term 75); plain cycles use the class subject's CA/Exam split.
+ */
 function rowMark(
   cells: RowCells,
-  cs: ClassSubject,
+  w1: number,
+  w2: number,
 ): { total: number | null; status: MarkStatusCode | null } {
   const ca = parseCell(cells.ca);
   const exam = parseCell(cells.exam);
@@ -90,7 +96,7 @@ function rowMark(
   }
   const caVal = ca.state === "valid" ? ca.value : null;
   const examVal = exam.state === "valid" ? exam.value : null;
-  return { total: subjectTotal(caVal, examVal, cs.caMarks, cs.examMarks), status: null };
+  return { total: subjectTotal(caVal, examVal, w1, w2), status: null };
 }
 
 export default function MarksEntryPage() {
@@ -132,6 +138,13 @@ export default function MarksEntryPage() {
   // Primary (Grades 1-7) uses no points — the grid hides the Points column.
   const isPrimary = isPrimaryClass(cls.id);
   const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
+  // COMBINED cycles (created with two exam components, e.g. Monthly +
+  // Mid-Term): the grid shows one column per exam and weights the total by
+  // the component weights. Plain cycles keep the classic CA/Exam sheet.
+  const combined = combinedComponents(cycle);
+  const w1 = combined ? combined[0].weight : classSubject.caMarks;
+  const w2 = combined ? combined[1].weight : classSubject.examMarks;
+  const colLabel = (i: 0 | 1) => (combined ? combined[i].label : i === 0 ? "CA" : "Exam");
 
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const focusCell = (r: number, c: number) => {
@@ -191,7 +204,7 @@ export default function MarksEntryPage() {
   const rows = students.map((s, i) => {
     const cells = working[s.id] ?? { ca: "", exam: "" };
     const enrolled = getComponents(cls.id, classSubject.subjectId)[s.id]?.enrolled ?? true;
-    return { student: s, index: i, cells, enrolled, mark: rowMark(cells, classSubject) };
+    return { student: s, index: i, cells, enrolled, mark: rowMark(cells, w1, w2) };
   });
 
   const entered = rows.filter((r) => r.enrolled && r.mark.total !== null);
@@ -243,7 +256,7 @@ export default function MarksEntryPage() {
     let changed = 0;
     for (const s of students) {
       const prev = getMarks(cls.id, subject.id)[s.id] ?? null;
-      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }, classSubject).total;
+      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }, w1, w2).total;
       if (next !== prev) changed += 1;
       committed[s.id] = next;
     }
@@ -264,7 +277,11 @@ export default function MarksEntryPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Marks entry: ${cls.name}`}
-        description={`${cycle.name} · CA and Exam are entered out of 100 and weighted by the class subject (${classSubject.caMarks} + ${classSubject.examMarks}). Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move between cells · Esc clears.`}
+        description={`${cycle.name} · ${
+          combined
+            ? `a combined cycle — ${combined[0].label} and ${combined[1].label} are entered out of 100 and weighted ${w1} + ${w2}`
+            : `CA and Exam are entered out of 100 and weighted by the class subject (${classSubject.caMarks} + ${classSubject.examMarks})`
+        }. Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move between cells · Esc clears.`}
         actions={
           <>
             <Button
@@ -310,7 +327,7 @@ export default function MarksEntryPage() {
       <SectionCard
         noPadding
         title="Mark sheet"
-        description={`${subject.name} (${subject.code}) · ${teacherName} · CA ${classSubject.caMarks} + Exam ${classSubject.examMarks} = ${classSubject.fullMarks} · ${classSubject.examPapers} paper${classSubject.examPapers > 1 ? "s" : ""}`}
+        description={`${subject.name} (${subject.code}) · ${teacherName} · ${combined ? `${combined[0].label} ${w1} + ${combined[1].label} ${w2} = 100` : `CA ${classSubject.caMarks} + Exam ${classSubject.examMarks} = ${classSubject.fullMarks}`} · ${classSubject.examPapers} paper${classSubject.examPapers > 1 ? "s" : ""}`}
       >
         {/* Subject selector — order follows the Class subjects page */}
         <div className="border-b border-border/70 px-4 py-3">
@@ -356,8 +373,18 @@ export default function MarksEntryPage() {
                   Student
                 </TableHead>
                 <TableHead>Adm. no</TableHead>
-                <TableHead className="text-center">CA /100</TableHead>
-                <TableHead className="text-center">Exam /100</TableHead>
+                <TableHead className="text-center">
+                  {colLabel(0)} /100
+                  <span className="block text-3xs font-medium tracking-wide text-muted-foreground">
+                    {w1} %
+                  </span>
+                </TableHead>
+                <TableHead className="text-center">
+                  {colLabel(1)} /100
+                  <span className="block text-3xs font-medium tracking-wide text-muted-foreground">
+                    {w2} %
+                  </span>
+                </TableHead>
                 <TableHead className="text-center">Total /100</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 {!isPrimary ? <TableHead className="text-center">Points</TableHead> : null}
@@ -395,7 +422,7 @@ export default function MarksEntryPage() {
                         data-c={0}
                         disabled={!enrolled}
                         aria-invalid={parseCell(cells.ca).state === "invalid"}
-                        aria-label={`CA mark for ${student.name}`}
+                        aria-label={`${colLabel(0)} mark for ${student.name}`}
                         placeholder="-"
                         className={cn(
                           "mx-auto h-8 w-16 text-center text-compact tabular",
@@ -418,7 +445,7 @@ export default function MarksEntryPage() {
                         data-c={1}
                         disabled={!enrolled}
                         aria-invalid={parseCell(cells.exam).state === "invalid"}
-                        aria-label={`Exam mark for ${student.name}`}
+                        aria-label={`${colLabel(1)} mark for ${student.name}`}
                         placeholder="-"
                         className={cn(
                           "mx-auto h-8 w-16 text-center text-compact tabular",
