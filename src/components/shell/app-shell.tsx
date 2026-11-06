@@ -6,7 +6,10 @@ import { CommandPalette } from "@/components/shell/command-palette";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAppContext } from "@/lib/store";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+
+/** Subscribe never — the snapshot only flips between server and client. */
+const subscribeNoop = () => () => {};
 
 /** Keeps the sidebar collapsed/expanded state across reloads. */
 function SidebarStateSync() {
@@ -36,10 +39,13 @@ function SidebarStateSync() {
  * construction and removes the whole class of mismatches.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  // Restore the persisted cycle/class/student context after mount.
+  // False during SSR and the first client render, true afterwards.
+  const mounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
   useEffect(() => {
-    setMounted(true);
     void useAppContext.persist.rehydrate();
   }, []);
 
