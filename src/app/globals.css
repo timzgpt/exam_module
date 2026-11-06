@@ -1,0 +1,313 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Josephian design tokens: raw values. Components never reference these
+   directly; they use the semantic utilities Tailwind generates from them. */
+@theme {
+  /* Compact data-app type scale (marks entry, tables, shell chrome). */
+  --text-3xs: 0.625rem; /* 10px report-card print labels */
+  --text-3xs--line-height: 1.4;
+  --text-2xs: 0.6875rem; /* 11px overline and badge text */
+  --text-2xs--line-height: 1.4545;
+  --text-compact: 0.8125rem; /* 13px body of dense data screens */
+  --text-compact--line-height: 1.5385;
+
+  /* Shell page and overlay measures. */
+  --container-page: 1400px;
+  --container-toast: 420px;
+
+  /* Grade band ramp: the A to F reporting scale. A rides success,
+     C rides warning and F rides destructive; only the in-between hues
+     need their own primitives. */
+  --color-grade-b: #3d7d2f;
+  --color-grade-b-strong: #35682a;
+  --color-grade-d: #b05c1c;
+  --color-grade-d-strong: #96491a;
+  --color-grade-e: #b3352e;
+  --color-grade-e-strong: #a02a25;
+
+  /* Status strong variants: readable text on tinted surfaces. */
+  --color-success-strong: #116b3c;
+  --color-warning-strong: #9a5f11;
+  --color-destructive-strong: #b91c1c;
+  --color-info-strong: #5a3f8a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-burgundy: var(--burgundy);
+  --color-burgundy-dark: var(--burgundy-dark);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* Josephian Schools brand palette */
+  --burgundy: #650f12;
+  --burgundy-dark: #4b0b0e;
+  --success: #16834a;
+  --warning: #c47a16;
+  --info: #6b4f9e;
+
+  --background: #faf8f5;
+  --foreground: #202938;
+  --card: #ffffff;
+  --card-foreground: #202938;
+  --popover: #ffffff;
+  --popover-foreground: #202938;
+  --primary: #650f12;
+  --primary-foreground: #fdf7f3;
+  --secondary: #f4ece8;
+  --secondary-foreground: #4b0b0e;
+  --muted: #f4f1ec;
+  --muted-foreground: #617081;
+  --accent: #f4ece8;
+  --accent-foreground: #4b0b0e;
+  --destructive: #dc2626;
+  --border: #e5e1dc;
+  --input: #ded9d2;
+  --ring: #650f12;
+  --success-foreground: #ffffff;
+  --warning-foreground: #ffffff;
+  --info-foreground: #ffffff;
+  --chart-1: #650f12;
+  --chart-2: #c47a16;
+  --chart-3: #16834a;
+  --chart-4: #8c3540;
+  --chart-5: #64748b;
+  --sidebar: #4b0b0e;
+  --sidebar-foreground: #efe6e0;
+  --sidebar-primary: #fdf7f3;
+  --sidebar-primary-foreground: #4b0b0e;
+  --sidebar-accent: rgb(255 255 255 / 0.09);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.12);
+  --sidebar-ring: #c47a16;
+}
+
+.dark {
+  --background: #17110f;
+  --foreground: #f3ede7;
+  --card: #211816;
+  --card-foreground: #f3ede7;
+  --popover: #211816;
+  --popover-foreground: #f3ede7;
+  --primary: #a34a50;
+  --primary-foreground: #fdf7f3;
+  --secondary: #2d2220;
+  --secondary-foreground: #f3ede7;
+  --muted: #2d2220;
+  --muted-foreground: #a8a29e;
+  --accent: #2d2220;
+  --accent-foreground: #f3ede7;
+  --destructive: #ef4444;
+  --border: rgb(255 255 255 / 0.12);
+  --input: rgb(255 255 255 / 0.16);
+  --ring: #a34a50;
+  --chart-1: #b95c63;
+  --chart-2: #d99a45;
+  --chart-3: #4cae7c;
+  --chart-4: #a06b74;
+  --chart-5: #8fa3bd;
+  --sidebar: #1d1412;
+  --sidebar-foreground: #efe6e0;
+  --sidebar-primary: #fdf7f3;
+  --sidebar-primary-foreground: #4b0b0e;
+  --sidebar-accent: rgb(255 255 255 / 0.09);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.12);
+  --sidebar-ring: #d99a45;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* A card must never push a grid track wider than the viewport; wide tables
+     and charts scroll inside their own container instead. */
+  [data-slot="card"] {
+    min-width: 0;
+  }
+  ::selection {
+    background-color: rgb(101 15 18 / 0.14);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ------- Report card printing ------- */
+/* The PDF/print output must be exactly the .print-area card on white A4
+   paper: no app chrome, no container frame, no screen-only controls, and
+   pagination that flows naturally without slicing rows or sections. */
+@media print {
+  /* 1 · Everything outside the printable chain is removed from the layout
+     (display:none — unlike the old visibility:hidden trick it reserves no
+     space, so there is no offset above the card and no trailing blank
+     pages from hidden screen chrome). Ancestors of the card must stay to
+     keep it in the tree; the card itself and its descendants stay. */
+  body *:not(.print-area):not(.print-area *):not(:has(.print-area)) {
+    display: none !important;
+  }
+  /* Fallback for engines without :has() (the selector list above is then
+     invalid and dropped as a whole): the classic visibility trick still
+     hides the chrome. */
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  /* 2 · Ancestors of the card become plain white pass-throughs: no
+     container border, background, shadow or padding around the report. */
+  body :has(.print-area) {
+    display: block !important;
+    overflow: visible !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* 3 · The printed page IS the sheet: strip the on-screen preview chrome
+     (frame, padding, shadow, fixed sheet width) from the card itself and
+     let it flow in the normal document layout. Intentional table borders
+     inside the card are untouched. */
+  .print-area {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+
+  .print-area,
+  .print-area * {
+    /* The maroon (#5C0A14) table headers must print as coloured. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 4 · Intelligent pagination — nothing forces a page break, content
+     flows naturally, but no element is sliced in half: each table body
+     (whole section tables; per-subject groups inside the results table),
+     every row, the chart image and any .print-keep-together block stays
+     on one page. The maroon header bands repeat on continuation pages via
+     thead's default table-header-group behaviour. */
+  .print-area tr,
+  .print-area tbody,
+  .print-area thead,
+  .print-area img,
+  .print-keep-together {
+    break-inside: avoid;
+  }
+
+  /* Exception: the Early Years parallel-grid bodies (KG/Baby B) can be
+     taller than one page, so they must paginate BETWEEN rows rather than
+     stay atomic. Individual rows (above) still never split. */
+  .print-area .nursery-grid-body {
+    break-inside: auto;
+  }
+
+  /* The parallel learning-area grids (Baby B, KG1–KG3) scroll horizontally
+     on screen via a min-width wider than the viewport. In print that width
+     would push the last area's columns off the sheet (print cannot scroll),
+     so drop the min-width and let the table fill the landscape page — the
+     !important beats the inline min-width that drives the on-screen scroll. */
+  .print-area .nursery-grid-wrap {
+    overflow: visible !important;
+  }
+  .print-area .nursery-grid-table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Portrait is the default page. Template A and the marks cards use it. */
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  /* The parallel-column Early Years templates (Baby B, KG1–KG3) print
+     landscape so their learning-area columns stay readable. A named page
+     keeps every other card portrait. */
+  @page landscapeA4 {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  .print-area.print-landscape {
+    page: landscapeA4;
+  }
+}

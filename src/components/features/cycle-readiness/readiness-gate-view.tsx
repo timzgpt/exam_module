@@ -1,0 +1,366 @@
+"use client";
+
+import { SectionCard } from "@/components/shared/section-card";
+import { StatusBadge, toneForStatus, labelForStatus } from "@/components/shared/status-badge";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useCycleContext } from "@/hooks/use-academic-context";
+import { possibleSchoolDays } from "@/lib/attendance";
+import {
+  attendanceReadinessFor,
+  approvalFor,
+  classes,
+  classNameOf,
+  commentProgress,
+  cycleStatsFor,
+  marksDeadlines,
+  subjectById,
+} from "@/lib/demo-data";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  CalendarOff,
+  CheckCircle2,
+  Info,
+  MessageSquareText,
+  XCircle,
+} from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+
+/**
+ * Readiness gate view of the Cycle readiness & deadlines host: overall
+ * readiness, blocking issues, warnings and per-class eligibility before
+ * batch generation.
+ */
+export function ReadinessGateView() {
+  const { cycle } = useCycleContext();
+  const stats = cycleStatsFor(cycle.id);
+
+  /* Overall readiness: average of marks and comments completion. */
+  const readiness = Math.round((stats.marksCompletion + stats.commentsCompletion) / 2);
+
+  const perClass = classes.map((cls) => {
+    const rows = marksDeadlines.filter((d) => d.classId === cls.id);
+    const done = rows.reduce((a, d) => a + d.entriesDone, 0);
+    const total = rows.reduce((a, d) => a + d.entriesTotal, 0);
+    const marksPct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const cp = commentProgress(cls.id);
+    const commentsPct = cp.total > 0 ? Math.round((cp.done / cp.total) * 100) : 0;
+    const approval = approvalFor(cls.id);
+    const attendance = attendanceReadinessFor(cls.id);
+    const eligible =
+      marksPct === 100 && (approval.status === "approved" || approval.status === "submitted");
+    return { cls, marksPct, done, total, commentsPct, cp, approval, attendance, eligible };
+  });
+
+  /* Blocking issues: incomplete marks, and pending approvals on classes with incomplete marks. */
+  const marksIssues = marksDeadlines
+    .filter((d) => d.entriesDone < d.entriesTotal)
+    .sort((a, b) => a.entriesDone / a.entriesTotal - b.entriesDone / b.entriesTotal);
+  const approvalIssues = perClass
+    .filter(
+      (c) =>
+        c.marksPct < 100 &&
+        (c.approval.status === "changes-requested" || c.approval.status === "not-submitted"),
+    )
+    .map((c) => ({ cls: c.cls, approval: c.approval, marksPct: c.marksPct }));
+  const blockingCount = marksIssues.length + approvalIssues.length;
+
+  /* Warnings: classes with missing class-teacher comments, plus attendance
+     gaps (B1.6): school days with no counted register in the period and
+     pending catch-up registers awaiting approval. */
+  const commentWarnings = perClass.filter((c) => c.cp.done < c.cp.total);
+  const attendanceWarnings = perClass.filter(
+    (c) => c.attendance.missingRegisterDays > 0 || c.attendance.pendingCatchUpRegisters > 0,
+  );
+  const warningCount = commentWarnings.length + attendanceWarnings.length;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Overall readiness gauge */}
+        <SectionCard
+          title="Overall readiness"
+          description={`${cycle.term} ${cycle.academicYear} · marks and comments combined`}
+        >
+          <div className="space-y-4">
+            <div className="relative mx-auto h-44 w-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Complete", value: readiness },
+                      { name: "Remaining", value: 100 - readiness },
+                    ]}
+                    dataKey="value"
+                    innerRadius={56}
+                    outerRadius={76}
+                    startAngle={90}
+                    endAngle={-270}
+                    strokeWidth={0}
+                  >
+                    <Cell className="fill-success" />
+                    <Cell fill="var(--muted)" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-semibold tabular text-foreground">{readiness}%</span>
+                <span className="text-xs text-muted-foreground">ready</span>
+              </div>
+            </div>
+            <p
+              className={
+                blockingCount === 0
+                  ? "flex items-center gap-1.5 text-sm font-medium text-success"
+                  : "flex items-center gap-1.5 text-sm font-medium text-destructive-strong"
+              }
+            >
+              {blockingCount === 0 ? (
+                <BadgeCheck className="size-4" />
+              ) : (
+                <AlertTriangle className="size-4" />
+              )}
+              {blockingCount === 0
+                ? "Ready. No blocking issues"
+                : `Not ready: ${blockingCount} blocking issue${blockingCount === 1 ? "" : "s"}`}
+            </p>
+            <div className="space-y-2.5">
+              <div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Marks entry</span>
+                  <span className="tabular">{stats.marksCompletion}%</span>
+                </div>
+                <Progress value={stats.marksCompletion} className="mt-1 h-1.5" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Teacher comments</span>
+                  <span className="tabular">{stats.commentsCompletion}%</span>
+                </div>
+                <Progress value={stats.commentsCompletion} className="mt-1 h-1.5" />
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Blocking issues */}
+        <SectionCard
+          className="lg:col-span-2"
+          title="Blocking issues"
+          description="These must be resolved before report cards can be generated."
+          actions={
+            <StatusBadge
+              tone={blockingCount === 0 ? "success" : "destructive"}
+              label={blockingCount === 0 ? "Clear" : `${blockingCount} blocking`}
+            />
+          }
+        >
+          {blockingCount === 0 ? (
+            <EmptyState
+              icon={BadgeCheck}
+              title="No blocking issues"
+              description="Marks are complete and every class is approved or submitted."
+            />
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {marksIssues.map((d) => {
+                const subject = subjectById(d.subjectId);
+                const missing = d.entriesTotal - d.entriesDone;
+                return (
+                  <li key={d.id} className="flex items-start gap-2.5 px-1 py-2.5 first:pt-0 last:pb-0">
+                    <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                    <div className="min-w-0">
+                      <p className="text-compact font-medium text-foreground">
+                        {subject?.name ?? "Subject"} · {classNameOf(d.classId)}
+                      </p>
+                      <p className="text-xs text-muted-foreground tabular">
+                        {d.entriesDone} of {d.entriesTotal} entries entered · {missing} missing
+                        (overdue, due {d.dueDate})
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+              {approvalIssues.map(({ cls, approval, marksPct }) => (
+                <li
+                  key={`approval-${cls.id}`}
+                  className="flex items-start gap-2.5 px-1 py-2.5 first:pt-0 last:pb-0"
+                >
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  <div className="min-w-0">
+                    <p className="text-compact font-medium text-foreground">
+                      {cls.name} · approval {labelForStatus(approval.status).toLowerCase()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {approval.status === "changes-requested"
+                        ? `${approval.reviewedBy ?? "Reviewer"} requested changes${approval.note ? `: ${approval.note}` : ""}`
+                        : `Class has not submitted for review and marks are only ${marksPct}% entered.`}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Warnings */}
+        <SectionCard
+          title="Warnings"
+          description="Non-blocking, but worth chasing before release."
+          actions={
+            <StatusBadge
+              tone={warningCount === 0 ? "success" : "warning"}
+              label={warningCount === 0 ? "None" : `${warningCount} items`}
+            />
+          }
+        >
+          {warningCount === 0 ? (
+            <EmptyState
+              icon={MessageSquareText}
+              title="All clear"
+              description="Every class-teacher comment is written and every register is counted."
+            />
+          ) : (
+            <ul className="space-y-2.5">
+              {commentWarnings.map((c) => (
+                <li key={`comment-${c.cls.id}`} className="flex items-start gap-2.5">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <p className="text-compact text-foreground tabular">
+                    {c.cls.name}: {c.cp.done} of {c.cp.total} class-teacher comments complete
+                  </p>
+                </li>
+              ))}
+              {attendanceWarnings.map((c) => (
+                <li key={`attendance-${c.cls.id}`} className="flex items-start gap-2.5">
+                  <CalendarOff className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <p className="text-compact text-foreground tabular">
+                    {c.cls.name}: {c.attendance.missingRegisterDays} day
+                    {c.attendance.missingRegisterDays === 1 ? "" : "s"} not recorded — take catch-up
+                    registers
+                    {c.attendance.pendingCatchUpRegisters > 0
+                      ? ` · ${c.attendance.pendingCatchUpRegisters} catch-up register awaiting approval`
+                      : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
+        {/* Per-class readiness */}
+        <SectionCard
+          noPadding
+          className="lg:col-span-2"
+          title="Per-class readiness"
+          description="A class is eligible for batch generation when marks are 100% entered and approval is submitted or approved."
+        >
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="pl-4">Class</TableHead>
+                  <TableHead>Marks</TableHead>
+                  <TableHead>Comments</TableHead>
+                  <TableHead>Attendance</TableHead>
+                  <TableHead>Approval</TableHead>
+                  <TableHead className="pr-4">Eligible?</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {perClass.map((c) => (
+                  <TableRow key={c.cls.id}>
+                    <TableCell className="pl-4">
+                      <p className="text-compact font-medium text-foreground">{c.cls.name}</p>
+                      <p className="text-xs text-muted-foreground">{c.cls.level}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="w-28">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground tabular">
+                          <span>
+                            {c.done}/{c.total}
+                          </span>
+                          <span>{c.marksPct}%</span>
+                        </div>
+                        <Progress value={c.marksPct} className="mt-1 h-1.5" />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="w-28">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground tabular">
+                          <span>
+                            {c.cp.done}/{c.cp.total}
+                          </span>
+                          <span>{c.commentsPct}%</span>
+                        </div>
+                        <Progress value={c.commentsPct} className="mt-1 h-1.5" />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-compact tabular">
+                        {c.attendance.missingRegisterDays === 0 &&
+                        c.attendance.pendingCatchUpRegisters === 0 ? (
+                          <span className="inline-flex items-center gap-1.5 text-success">
+                            <CheckCircle2 className="size-3.5" /> All days recorded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-warning-strong">
+                            <AlertTriangle className="size-3.5" />
+                            {c.attendance.missingRegisterDays} day
+                            {c.attendance.missingRegisterDays === 1 ? "" : "s"} not recorded
+                            {c.attendance.pendingCatchUpRegisters > 0
+                              ? ` · ${c.attendance.pendingCatchUpRegisters} pending`
+                              : ""}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-2xs text-muted-foreground tabular">
+                        {possibleSchoolDays(cycle.attendanceFrom, cycle.attendanceTo)} possible school days
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        tone={toneForStatus(c.approval.status)}
+                        label={labelForStatus(c.approval.status)}
+                      />
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      <span
+                        className={
+                          c.eligible
+                            ? "inline-flex items-center gap-1.5 text-compact font-medium text-success"
+                            : "inline-flex items-center gap-1.5 text-compact font-medium text-destructive"
+                        }
+                      >
+                        {c.eligible ? (
+                          <CheckCircle2 className="size-4" />
+                        ) : (
+                          <XCircle className="size-4" />
+                        )}
+                        {c.eligible ? "Eligible" : "Not eligible"}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="flex items-center gap-1.5 border-t border-border/70 px-4 py-2.5 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0" />
+            Classes marked eligible can be included in batch generation.
+          </p>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
