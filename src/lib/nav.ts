@@ -301,7 +301,10 @@ export function matchNavKey(pathname: string): string | undefined {
 
 /**
  * Resolve the breadcrumb trail for a pathname by matching it against the
- * resolved hrefs of every nav item (longest match first).
+ * resolved hrefs of every nav item (longest match first). Structural
+ * template matching runs first so the trail is correct even when the URL's
+ * {classId}/{cycleId} differ from the header context (e.g. opening KG2's
+ * class subjects while the header context is Form 3A).
  */
 export function breadcrumbFor(
   pathname: string,
@@ -309,13 +312,17 @@ export function breadcrumbFor(
 ): { label: string; href: string | null }[] {
   const trail: { label: string; href: string | null }[] = [];
   let best: NavItemDef | undefined;
-  let bestLen = -1;
-  for (const item of ALL_NAV_ITEMS) {
-    const href = resolve(item.hrefTemplate);
-    if (pathname === href || pathname.startsWith(href + "/")) {
-      if (href.length > bestLen) {
-        best = item;
-        bestLen = href.length;
+  const structKey = matchNavKey(pathname);
+  if (structKey) best = navItemByKey(structKey);
+  if (!best) {
+    let bestLen = -1;
+    for (const item of ALL_NAV_ITEMS) {
+      const href = resolve(item.hrefTemplate);
+      if (pathname === href || pathname.startsWith(href + "/")) {
+        if (href.length > bestLen) {
+          best = item;
+          bestLen = href.length;
+        }
       }
     }
   }
