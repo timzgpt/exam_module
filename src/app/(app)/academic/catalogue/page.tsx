@@ -41,6 +41,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { classById } from "@/lib/demo-data";
 import {
   Archive,
   ArchiveRestore,
@@ -387,7 +388,10 @@ function UsageView({ itemId }: { itemId: string }) {
       <UsageBlock icon={Layers} title="Class allocations" count={usage.adoptions.length}
         empty="Not allocated to any class.">
         {usage.adoptions.map((a) => (
-          <p key={a.classId} className="text-compact">{a.classId} <span className="text-xs text-muted-foreground">· via {a.curriculumId}</span></p>
+          <p key={a.classId} className="text-compact">
+            {classById(a.classId)?.name ?? a.classId}
+            <span className="text-xs text-muted-foreground"> · {curricula.find((c) => c.id === a.curriculumId)?.name}</span>
+          </p>
         ))}
       </UsageBlock>
       <UsageBlock icon={Lock} title="Teacher assignments" count={usage.assignments}

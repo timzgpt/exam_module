@@ -6,7 +6,7 @@ import { CommandPalette } from "@/components/shell/command-palette";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAppContext } from "@/lib/store";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Keeps the sidebar collapsed/expanded state across reloads. */
 function SidebarStateSync() {
@@ -27,12 +27,23 @@ function SidebarStateSync() {
 /**
  * Shared application chrome for the academic module: collapsible sidebar,
  * sticky header, global page search and the content surface.
+ *
+ * The chrome is mounted client-side only: the streamed server tree and the
+ * client tree used to disagree on Radix `useId` positions (the streamed
+ * App Router segments add fork nodes the client render does not have), so
+ * every Select/Dialog in the header hydrated with mismatched `aria-controls`
+ * ids. Rendering the chrome after mount makes the two trees identical by
+ * construction and removes the whole class of mismatches.
  */
 export function AppShell({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   // Restore the persisted cycle/class/student context after mount.
   useEffect(() => {
+    setMounted(true);
     void useAppContext.persist.rehydrate();
   }, []);
+
+  if (!mounted) return null;
 
   return (
     <SidebarProvider>

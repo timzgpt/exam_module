@@ -414,24 +414,30 @@ function CombinationRegistration({ classId }: { classId: string }) {
       <SectionCard>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <Label>Student</Label>
+            <Label htmlFor="combo-student">Student</Label>
             <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger className="w-full" aria-label="Student"><SelectValue placeholder="Choose student…" /></SelectTrigger>
+              <SelectTrigger id="combo-student" className="w-full" aria-label="Combination student"><SelectValue placeholder="Choose student…" /></SelectTrigger>
               <SelectContent>
                 {students.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} · {s.admissionNo}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label>Approved combination ({curriculum?.level})</Label>
+            <Label htmlFor="combo-pick">Approved combination ({curriculum?.level})</Label>
             <Select value={combinationId} onValueChange={setCombinationId}>
-              <SelectTrigger className="w-full" aria-label="Combination"><SelectValue placeholder="Choose combination…" /></SelectTrigger>
+              <SelectTrigger id="combo-pick" className="w-full" aria-label="Approved combination"><SelectValue placeholder="Choose combination…" /></SelectTrigger>
               <SelectContent>
                 {levelCombos.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
+        {levelCombos.length === 0 ? (
+          <p className="mt-3 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+            No active combinations are configured for {curriculum?.level}. Create them in{" "}
+            <a href="/academic/curricula" className="underline">Curriculum Management → Optional combinations</a>.
+          </p>
+        ) : null}
         {combo ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Includes:</span>

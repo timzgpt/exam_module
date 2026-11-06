@@ -954,14 +954,14 @@ export function levelsForSection(section: SchoolSection): string[] {
 
 /** Classes in a section, optionally filtered by level. */
 export function classesForSection(section: SchoolSection, level?: string) {
-  return allClasses.filter(
-    (c) =>
-      (section === "Early Years"
-        ? nurseryClasses.some((n) => n.id === c.id)
-        : section === "Secondary" === isPrimaryClass(c.id) &&
-          !nurseryClasses.some((n) => n.id === c.id)) &&
-      (!level || c.level === level),
-  );
+  return allClasses.filter((c) => {
+    const isNursery = nurseryClasses.some((n) => n.id === c.id);
+    const belongs =
+      section === "Early Years"
+        ? isNursery
+        : !isNursery && (section === "Secondary") === c.level.startsWith("Form");
+    return belongs && (!level || c.level === level);
+  });
 }
 
 /** Sections an item serves (catalogue availability). */

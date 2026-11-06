@@ -28,6 +28,7 @@ import {
   classById,
   studentsInClass,
 } from "../src/lib/demo-data";
+import { classesForSection } from "../src/lib/academic-admin";
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = ""): void {
@@ -159,6 +160,13 @@ check("Standard 5 keeps its own curriculum",
   adoptedCurriculum(seed, "cls-p5")?.section === "Primary");
 
 /* ── 10 · Class helpers ──────────────────────────────────────────── */
+check("classesForSection(Secondary, Form 3) returns Form 3A + 3B",
+  classesForSection("Secondary", "Form 3").map((c) => c.id).sort().join(",") ===
+  ["cls-3b", "01a1a064-7c3b-4e2d-9f1a-8b5c6d4e3f21"].sort().join(","));
+check("classesForSection(Early Years) returns only nursery classes",
+  classesForSection("Early Years").every((c) => c.id.startsWith("cls-kg") || c.id.startsWith("cls-baby")));
+check("classesForSection(Primary) returns Standard 5A",
+  classesForSection("Primary", "Standard 5").map((c) => c.id).join(",") === "cls-p5");
 check("classById resolves nursery and marks classes",
   classById("cls-kg2")?.name === "KG2" && classById(FORM3A)?.name === "Form 3A");
 
