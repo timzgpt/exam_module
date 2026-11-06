@@ -74,8 +74,8 @@ export default function CommentsPage() {
     if (!selected.classTeacher?.trim()) {
       toast({
         variant: "destructive",
-        title: "Class teacher's remark required",
-        description: "Write the class teacher's remark before submitting.",
+        title: "Class teacher's comments required",
+        description: "Write the class teacher's comments before submitting.",
       });
       return;
     }
@@ -105,7 +105,7 @@ export default function CommentsPage() {
       }
     }
     toast({
-      title: "All remarks complete",
+      title: "All comments complete",
       description: `Every student in ${cls.name} has a complete comment record.`,
     });
   };
@@ -124,12 +124,12 @@ export default function CommentsPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Comments: ${cls.name}`}
-        description={`${cycle.name} · write the class teacher's remark and parental involvement per student, then submit for report generation.`}
+        description={`${cycle.name} · write the class teacher's comments and parental involvement per student, then submit for report generation.`}
       />
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
         {/* Student list */}
-        <SectionCard noPadding title="Students" description={`${doneCount} of ${students.length} remarks complete`}>
+        <SectionCard noPadding title="Students" description={`${doneCount} of ${students.length} comments complete`}>
           <div className="border-b border-border/70 p-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -230,7 +230,7 @@ export default function CommentsPage() {
 
               <div className="grid gap-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="class-teacher-remark">Class teacher&apos;s remark</Label>
+                  <Label htmlFor="class-teacher-remark">Class teacher&apos;s comments</Label>
                   <span className="text-xs tabular text-muted-foreground">
                     {(selected.classTeacher ?? "").length}/{REMARK_MAX}
                   </span>
@@ -241,7 +241,7 @@ export default function CommentsPage() {
                   maxLength={REMARK_MAX}
                   value={selected.classTeacher ?? ""}
                   onChange={(e) => updateSelected({ classTeacher: e.target.value })}
-                  placeholder="Write a constructive remark about this student's term…"
+                  placeholder="Write a constructive comment about this student's term…"
                 />
               </div>
 

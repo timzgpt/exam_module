@@ -80,7 +80,7 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         group: "Report cards",
         hrefTemplate: "/academic/report-cycles/{cycleId}/classes/{classId}/comments",
         icon: MessageSquareText,
-        description: "Teacher remarks and templates",
+        description: "Teacher comments and templates",
       },
       {
         key: "report-card",

@@ -35,16 +35,9 @@ import type { Student } from "@/lib/types";
 import { Download } from "lucide-react";
 
 /**
- * Terminal and annual reports print without the "Teacher's remark" captions
- * (school rule): the remark text stands alone and the caption space is left
- * blank. Mid-term cards keep the captions.
- */
-const REMARK_CAPTIONS_OFF = currentCycle.kind === "terminal" || currentCycle.kind === "annual";
-
-/**
  * Subject comments print on Terminal and Annual cards only — the Mid-Term
  * and Monthly templates have no subject comments at all (school rule).
- * The portal renders the current cycle, so the remark column follows it.
+ * The portal renders the current cycle, so the comment column follows it.
  */
 const SHOW_SUBJECT_REMARKS =
   currentCycle.kind === "terminal" || currentCycle.kind === "annual";
@@ -223,19 +216,11 @@ export function ReportCardView({ child }: { child: Student }) {
         <AttendanceSummaryCard variant="screen" summary={attendance} className="mt-3" />
 
         <div className="mt-3 rounded-lg border border-border/80 bg-muted/40 p-4">
-          {REMARK_CAPTIONS_OFF ? null : (
-            <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Class teacher&apos;s remark
-            </p>
-          )}
-          <p
-            className={
-              REMARK_CAPTIONS_OFF
-                ? "text-compact leading-relaxed text-foreground"
-                : "mt-1.5 text-compact leading-relaxed text-foreground"
-            }
-          >
-            {comment.classTeacher ?? (REMARK_CAPTIONS_OFF ? "\u00A0" : "Awaiting remark")}
+          <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Class teacher&apos;s comments
+          </p>
+          <p className="mt-1.5 text-compact leading-relaxed text-foreground">
+            {comment.classTeacher ?? "Awaiting comment"}
           </p>
           {classTeacher ? (
             <p className="mt-2 text-xs text-muted-foreground">

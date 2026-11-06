@@ -283,7 +283,7 @@ export default function BatchesPage() {
               <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 px-3 py-2.5">
                 <div>
                   <p className="text-compact font-medium text-foreground">Include class-teacher comments</p>
-                  <p className="text-xs text-muted-foreground">Print the remark block on every card.</p>
+                  <p className="text-xs text-muted-foreground">Print the comments block on every card.</p>
                 </div>
                 <Switch checked={includeComments} onCheckedChange={setIncludeComments} aria-label="Include class-teacher comments" />
               </div>

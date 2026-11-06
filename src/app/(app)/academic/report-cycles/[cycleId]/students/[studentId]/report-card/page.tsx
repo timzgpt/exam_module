@@ -950,7 +950,7 @@ export default function ReportCardPage() {
             />
           ) : null}
 
-          {/* Remarks */}
+          {/* Comments */}
           <table className={cn(TBL, "mt-4")}>
             <colgroup>
               <col className="w-[22%]" />
@@ -959,30 +959,17 @@ export default function ReportCardPage() {
             <tbody>
               <tr>
                 <th colSpan={2} scope="colgroup" className={SECTION_BAR}>
-                  Remarks
+                  Comments
                 </th>
               </tr>
-              {isTerminalLike ? (
-                // Terminal/annual: no "Class teacher's remark" caption — the
-                // remark prints alone; a missing remark leaves blank space.
-                <tr>
-                  <td
-                    colSpan={2}
-                    className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}
-                  >
-                    {comment.classTeacher ?? "\u00A0"}
-                  </td>
-                </tr>
-              ) : (
-                <tr>
-                  <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
-                    Class teacher&apos;s remark
-                  </th>
-                  <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
-                    {comment.classTeacher ?? "Awaiting remark"}
-                  </td>
-                </tr>
-              )}
+              <tr>
+                <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
+                  Class teacher&apos;s comments
+                </th>
+                <td className={cn(CELL, "text-compact leading-relaxed text-foreground/80")}>
+                  {comment.classTeacher ?? "Awaiting comment"}
+                </td>
+              </tr>
               <tr>
                 <th scope="row" className={cn(CELL, "text-left", CELL_LABEL)}>
                   Parental involvement
