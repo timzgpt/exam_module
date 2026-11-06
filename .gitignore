@@ -60,3 +60,6 @@ server.log
 
 # agent tooling artifacts
 tool-results/
+
+# large local tool binaries (never commit)
+/tools/bin/
