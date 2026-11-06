@@ -28,14 +28,27 @@ type NurseryKind = Exclude<ReportTemplateKind, "primary" | "secondary">;
 interface TemplateState {
   /** classId -> assigned template kind (admin's per-class assignment). */
   assignments: Record<string, ReportTemplateKind>;
-  /** classId -> full configuration override saved from the admin editor. */
+  /**
+   * configKey -> full configuration override saved from the admin editor.
+   * The key is the class id for period-invariant templates, or
+   * `classId::period` for KG3 (see report-templates.templateConfigKey).
+   */
   configs: Record<string, NurseryTemplateConfig>;
   /** Assign a template kind: re-seeds the class config from the kind's defaults. */
   assign: (classId: string, kind: ReportTemplateKind) => void;
-  /** Persist a full configuration edited on the admin page. */
-  saveConfig: (classId: string, config: NurseryTemplateConfig) => void;
-  /** Drop the admin override: the class falls back to level defaults. */
-  resetConfig: (classId: string) => void;
+  /**
+   * Persist a full configuration edited on the admin page, under `configKey`.
+   * `assignmentClassId` (the plain class id) syncs the class-list badge for
+   * templates whose kind the admin can choose (Baby Class A/B); omit it for
+   * KG3 so a per-period edit never rewrites the class assignment.
+   */
+  saveConfig: (
+    configKey: string,
+    config: NurseryTemplateConfig,
+    assignmentClassId?: string,
+  ) => void;
+  /** Drop the admin override under `configKey`; also clears the assignment if given. */
+  resetConfig: (configKey: string, assignmentClassId?: string) => void;
 }
 
 export const useTemplateStore = create<TemplateState>()(
@@ -58,17 +71,19 @@ export const useTemplateStore = create<TemplateState>()(
             configs: { ...s.configs, [classId]: config },
           };
         }),
-      saveConfig: (classId, config) =>
+      saveConfig: (configKey, config, assignmentClassId) =>
         set((s) => ({
-          configs: { ...s.configs, [classId]: config },
-          assignments: { ...s.assignments, [classId]: config.kind as ReportTemplateKind },
+          configs: { ...s.configs, [configKey]: config },
+          assignments: assignmentClassId
+            ? { ...s.assignments, [assignmentClassId]: config.kind as ReportTemplateKind }
+            : s.assignments,
         })),
-      resetConfig: (classId) =>
+      resetConfig: (configKey, assignmentClassId) =>
         set((s) => {
           const configs = { ...s.configs };
+          delete configs[configKey];
           const assignments = { ...s.assignments };
-          delete configs[classId];
-          delete assignments[classId];
+          if (assignmentClassId) delete assignments[assignmentClassId];
           return { configs, assignments };
         }),
     }),
@@ -95,7 +110,7 @@ export const useTemplateStore = create<TemplateState>()(
 
 export interface NurseryAssessmentPatch {
   assessedOn?: string;
-  areaRemarks?: Record<string, string>;
+  benchmarkRemarks?: Record<string, string>;
   benchmarkGrades?: Record<string, CompetencyCode | null>;
   areaComments?: Record<string, string>;
   classTeacherComment?: string;

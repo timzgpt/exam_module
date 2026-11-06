@@ -21,7 +21,7 @@ import {
   useClassTemplateConfig,
 } from "@/hooks/use-class-template";
 import { classNameOf, studentsInClass } from "@/lib/demo-data";
-import { templateKindLabel } from "@/lib/report-templates";
+import { nurseryPeriodForCycle, templateKindLabel } from "@/lib/report-templates";
 import { assessmentKey, useNurseryAssessmentStore } from "@/lib/template-store";
 import type { CompetencyCode, ReportCycle } from "@/lib/types";
 import { Save } from "lucide-react";
@@ -43,7 +43,7 @@ export function NurseryAssessmentEntry({
   const { toast } = useToast();
   const students = useMemo(() => studentsInClass(classId), [classId]);
   const [studentId, setStudentId] = useState<string>(students[0]?.id ?? "");
-  const config = useClassTemplateConfig(classId);
+  const config = useClassTemplateConfig(classId, nurseryPeriodForCycle(cycle));
   const seed = useNurseryAssessment(classId, studentId, cycle);
   const saveAssessment = useNurseryAssessmentStore((s) => s.saveAssessment);
 
@@ -60,7 +60,7 @@ export function NurseryAssessmentEntry({
   const save = () => {
     saveAssessment(assessmentKey(cycle.id, classId, studentId), {
       assessedOn: working.assessedOn,
-      areaRemarks: working.areaRemarks,
+      benchmarkRemarks: working.benchmarkRemarks,
       benchmarkGrades: working.benchmarkGrades,
       areaComments: working.areaComments,
       classTeacherComment: working.classTeacherComment,
@@ -196,32 +196,34 @@ export function NurseryAssessmentEntry({
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 space-y-1.5">
+                <div className="mt-2 space-y-2.5">
                   <p className="text-2xs text-muted-foreground">
-                    Benchmarks observed: {area.benchmarks.map((b) => b.text).join(" · ")}
+                    {config.areaRemarkLabel ?? "Teacher's remarks"} — one per benchmark
                   </p>
-                  <div className="grid gap-1.5">
-                    <Label
-                      htmlFor={`area-remark-${area.id}`}
-                      className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-                    >
-                      {config.areaRemarkLabel ?? "Teacher's remarks"} — {area.name}
-                    </Label>
-                    <Textarea
-                      id={`area-remark-${area.id}`}
-                      rows={3}
-                      value={working.areaRemarks[area.id] ?? ""}
-                      onChange={(e) =>
-                        setWorking({
-                          ...working,
-                          areaRemarks: {
-                            ...working.areaRemarks,
-                            [area.id]: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                  {area.benchmarks.map((b, bi) => (
+                    <div key={b.id} className="grid gap-1">
+                      <Label
+                        htmlFor={`bench-remark-${b.id}`}
+                        className="text-2xs font-medium text-foreground/80"
+                      >
+                        {bi + 1}. {b.text}
+                      </Label>
+                      <Textarea
+                        id={`bench-remark-${b.id}`}
+                        rows={2}
+                        value={working.benchmarkRemarks[b.id] ?? ""}
+                        onChange={(e) =>
+                          setWorking({
+                            ...working,
+                            benchmarkRemarks: {
+                              ...working.benchmarkRemarks,
+                              [b.id]: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

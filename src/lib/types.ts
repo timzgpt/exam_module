@@ -380,6 +380,13 @@ export type ReportTemplateKind =
 /** Codes of the Early Years competency grading scale (KG2 / KG3). */
 export type CompetencyCode = "B" | "D" | "C" | "HC";
 
+/**
+ * The assessment period a KG3 card is produced for. KG3 is the only template
+ * whose benchmark set changes by period: the Midterm set is shorter, the
+ * End-of-Term set is extended. Every other template is period-invariant.
+ */
+export type NurseryPeriod = "midterm" | "terminal";
+
 export interface CompetencyLevel {
   code: CompetencyCode;
   label: string;
@@ -448,8 +455,12 @@ export interface NurseryAssessment {
   cycleId: string;
   /** Date of assessment printed on the card (Template A field). */
   assessedOn: string;
-  /** areaId -> teacher remark / observation (Baby A, Baby B, KG1). */
-  areaRemarks: Record<string, string>;
+  /**
+   * benchmarkId -> teacher's narrative remark / observation, written against
+   * each individual benchmark (Baby A skill comments, Baby B & KG1 remarks).
+   * The reference reports carry one remark per benchmark, not per area.
+   */
+  benchmarkRemarks: Record<string, string>;
   /** benchmarkId -> competency grade (KG2, KG3). */
   benchmarkGrades: Record<string, CompetencyCode | null>;
   /** areaId -> dedicated learning-area comment (KG2, KG3). */

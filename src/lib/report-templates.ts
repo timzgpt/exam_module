@@ -20,7 +20,9 @@ import {
 import { classes as marksClasses } from "./demo-data";
 import type {
   ClassRoom,
+  NurseryPeriod,
   NurseryTemplateConfig,
+  ReportCycle,
   ReportTemplateKind,
   SchoolSection,
 } from "./types";
@@ -93,12 +95,41 @@ export function templateKindLabel(kind: ReportTemplateKind): string {
 
 /**
  * Build a full default configuration for a class, personalised with the
- * class teacher's name on the first signature slot.
+ * class teacher's name on the first signature slot. `period` selects the KG3
+ * benchmark set (ignored by every period-invariant template).
  */
 export function defaultConfigFor(
   classId: string,
   kind: Exclude<ReportTemplateKind, "primary" | "secondary">,
   classTeacherName: string,
+  period: NurseryPeriod = "terminal",
 ): NurseryTemplateConfig {
-  return defaultTemplateConfig(kind, classId, classTeacherName);
+  return defaultTemplateConfig(kind, classId, classTeacherName, period);
+}
+
+/** KG3 is the only template whose benchmark set changes with the period. */
+export function isPeriodVaryingKind(kind: ReportTemplateKind): boolean {
+  return kind === "kg3";
+}
+
+/** The assessment period a cycle produces: mid-term/monthly vs terminal/annual. */
+export function nurseryPeriodForCycle(
+  cycle: Pick<ReportCycle, "kind">,
+): NurseryPeriod {
+  return cycle.kind === "mid-term" || cycle.kind === "monthly"
+    ? "midterm"
+    : "terminal";
+}
+
+/**
+ * The persisted-config key for a class's template. Period-varying templates
+ * (KG3) store one config per period so Midterm and End-of-Term benchmark sets
+ * are maintained independently; every other template keys by class alone.
+ */
+export function templateConfigKey(
+  classId: string,
+  kind: ReportTemplateKind,
+  period: NurseryPeriod,
+): string {
+  return isPeriodVaryingKind(kind) ? `${classId}::${period}` : classId;
 }

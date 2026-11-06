@@ -274,8 +274,40 @@
     break-inside: avoid;
   }
 
+  /* Exception: the Early Years parallel-grid bodies (KG/Baby B) can be
+     taller than one page, so they must paginate BETWEEN rows rather than
+     stay atomic. Individual rows (above) still never split. */
+  .print-area .nursery-grid-body {
+    break-inside: auto;
+  }
+
+  /* The parallel learning-area grids (Baby B, KG1–KG3) scroll horizontally
+     on screen via a min-width wider than the viewport. In print that width
+     would push the last area's columns off the sheet (print cannot scroll),
+     so drop the min-width and let the table fill the landscape page — the
+     !important beats the inline min-width that drives the on-screen scroll. */
+  .print-area .nursery-grid-wrap {
+    overflow: visible !important;
+  }
+  .print-area .nursery-grid-table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Portrait is the default page. Template A and the marks cards use it. */
   @page {
     size: A4;
     margin: 12mm;
+  }
+
+  /* The parallel-column Early Years templates (Baby B, KG1–KG3) print
+     landscape so their learning-area columns stay readable. A named page
+     keeps every other card portrait. */
+  @page landscapeA4 {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  .print-area.print-landscape {
+    page: landscapeA4;
   }
 }

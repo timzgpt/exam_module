@@ -19,6 +19,7 @@ import type {
   CompetencyCode,
   CompetencyScale,
   NurseryAssessment,
+  NurseryPeriod,
   NurseryTemplateConfig,
   Student,
   TemplateLearningArea,
@@ -122,9 +123,17 @@ export const DEFAULT_COMPETENCY_SCALE: CompetencyScale = {
 /* ================================================================
  * Default learning areas & benchmarks per template kind
  *
- * Invented early-years milestones following each template's described
- * structure — the exact wording of the school's printed samples is
- * entered through the Report templates admin page (task §2/§4).
+ * The benchmark wording below is transcribed from the school's own
+ * reference report cards (the six named sample files) — it is the
+ * curriculum structure, NOT child data, so it is safe to ship as the
+ * default. Administrators add/edit/reorder it through the Report
+ * templates admin page (task §2/§4). Only learner names, remarks,
+ * grades and comments are fake/seeded (repo rule 4).
+ *
+ * Baby Class has TWO distinct templates:
+ *   A (Developmental Assessment) — skills-per-domain with a comment per skill
+ *   B (Four Developmental Domains) — a benchmark set per domain with remarks
+ * They carry different benchmark lists and are kept separate (task §2).
  * ================================================================ */
 
 function area(id: string, name: string, benchmarks: string[]): TemplateLearningArea {
@@ -135,135 +144,346 @@ function area(id: string, name: string, benchmarks: string[]): TemplateLearningA
   };
 }
 
-/** The four Baby Class developmental areas (Templates A and B). */
-export const BABY_AREAS: TemplateLearningArea[] = [
-  area("baby-physical", "Physical Development", [
-    "Climbs, runs and balances confidently on play equipment",
-    "Holds crayons and makes purposeful marks",
-    "Participates in music and movement sessions",
-    "Feeds self and tidies up after meals",
+/**
+ * Baby Class — Template A (Developmental Assessment, ref: "Raylynn Rajab").
+ * Four developmental domains, each a list of observable skills; the teacher
+ * writes a comment against every skill.
+ */
+export const BABY_A_AREAS: TemplateLearningArea[] = [
+  area("babyA-physical", "Physical Development", [
+    "Can eat independently",
+    "Can throw, kick and catch objects",
+    "Can walk forward",
+    "Can jump with both feet and attempt to run",
+    "Can hold / carry objects like a cup or a spoon",
+    "Can climb stairs",
+    "Can colour / decorate pictures and make brush paintings",
   ]),
-  area("baby-language", "Language Development", [
-    "Responds to own name and simple instructions",
-    "Uses words and short phrases to express needs",
-    "Enjoys songs, rhymes and picture books",
-    "Follows two-step directions",
+  area("babyA-language", "Language Development", [
+    "Understands and responds to simple instructions (common commands)",
+    "Responds to simple questions using “yes” or “no” appropriately",
+    "Responds when called by name",
+    "Can sing songs and recite rhymes",
+    "Can speak one or more words (vocabulary development)",
+    "Identifies objects in the classroom and the environment",
+    "Calls peers and teachers by their names or familiar terms",
+    "Uses gestures along with words to communicate, like waving and pointing",
+    "Identifies animals and imitates their sounds, like “moo”",
+    "Identifies and mentions family members",
+    "Uses dolls to discuss family roles (mommy, daddy, baby)",
   ]),
-  area("baby-social", "Social and Emotional Development", [
-    "Plays alongside and with other children",
-    "Shares toys and takes turns with prompting",
-    "Separates comfortably from the caregiver at drop-off",
-    "Expresses feelings with words or gestures",
+  area("babyA-social", "Social and Emotional Development", [
+    "Shares toys with peers and cooperates with others with guidance",
+    "Shows awareness and adjusts to new environments or routines with support",
+    "Begins to follow simple classroom routines with reminders",
+    "Shows positive social-interaction behaviours",
   ]),
-  area("baby-cognitive", "Cognitive Development", [
-    "Explores objects by stacking, posting and sorting",
-    "Matches colours and shapes",
-    "Completes simple inset puzzles",
-    "Shows curiosity and asks about new things",
+  area("babyA-cognitive", "Cognitive Development", [
+    "Recognises own properties such as a bag, a bottle and shoes",
+    "Identifies basic body parts when named (head, hand, mouth)",
+    "Imitates adult actions, like pretending to talk on a phone",
+    "Recognises familiar people such as teachers and peers",
+    "Can stay a day with no diapers",
   ]),
 ];
 
+/**
+ * Baby Class — Template B (Four Developmental Domains, ref: "Kwame-William").
+ * The four domains each carry a set of developmental benchmarks with a
+ * teacher's remark per benchmark.
+ */
+export const BABY_B_AREAS: TemplateLearningArea[] = [
+  area("babyB-physical", "Physical Development", [
+    "Gross motor skills",
+    "Fine motor skills",
+    "Hand-eye coordination",
+    "Sensory & body awareness",
+    "Oral motor skills (eating & communication)",
+    "Balance & spatial awareness",
+    "Self-care & independence",
+  ]),
+  area("babyB-language", "Language Development", [
+    "Listening & comprehension",
+    "Expressive language & vocabulary",
+    "Communication & social language",
+    "Phonological awareness & articulation",
+    "Early literacy foundations",
+    "Verbal and non-verbal communication",
+  ]),
+  area("babyB-social", "Social and Emotional Development", [
+    "Self-awareness",
+    "Emotional expression / regulation",
+    "Relationships",
+    "Social interaction & play",
+    "Empathy / awareness of others",
+    "Independence / confidence",
+  ]),
+  area("babyB-cognitive", "Cognitive Development", [
+    "Problem solving / critical thinking",
+    "Memory / recall",
+    "Curiosity & exploration",
+    "Concept development",
+    "Attention & concentration",
+    "Imagination & creativity",
+  ]),
+];
+
+/** KG1 — Observation Report (ref: "Brandon Nashoni"). Four learning areas. */
 export const KG1_AREAS: TemplateLearningArea[] = [
   area("kg1-arithmetic", "Kindergarten Arithmetic", [
-    "Counts objects up to ten",
-    "Recognises numerals 1 to 10",
-    "Sorts objects by colour, shape and size",
-    "Compares big and small, more and less",
+    "Counts objects from 1–10 using one-to-one correspondence",
+    "Number recognition and sequencing (0–8)",
+    "Shape identification",
+    "Understanding measurements, position and size (big / small, tall / short)",
+    "Pattern recognition (colours and shapes)",
   ]),
   area("kg1-language", "Early Language & Communication", [
-    "Speaks in short full sentences",
-    "Retells a simple story in order",
-    "Recognises own name in print",
-    "Listens to and follows classroom instructions",
+    "Letter sound recognition (s, a, t, i, p, n, c and k)",
+    "Letter sound and picture matching (s for snake, a for ant)",
+    "Self introduction",
+    "Identifying fruits and their colours",
+    "Identifying animals and their sounds",
   ]),
   area("kg1-creative", "Creative Arts and Sensory Play", [
-    "Explores paint, dough and sensory trays",
-    "Sings and moves to familiar songs",
-    "Builds and constructs from imagination",
-    "Describes textures, sounds and colours",
+    "Identifying body parts",
+    "Body movement",
+    "Colour recognition and sorting",
+    "Moulding",
+    "Family",
   ]),
   area("kg1-social", "Social Skills", [
-    "Takes turns and shares materials",
-    "Follows class routines with growing independence",
-    "Plays cooperatively in small groups",
-    "Cares for belongings and classroom materials",
+    "Greetings and responding to greetings",
+    "Expressing oneself",
+    "Concentration and paying attention",
+    "Interaction and sharing with others",
+    "Listening and following instructions",
   ]),
 ];
 
+/** KG2 — Competency Report (ref: "Ivy Loren George"). Five learning areas. */
 export const KG2_AREAS: TemplateLearningArea[] = [
   area("kg2-arithmetic", "Kindergarten Arithmetic", [
-    "Counts and writes numbers 1 to 20",
-    "Matches numerals to quantities",
-    "Recognises basic shapes",
-    "Orders objects by size and number",
-    "Copies and completes simple patterns",
+    "Recognizes numbers from 1 to 20",
+    "Writes the numbers from 1 to 20 with minimal support",
+    "Writes the number that comes next correctly up to 10",
+    "Identifies all the shapes and draws four basic shapes (circle, square, triangle, rectangle)",
+    "Sorts objects according to shapes and matches them with the corresponding shape",
+    "Counts and matches quantities of objects with numbers from 1 to 20",
+    "Explores and compares objects by size (big / small) and height (tall / short)",
+    "Identifies and compares items that are the same within a group",
+    "Recognizes and compares objects that are different in a group",
   ]),
   area("kg2-language", "Pre-Early Language & Communication", [
-    "Identifies beginning letter sounds",
-    "Traces and writes own name",
-    "Answers simple questions about a story",
-    "Speaks confidently in front of the class",
-    "Pairs pictures with their beginning sounds",
+    "Identifies lowercase letters and connects them to their phonetic sounds",
+    "Recognizes and sorts the short vowels (a, e, i, o, u) within a group of letters",
+    "Recognizes and connects images with the correct initial sounds",
+    "Comprehends and reacts appropriately to everyday English instructions using context cues",
+    "Writes own name independently, without visual support",
+    "Identifies lowercase letters and their sounds through Jolly Phonics actions, songs or reading",
+    "Begins to write the lowercase letter sounds with proper formation and minimal assistance",
+    "Recognizes and identifies pre-writing strokes (circles, standing / sleeping lines, curves, slashes)",
+    "Recognizes the initial sound of the first letter of their name",
+    "Blends two sounds to form a word, such as “in”",
+    "Identifies pictures, names, matches and writes CVC words (e.g. sun, win, box)",
   ]),
   area("kg2-lifeskills", "Early Lifeskills (Relations)", [
-    "Greets adults and classmates politely",
-    "Practises personal hygiene routines",
-    "Helps with simple classroom chores",
-    "Respects turn-taking and class rules",
+    "Engages in daily greetings and introduces self confidently",
+    "Demonstrates understanding of good behaviour through actions and words",
+    "Follows hygiene routines consistently, including washing hands before meals",
+    "Carries out basic daily tasks independently (shelving books, placing homework folders)",
+    "Demonstrates good habits by organizing toys after play",
+    "Demonstrates responsibility in caring for personal belongings like water bottles and books",
+    "Develops coordination and control of body and hand movements for writing and drawing",
   ]),
   area("kg2-creative", "Creative Art & Sensory Play", [
-    "Draws and colours with growing control",
-    "Models with clay or dough",
-    "Participates in role play and pretend games",
-    "Sings action songs with the group",
+    "Recognizes various colours and connects them to objects in the environment",
+    "Names different feelings and links them to personal or real-world experiences",
+    "Draws and names different facial expressions (sad, happy, angry)",
+    "Recognizes and identifies different types of weather (sunny, rainy, windy, snowy, cloudy, stormy)",
+    "Classifies items such as games, clothes and food according to weather conditions",
+    "Draws simple pictures using pre-writing lines (a circle for a ball or the sun)",
+    "Identifies body parts during activities and action songs",
+    "Explains the functions of different body parts correctly",
+    "Transforms a circle shape into various objects (a ball, pizza or sun)",
+    "Demonstrates critical thinking by drawing items that could grow on a tree",
+    "Creates objects such as houses and slides using Jenga blocks, paper and bottle tops",
   ]),
   area("kg2-social", "Social & Developmental Learning Skills", [
-    "Follows multi-step instructions",
-    "Works independently on short tasks",
-    "Cooperates in pair and group work",
-    "Manages feelings with adult guidance",
+    "Demonstrates an understanding of emotions by expressing them appropriately",
+    "Shows good behaviour and treats others with kindness",
+    "Develops resilience by persisting through challenges and recovering from setbacks",
+    "Speaks with assurance and communicates well",
+    "Demonstrates effort in following classroom rules every day",
+    "Works well with others and demonstrates teamwork",
+    "Shares and takes turns appropriately during group activities",
+    "Interacts positively and plays cooperatively with peers",
+    "Shows strong attention and involvement in tasks given",
+    "Develops essential vocabulary and actively uses it in daily interactions",
+    "Demonstrates confidence when making decisions",
+    "Listens carefully and stays focused during activities and story time",
   ]),
 ];
 
-export const KG3_AREAS: TemplateLearningArea[] = [
-  area("kg3-numeracy", "Early Numeracy", [
-    "Counts and writes numbers 1 to 50",
-    "Adds and subtracts within 10 using objects",
-    "Recognises and names two-dimensional shapes",
-    "Measures using non-standard units",
-    "Completes number sequences",
+/**
+ * KG3 — Competency Report, MIDTERM set (ref: "Bryston Nashon", March 2026).
+ * Six learning areas. KG3 is the only template whose benchmark set changes by
+ * period (task §2 critical KG3 requirement): the End-of-Term set below extends
+ * several areas. The renderer stays period-agnostic — the resolved config
+ * carries whichever set the cycle's period selects.
+ */
+export const KG3_MIDTERM_AREAS: TemplateLearningArea[] = [
+  area("kg3m-numeracy", "Early Numeracy", [
+    "Recognizes and identifies numbers from 0 to 20",
+    "Writes numbers from 0–20 sequentially with proper formation",
+    "Rote-counts sequentially from 0–20",
+    "Identifies and names basic 2D shapes (circles, squares, triangles, rectangles)",
+    "Draws recognisable basic 2D shapes independently",
+    "Recognizes and extends simple patterns using colours, shapes or objects",
+    "Sorts objects by attributes (colour, shape, size) and explains the grouping",
+    "Understands basic measurement concepts (length, height, weight, capacity)",
+    "Compares measurement concepts using non-standard units (taller / shorter, heavier / lighter, more / less)",
   ]),
-  area("kg3-language", "Early Language & Communication", [
-    "Reads simple three-letter words",
-    "Writes letters and own name legibly",
-    "Retells stories in the right sequence",
-    "Answers and asks questions in full sentences",
+  area("kg3m-language", "Early Language & Communication", [
+    "Understands simple questions and responds appropriately through words or actions",
+    "Recognizes and distinguishes different sounds in the environment",
+    "Understands and follows common commands",
+    "Converses in different contexts and recalls or retells a story or experience",
+    "Identifies and recognizes all letter sounds taught this period",
+    "Identifies and differentiates beginning sounds in words",
+    "Identifies and differentiates ending sounds in words",
+    "Uses phonic awareness to sound out and read 3–4 letter words",
+    "Reads the high-frequency (tricky) words introduced this period",
+    "Reads and comprehends simple sentences using phonics, sight words and context clues",
+    "Begins to form letters correctly and clearly with increasing control and legibility",
   ]),
-  area("kg3-lifeskills", "Early Lifeskills (Relations)", [
-    "Demonstrates good manners every day",
-    "Takes care of personal belongings",
-    "Shows empathy and kindness to classmates",
-    "Follows safety rules indoors and outdoors",
+  area("kg3m-lifeskills", "Early Lifeskills (Relations)", [
+    "Introduces oneself confidently using full sentences",
+    "Introduces others using simple sentences",
+    "Demonstrates understanding and practice of good behaviours like sharing and taking turns",
+    "Identifies and describes examples of good and bad behaviours in daily life",
+    "Explains ways to be kind to people, animals and the environment",
+    "Recognizes and names basic personal rights, such as the right to play and be safe",
+    "Recognizes and describes basic personal responsibilities in different environments",
+    "Understands roles and responsibilities of family and community members",
   ]),
-  area("kg3-sports", "Sports, Arts & Crafts", [
-    "Runs, jumps and balances with control",
-    "Handles balls, beanbags and hoops",
-    "Creates artwork from own ideas",
-    "Performs songs and dances confidently",
+  area("kg3m-sports", "Sports, Arts & Crafts", [
+    "Sings songs and demonstrates basic vocal skills",
+    "Identifies primary colours and mixes them to create secondary colours",
+    "Colours within the lines and uses a variety of colours to complete a picture",
+    "Demonstrates drawing skills by creating recognisable representations of objects",
+    "Displays an understanding of different types of lines and shapes as elements of art",
+    "Draws simple pictures and shapes to express ideas, observations or feelings",
   ]),
-  area("kg3-health", "Health & Environmental Care", [
-    "Practises handwashing and personal hygiene",
-    "Keeps the classroom and compound clean",
-    "Names healthy foods and good habits",
-    "Cares for plants and class animals",
+  area("kg3m-health", "Health & Environmental Care", [
+    "Identifies and names different parts of the body",
+    "Describes the basic functions of different body parts",
+    "Demonstrates an understanding of personal hygiene practices like keeping the body clean",
+    "Follows basic clothing-care routines (dressing appropriately, keeping clothes clean)",
+    "Understands the importance of oral hygiene and demonstrates proper toothbrushing",
+    "Recognizes and names different types of food (fruits, vegetables, grains, meat)",
+    "Sorts foods into basic groups based on their types and benefits to the body",
   ]),
-  area("kg3-culture", "Culture & Religion", [
-    "Participates in morning devotions",
-    "Knows simple prayers and religious songs",
-    "Respects classmates of all backgrounds",
-    "Takes part in national and cultural celebrations",
+  area("kg3m-culture", "Culture & Religion", [
+    "Recognises and identifies the national flag of Tanzania",
+    "Identifies the colours of the national flag",
+    "Describes the meaning of each colour on the national flag",
+    "Recognises and names the national currency of Tanzania",
+    "Identifies the map of Tanzania",
+    "Identifies and describes the national emblem / coat of arms",
+    "Identifies the national language of Tanzania as Swahili",
+    "Understands the basic concept of patriotism and how to express pride in one's country",
+    "Displays an understanding of the union of Tanganyika and Zanzibar",
   ]),
 ];
+
+/**
+ * KG3 — Competency Report, END-OF-TERM set (ref: "Jolene Bright Protas",
+ * June 2026). Extends the Midterm set: numeracy to 50 with addition, more
+ * advanced language, emotional-regulation lifeskills, musical instruments in
+ * arts, food-preservation and kitchen utensils in health, and the national
+ * anthem and leaders in culture.
+ */
+export const KG3_TERMINAL_AREAS: TemplateLearningArea[] = [
+  area("kg3t-numeracy", "Early Numeracy", [
+    "Recognizes and identifies numbers from 0 to 50",
+    "Writes numbers from 0–50 sequentially with proper formation",
+    "Rote-counts sequentially from 0–50",
+    "Identifies and names basic 2D shapes (circles, squares, triangles, rectangles)",
+    "Draws recognisable basic 2D shapes independently",
+    "Sorts objects based on different attributes such as shape, colour and size",
+    "Recognizes and extends simple patterns using colours, shapes or objects",
+    "Understands basic measurement concepts (length, height, weight, capacity)",
+    "Compares and demonstrates measurement concepts using non-standard units (taller / shorter, heavier / lighter, more / less)",
+    "Identifies missing numbers in a sequence arranged from smallest to largest",
+    "Understands addition words (add, more, altogether) and that the plus (+) sign means putting things together",
+    "Adds real objects and single-digit numbers without assistance from the teacher",
+  ]),
+  area("kg3t-language", "Early Language & Communication", [
+    "Understands simple questions and responds appropriately through words or actions",
+    "Recognizes and distinguishes different sounds in the environment",
+    "Understands and follows common commands and communication principles (polite words, greetings, farewells)",
+    "Converses in different contexts and recalls or retells a story or experience",
+    "Identifies and recognizes all letter sounds taught this term",
+    "Associates letter sounds with their corresponding uppercase and lowercase letters",
+    "Identifies and differentiates beginning sounds in words",
+    "Identifies and differentiates ending sounds in words",
+    "Uses phonic awareness to sound out and read 3–4 letter words",
+    "Reads the high-frequency (tricky) words introduced this term",
+    "Reads and comprehends simple sentences using phonics, sight words and context clues",
+    "Forms letters correctly and clearly with increasing control and legibility",
+    "Uses phonics knowledge to independently write simple 3–4 letter words",
+  ]),
+  area("kg3t-lifeskills", "Early Lifeskills (Relations)", [
+    "Introduces oneself confidently using full sentences",
+    "Introduces others using simple sentences",
+    "Demonstrates understanding and practice of basic good behaviours such as sharing and taking turns",
+    "Explains ways to be kind to people, animals and the environment",
+    "Recognizes and names basic personal rights, such as the right to play and be safe",
+    "Recognizes and describes basic personal responsibilities in different environments",
+    "Understands roles and responsibilities of family and community members",
+    "Identifies and demonstrates awareness of different feelings and emotions",
+    "Demonstrates an understanding that all people and animals experience emotions",
+    "Identifies and explains strategies for managing and controlling emotions in different situations",
+  ]),
+  area("kg3t-sports", "Sports, Arts & Crafts", [
+    "Sings songs and demonstrates basic vocal skills",
+    "Uses a variety of colours to colour pictures creatively and show artistic ability",
+    "Colours within the lines and uses a variety of colours to complete a picture",
+    "Demonstrates drawing skills by creating recognisable representations of various objects",
+    "Names and demonstrates various games learnt",
+    "Recognises and names different familiar musical instruments",
+    "Displays an understanding of how musical instruments are used and the sounds they make",
+  ]),
+  area("kg3t-health", "Health & Environmental Care", [
+    "Identifies and names different parts of the body",
+    "Describes the basic functions of different body parts",
+    "Demonstrates an understanding of personal hygiene practices such as washing hands and keeping the body clean",
+    "Understands the importance of oral hygiene and demonstrates proper toothbrushing",
+    "Recognizes and names different types of food (fruits, vegetables, grains, meat)",
+    "Sorts foods into basic groups based on their types and benefits to the body",
+    "Demonstrates an understanding of good table manners and why they are important",
+    "Displays an understanding of how to preserve food and its importance",
+    "Recognises and names different kitchen utensils",
+  ]),
+  area("kg3t-culture", "Culture & Religion", [
+    "Recognises and identifies the national flag of Tanzania",
+    "Identifies the colours of the national flag",
+    "Describes the meaning of each colour on the national flag",
+    "Is familiar with the national anthem of Tanzania",
+    "Recognises and names the national currency of Tanzania",
+    "Identifies the map of Tanzania",
+    "Identifies the national language of Tanzania as Swahili",
+    "Understands the basic concept of patriotism and how to express pride in one's country",
+    "Displays an understanding of the union of Tanganyika and Zanzibar (the date, presidents and countries involved)",
+    "Names the national leaders (President)",
+    "Understands that every culture in Tanzania has its unique traditional foods",
+  ]),
+];
+
+/** The KG3 benchmark set for an assessment period (task §2 critical KG3 req.). */
+export function kg3AreasForPeriod(period: NurseryPeriod): TemplateLearningArea[] {
+  return period === "midterm" ? KG3_MIDTERM_AREAS : KG3_TERMINAL_AREAS;
+}
 
 const clone = (areas: TemplateLearningArea[]): TemplateLearningArea[] =>
   areas.map((a) => ({ ...a, benchmarks: a.benchmarks.map((b) => ({ ...b })) }));
@@ -320,6 +540,8 @@ export function defaultTemplateConfig(
   kind: NurseryKind,
   classId: string,
   classTeacherName = "",
+  /** KG3 only: selects the Midterm vs End-of-Term benchmark set and title. */
+  period: NurseryPeriod = "terminal",
 ): NurseryTemplateConfig {
   const base = {
     kind,
@@ -330,9 +552,9 @@ export function defaultTemplateConfig(
     case "baby-class-a":
       return {
         ...base,
-        title: "DEVELOPMENTAL ASSESSMENT REPORT",
+        title: "STUDENT PROGRESS REPORT",
         assessmentDateLabel: "Date of assessment",
-        areas: clone(BABY_AREAS),
+        areas: clone(BABY_A_AREAS),
         scale: null,
         gradesPerBenchmark: false,
         areaRemarkLabel: "Teacher's Comments",
@@ -342,9 +564,9 @@ export function defaultTemplateConfig(
     case "baby-class-b":
       return {
         ...base,
-        title: "DEVELOPMENTAL DOMAINS REPORT",
+        title: "TERMINAL REPORT",
         assessmentDateLabel: "Date of assessment",
-        areas: clone(BABY_AREAS),
+        areas: clone(BABY_B_AREAS),
         scale: null,
         gradesPerBenchmark: false,
         areaRemarkLabel: "Teacher's remarks",
@@ -378,9 +600,12 @@ export function defaultTemplateConfig(
     case "kg3":
       return {
         ...base,
-        title: "KINDERGARTEN 3 TERMINAL REPORT",
+        title:
+          period === "midterm"
+            ? "KINDERGARTEN 3 MIDTERM REPORT"
+            : "KINDERGARTEN 3 END OF TERM REPORT",
         assessmentDateLabel: "Assessment period",
-        areas: clone(KG3_AREAS),
+        areas: clone(kg3AreasForPeriod(period)),
         scale: { ...DEFAULT_COMPETENCY_SCALE, levels: DEFAULT_COMPETENCY_SCALE.levels.map((l) => ({ ...l })) },
         gradesPerBenchmark: true,
         areaRemarkLabel: null,
@@ -412,18 +637,13 @@ export function assignableKindsFor(classId: string): NurseryKind[] {
  * Seeded assessments (deterministic, per student × cycle)
  * ================================================================ */
 
-const REMARK_OPEN = [
-  "{name} participates happily in {area} activities this term.",
-  "{name} joins {area} sessions with growing confidence.",
-  "{name} is an active participant during {area} time.",
-  "{name} approaches {area} activities with curiosity and energy.",
-];
-
-const REMARK_CLOSE = [
-  "Regular practice at home will build on this lovely progress.",
-  "The class teacher will keep offering gentle challenges in this area.",
-  "Continued encouragement at home and school will keep this growth steady.",
-  "A very pleasing stage of development — well done.",
+const REMARK_PER_BENCHMARK = [
+  "{name} shows this skill confidently in daily classroom activities.",
+  "{name} is developing this well and needs only occasional prompting.",
+  "{name} demonstrates this benchmark with growing independence.",
+  "{name} approaches this with curiosity and improving control.",
+  "{name} performs this skill happily during group and play sessions.",
+  "{name} is making steady progress with this milestone.",
 ];
 
 const AREA_COMMENT_POOLS = [
@@ -473,28 +693,40 @@ export function seedNurseryAssessment(
   classId: string,
   studentId: string,
   cycle: Pick<ReportCycle, "id" | "name" | "reportDate">,
+  /**
+   * The RESOLVED template config (admin assignment + edits). Passing it keeps
+   * the seed aligned with the benchmark IDs the renderer actually shows — so
+   * switching Baby Class between Template A and B, or editing benchmarks,
+   * still produces demo remarks/grades for the right benchmarks.
+   */
+  config?: NurseryTemplateConfig,
 ): NurseryAssessment {
-  const kind = defaultKindForNurseryClass(classId);
-  const config = defaultTemplateConfig(kind, classId);
+  const resolved =
+    config ?? defaultTemplateConfig(defaultKindForNurseryClass(classId), classId);
   const student = [...nurseryStudents].find((s) => s.id === studentId);
   const name = student?.name.split(" ")[0] ?? "The learner";
   const className = nurseryClasses.find((c) => c.id === classId)?.name ?? "class";
   const ability = hashStr(`ability|${studentId}`) % 100; // 0-99
 
-  const areaRemarks: Record<string, string> = {};
+  const benchmarkRemarks: Record<string, string> = {};
   const areaComments: Record<string, string> = {};
   const benchmarkGrades: Record<string, CompetencyCode | null> = {};
 
-  for (const a of config.areas) {
+  for (const a of resolved.areas) {
     const rnd = mulberry32(hashStr(`assess|${cycle.id}|${classId}|${studentId}|${a.id}`));
     const vars = { name, area: a.name.toLowerCase(), class: className };
-    if (config.areaRemarkLabel) {
-      areaRemarks[a.id] = `${fill(pick(REMARK_OPEN, rnd), vars)} ${fill(pick(REMARK_CLOSE, rnd), vars)}`;
+    // Templates A / B / KG1 carry one narrative remark per benchmark.
+    if (resolved.areaRemarkLabel) {
+      for (const b of a.benchmarks) {
+        benchmarkRemarks[b.id] = fill(pick(REMARK_PER_BENCHMARK, rnd), vars);
+      }
     }
-    if (config.areaCommentLabel) {
+    // KG2 / KG3 carry one dedicated comment per learning area.
+    if (resolved.areaCommentLabel) {
       areaComments[a.id] = fill(pick(AREA_COMMENT_POOLS, rnd), vars);
     }
-    if (config.gradesPerBenchmark) {
+    // KG2 / KG3 carry a competency grade per benchmark.
+    if (resolved.gradesPerBenchmark) {
       for (const b of a.benchmarks) {
         benchmarkGrades[b.id] = seededGrade(rnd, ability);
       }
@@ -514,7 +746,7 @@ export function seedNurseryAssessment(
     studentId,
     cycleId: cycle.id,
     assessedOn: cycle.reportDate,
-    areaRemarks,
+    benchmarkRemarks,
     benchmarkGrades,
     areaComments,
     classTeacherComment,
