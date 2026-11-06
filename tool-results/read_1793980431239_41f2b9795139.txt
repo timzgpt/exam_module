@@ -1,0 +1,820 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+     4→import { usePathname, useRouter, useSearchParams } from "next/navigation";
+     5→import { GradePill } from "@/components/shared/grade-pill";
+     6→import { PageHeader } from "@/components/shared/page-header";
+     7→import { SectionCard } from "@/components/shared/section-card";
+     8→import { StatCard } from "@/components/shared/stat-card";
+     9→import { Badge } from "@/components/ui/badge";
+    10→import { Button } from "@/components/ui/button";
+    11→import { Input } from "@/components/ui/input";
+    12→import { Label } from "@/components/ui/label";
+    13→import {
+    14→  Select,
+    15→  SelectContent,
+    16→  SelectItem,
+    17→  SelectTrigger,
+    18→  SelectValue,
+    19→} from "@/components/ui/select";
+    20→import {
+    21→  Table,
+    22→  TableBody,
+    23→  TableCell,
+    24→  TableHead,
+    25→  TableHeader,
+    26→  TableRow,
+    27→} from "@/components/ui/table";
+    28→import { useToast } from "@/hooks/use-toast";
+    29→import { useAppContext, selectCycles } from "@/lib/store";
+    30→import { combinedComponents } from "@/lib/cycle-components";
+    31→import {
+    32→  classById,
+    33→  classSubjectsFor,
+    34→  eligibleStudentsFor,
+    35→  getComponents,
+    36→  getMarks,
+    37→  isPrimaryClass,
+    38→  markStatusOf,
+    39→  schemeForClass,
+    40→  studentsInClass,
+    41→  subjectById,
+    42→  subjectTeacherOf,
+    43→} from "@/lib/demo-data";
+    44→import {
+    45→  assignedSubjectIdsForClass,
+    46→  canEditSubject,
+    47→  subjectTeachers,
+    48→  useViewer,
+    49→  viewerLabel,
+    50→  visibleClassesForViewer,
+    51→  type Viewer,
+    52→} from "@/lib/viewer";
+    53→import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
+    54→import { cn } from "@/lib/utils";
+    55→import type { ClassRoom, MarkStatusCode, ReportCycle } from "@/lib/types";
+    56→import {
+    57→  ClipboardList,
+    58→  Keyboard,
+    59→  Loader2,
+    60→  Lock,
+    61→  Percent,
+    62→  RotateCcw,
+    63→  Save,
+    64→  Search,
+    65→  ShieldOff,
+    66→  UserCog,
+    67→} from "lucide-react";
+    68→
+    69→/* ================================================================
+    70→ * Shared cell parsing + grading (unchanged calculation engine)
+    71→ * ================================================================ */
+    72→
+    73→type ParsedCell =
+    74→  | { state: "empty" }
+    75→  | { state: "valid"; value: number }
+    76→  | { state: "code"; code: MarkStatusCode }
+    77→  | { state: "invalid" };
+    78→
+    79→const STATUS_MEANING: Record<MarkStatusCode, string> = {
+    80→  ABS: "Absent — treated as blank, excluded from averages",
+    81→  NA: "Not assessed — treated as blank, excluded from averages",
+    82→  NR: "Not reported — treated as blank, excluded from averages",
+    83→  PENDING: "Not yet entered — treated as blank",
+    84→  DISQ: "Disqualified / malpractice — counted as a real zero (0.0)",
+    85→};
+    86→
+    87→function parseCell(raw: string): ParsedCell {
+    88→  const t = raw.trim().toUpperCase();
+    89→  if (t === "") return { state: "empty" };
+    90→  if (t === "ABS" || t === "NA" || t === "NR" || t === "PENDING")
+    91→    return { state: "code", code: t };
+    92→  if (t === "DISQ") return { state: "code", code: "DISQ" };
+    93→  if (!/^\d+(\.\d+)?$/.test(t)) return { state: "invalid" };
+    94→  const n = Number(t);
+    95→  if (n < 0 || n > 100) return { state: "invalid" };
+    96→  return { state: "valid", value: n };
+    97→}
+    98→
+    99→interface RowCells {
+   100→  ca: string;
+   101→  exam: string;
+   102→}
+   103→
+   104→function rowMark(
+   105→  cells: RowCells,
+   106→  w1: number,
+   107→  w2: number,
+   108→): { total: number | null; status: MarkStatusCode | null } {
+   109→  const ca = parseCell(cells.ca);
+   110→  const exam = parseCell(cells.exam);
+   111→  const codeCell = ca.state === "code" ? ca : exam.state === "code" ? exam : null;
+   112→  if (codeCell) {
+   113→    return { total: codeCell.code === "DISQ" ? 0 : null, status: codeCell.code };
+   114→  }
+   115→  const caVal = ca.state === "valid" ? ca.value : null;
+   116→  const examVal = exam.state === "valid" ? exam.value : null;
+   117→  return { total: subjectTotal(caVal, examVal, w1, w2), status: null };
+   118→}
+   119→
+   120→/** The section letter of a class, derived from its name minus the level. */
+   121→function sectionOf(cls: ClassRoom): string {
+   122→  const s = cls.name.slice(cls.level.length).trim();
+   123→  return s.length > 0 ? s : "—";
+   124→}
+   125→
+   126→const EXAM_GROUP_ORDER: ReportCycle["kind"][] = ["monthly", "mid-term", "terminal", "annual"];
+   127→const EXAM_GROUP_LABEL: Record<ReportCycle["kind"], string> = {
+   128→  monthly: "Monthly Test",
+   129→  "mid-term": "Mid-Term",
+   130→  terminal: "Terminal",
+   131→  annual: "Annual",
+   132→};
+   133→
+   134→/* ================================================================
+   135→ * Subject-by-subject marks entry (task §2–§7)
+   136→ * ================================================================ */
+   137→
+   138→export function SubjectMarksEntry({
+   139→  cycle,
+   140→  classId: routeClassId,
+   141→}: {
+   142→  cycle: ReportCycle;
+   143→  classId: string;
+   144→}) {
+   145→  const router = useRouter();
+   146→  const pathname = usePathname();
+   147→  const searchParams = useSearchParams();
+   148→  const subjectParam = searchParams.get("subject") ?? "";
+   149→
+   150→  // Persisted demo viewer (role). Rehydrates after mount like the other stores.
+   151→  useEffect(() => {
+   152→    void useViewer.persist.rehydrate();
+   153→  }, []);
+   154→  const role = useViewer((s) => s.role);
+   155→  const teacherId = useViewer((s) => s.teacherId);
+   156→  const setViewer = useViewer((s) => s.setViewer);
+   157→  const viewer: Viewer = useMemo(() => ({ role, teacherId }), [role, teacherId]);
+   158→
+   159→  const setCycle = useAppContext((s) => s.setCycle);
+   160→  const setClass = useAppContext((s) => s.setClass);
+   161→  const createdCycles = useAppContext((s) => s.createdCycles);
+   162→  const cycleOverrides = useAppContext((s) => s.cycleOverrides);
+   163→  const deletedCycleIds = useAppContext((s) => s.deletedCycleIds);
+   164→  const allCycles = useMemo(
+   165→    () => selectCycles({ createdCycles, cycleOverrides, deletedCycleIds }),
+   166→    [createdCycles, cycleOverrides, deletedCycleIds],
+   167→  );
+   168→
+   169→  const routeClass = classById(routeClassId);
+   170→  const visibleClasses = useMemo(() => visibleClassesForViewer(viewer), [viewer]);
+   171→
+   172→  // ── Filter draft (committed only on Search via navigation) ──────
+   173→  const computeDraft = () => ({
+   174→    examGroup: cycle.kind,
+   175→    examId: cycle.id,
+   176→    classLevel: routeClass?.level ?? visibleClasses[0]?.level ?? "",
+   177→    section: routeClass ? sectionOf(routeClass) : visibleClasses[0] ? sectionOf(visibleClasses[0]) : "",
+   178→    subjectId: subjectParam,
+   179→  });
+   180→  // Re-sync the draft to the route during render when the route changes
+   181→  // (React's "adjust state when a prop changes" pattern — no effect).
+   182→  const routeKey = `${cycle.id}|${cycle.kind}|${routeClassId}|${subjectParam}`;
+   183→  const [draft, setDraft] = useState(computeDraft);
+   184→  const [lastRouteKey, setLastRouteKey] = useState(routeKey);
+   185→  if (routeKey !== lastRouteKey) {
+   186→    setLastRouteKey(routeKey);
+   187→    setDraft(computeDraft());
+   188→  }
+   189→
+   190→  // ── Dependent option lists (scoped by viewer role) ──────────────
+   191→  const examGroups = useMemo(() => {
+   192→    const kinds = new Set(allCycles.map((c) => c.kind));
+   193→    return EXAM_GROUP_ORDER.filter((k) => kinds.has(k));
+   194→  }, [allCycles]);
+   195→  const examsInGroup = useMemo(
+   196→    () => allCycles.filter((c) => c.kind === draft.examGroup),
+   197→    [allCycles, draft.examGroup],
+   198→  );
+   199→  const classLevels = useMemo(() => {
+   200→    const seen = new Set<string>();
+   201→    const out: string[] = [];
+   202→    for (const c of visibleClasses) {
+   203→      if (!seen.has(c.level)) {
+   204→        seen.add(c.level);
+   205→        out.push(c.level);
+   206→      }
+   207→    }
+   208→    return out;
+   209→  }, [visibleClasses]);
+   210→  const sectionsForLevel = useMemo(
+   211→    () => visibleClasses.filter((c) => c.level === draft.classLevel).map(sectionOf),
+   212→    [visibleClasses, draft.classLevel],
+   213→  );
+   214→  const resolvedClass = useMemo(
+   215→    () =>
+   216→      visibleClasses.find(
+   217→        (c) => c.level === draft.classLevel && sectionOf(c) === draft.section,
+   218→      ),
+   219→    [visibleClasses, draft.classLevel, draft.section],
+   220→  );
+   221→  const subjectOptions = useMemo(
+   222→    () => (resolvedClass ? assignedSubjectIdsForClass(viewer, resolvedClass.id) : []),
+   223→    [resolvedClass, viewer],
+   224→  );
+   225→
+   226→  const selectedExam = allCycles.find((c) => c.id === draft.examId) ?? cycle;
+   227→
+   228→  // ── Dependent setters (reset downstream selections) ─────────────
+   229→  const pickExamGroup = (g: string) => {
+   230→    const group = g as ReportCycle["kind"];
+   231→    const first = allCycles.find((c) => c.kind === group);
+   232→    setDraft((d) => ({ ...d, examGroup: group, examId: first?.id ?? d.examId }));
+   233→  };
+   234→  const pickExam = (id: string) => setDraft((d) => ({ ...d, examId: id }));
+   235→  const pickLevel = (level: string) => {
+   236→    const firstSection = visibleClasses.filter((c) => c.level === level).map(sectionOf)[0] ?? "";
+   237→    setDraft((d) => ({ ...d, classLevel: level, section: firstSection, subjectId: "" }));
+   238→  };
+   239→  const pickSection = (s: string) => setDraft((d) => ({ ...d, section: s, subjectId: "" }));
+   240→  const pickSubject = (id: string) => setDraft((d) => ({ ...d, subjectId: id }));
+   241→
+   242→  const canSearch = !!resolvedClass && !!draft.subjectId;
+   243→  const onSearch = () => {
+   244→    if (!resolvedClass || !draft.subjectId) return;
+   245→    setCycle(draft.examId);
+   246→    setClass(resolvedClass.id);
+   247→    router.push(
+   248→      `/academic/report-cycles/${draft.examId}/classes/${resolvedClass.id}/marks?subject=${draft.subjectId}`,
+   249→    );
+   250→  };
+   251→
+   252→  // ── What is actually loaded (from the committed route) ──────────
+   253→  const loadedValid =
+   254→    !!subjectParam &&
+   255→    !!routeClass &&
+   256→    classSubjectsFor(routeClassId).some((cs) => cs.subjectId === subjectParam);
+   257→  const loadedPermitted = loadedValid && canEditSubject(viewer, routeClassId, subjectParam);
+   258→
+   259→  const changeSubject = () => router.push(pathname);
+   260→
+   261→  return (
+   262→    <div className="space-y-5">
+   263→      <PageHeader
+   264→        title="Marks entry"
+   265→        description="Enter marks one subject at a time. Choose the exam, class, section and subject, then load the sheet."
+   266→        actions={<ViewerSwitcher role={role} teacherId={teacherId} onChange={setViewer} />}
+   267→      />
+   268→
+   269→      {/* ── Filter panel ─────────────────────────────────────────── */}
+   270→      <SectionCard>
+   271→        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+   272→          <FilterField label="Exam Group">
+   273→            <Select value={draft.examGroup} onValueChange={pickExamGroup}>
+   274→              <SelectTrigger aria-label="Exam Group"><SelectValue /></SelectTrigger>
+   275→              <SelectContent>
+   276→                {examGroups.map((g) => (
+   277→                  <SelectItem key={g} value={g}>{EXAM_GROUP_LABEL[g]}</SelectItem>
+   278→                ))}
+   279→              </SelectContent>
+   280→            </Select>
+   281→          </FilterField>
+   282→
+   283→          <FilterField label="Examination">
+   284→            <Select value={draft.examId} onValueChange={pickExam}>
+   285→              <SelectTrigger aria-label="Examination"><SelectValue /></SelectTrigger>
+   286→              <SelectContent>
+   287→                {examsInGroup.map((c) => (
+   288→                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+   289→                ))}
+   290→              </SelectContent>
+   291→            </Select>
+   292→          </FilterField>
+   293→
+   294→          <FilterField label="Session">
+   295→            <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-compact text-foreground">
+   296→              {selectedExam.academicYear} · {selectedExam.term}
+   297→            </div>
+   298→          </FilterField>
+   299→
+   300→          <FilterField label="Class">
+   301→            <Select value={draft.classLevel} onValueChange={pickLevel}>
+   302→              <SelectTrigger aria-label="Class"><SelectValue placeholder="Select" /></SelectTrigger>
+   303→              <SelectContent>
+   304→                {classLevels.map((l) => (
+   305→                  <SelectItem key={l} value={l}>{l}</SelectItem>
+   306→                ))}
+   307→              </SelectContent>
+   308→            </Select>
+   309→          </FilterField>
+   310→
+   311→          <FilterField label="Section">
+   312→            <Select value={draft.section} onValueChange={pickSection}>
+   313→              <SelectTrigger aria-label="Section"><SelectValue placeholder="Select" /></SelectTrigger>
+   314→              <SelectContent>
+   315→                {sectionsForLevel.map((s) => (
+   316→                  <SelectItem key={s} value={s}>Section {s}</SelectItem>
+   317→                ))}
+   318→              </SelectContent>
+   319→            </Select>
+   320→          </FilterField>
+   321→
+   322→          <FilterField label="Subject">
+   323→            <Select value={draft.subjectId || undefined} onValueChange={pickSubject}>
+   324→              <SelectTrigger aria-label="Subject"><SelectValue placeholder="Select" /></SelectTrigger>
+   325→              <SelectContent>
+   326→                {subjectOptions.length === 0 ? (
+   327→                  <SelectItem value="none" disabled>No subjects assigned</SelectItem>
+   328→                ) : (
+   329→                  subjectOptions.map((sid) => (
+   330→                    <SelectItem key={sid} value={sid}>{subjectById(sid)?.name}</SelectItem>
+   331→                  ))
+   332→                )}
+   333→              </SelectContent>
+   334→            </Select>
+   335→          </FilterField>
+   336→        </div>
+   337→
+   338→        <div className="mt-4 flex items-center justify-between gap-3">
+   339→          <p className="text-2xs text-muted-foreground">
+   340→            {role === "subject-teacher"
+   341→              ? "You see only the subjects assigned to you."
+   342→              : "Select a subject to load its mark sheet."}
+   343→          </p>
+   344→          <Button className="gap-1.5" onClick={onSearch} disabled={!canSearch}>
+   345→            <Search className="size-4" /> Search
+   346→          </Button>
+   347→        </div>
+   348→      </SectionCard>
+   349→
+   350→      {/* ── Result: workspace, blocked, or empty state ───────────── */}
+   351→      {subjectParam && loadedPermitted && routeClass ? (
+   352→        <SubjectMarkSheet
+   353→          key={`${routeClass.id}|${subjectParam}`}
+   354→          cls={routeClass}
+   355→          cycle={cycle}
+   356→          subjectId={subjectParam}
+   357→          onChangeSubject={changeSubject}
+   358→        />
+   359→      ) : subjectParam && loadedValid && !loadedPermitted ? (
+   360→        <NotAuthorised onChangeSubject={changeSubject} />
+   361→      ) : (
+   362→        <EmptyState />
+   363→      )}
+   364→    </div>
+   365→  );
+   366→}
+   367→
+   368→function FilterField({ label, children }: { label: string; children: ReactNode }) {
+   369→  return (
+   370→    <div className="grid gap-1.5">
+   371→      <Label className="text-2xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+   372→        {label} <span className="text-destructive">*</span>
+   373→      </Label>
+   374→      {children}
+   375→    </div>
+   376→  );
+   377→}
+   378→
+   379→function ViewerSwitcher({
+   380→  role,
+   381→  teacherId,
+   382→  onChange,
+   383→}: {
+   384→  role: Viewer["role"];
+   385→  teacherId: string | null;
+   386→  onChange: (role: Viewer["role"], teacherId?: string | null) => void;
+   387→}) {
+   388→  const value = role === "subject-teacher" && teacherId ? `t:${teacherId}` : role;
+   389→  return (
+   390→    <div className="flex items-center gap-2">
+   391→      <UserCog className="size-4 text-muted-foreground" />
+   392→      <Label className="text-xs text-muted-foreground">Viewing as</Label>
+   393→      <Select
+   394→        value={value}
+   395→        onValueChange={(v) =>
+   396→          v.startsWith("t:")
+   397→            ? onChange("subject-teacher", v.slice(2))
+   398→            : onChange(v as Viewer["role"])
+   399→        }
+   400→      >
+   401→        <SelectTrigger className="h-8 w-60 text-compact" aria-label="Viewing as role">
+   402→          <SelectValue />
+   403→        </SelectTrigger>
+   404→        <SelectContent>
+   405→          <SelectItem value="academic-master">Academic Master (all subjects)</SelectItem>
+   406→          <SelectItem value="administrator">Administrator</SelectItem>
+   407→          {subjectTeachers().map((t) => (
+   408→            <SelectItem key={t.id} value={`t:${t.id}`}>{t.name} · Subject Teacher</SelectItem>
+   409→          ))}
+   410→        </SelectContent>
+   411→      </Select>
+   412→    </div>
+   413→  );
+   414→}
+   415→
+   416→function EmptyState() {
+   417→  return (
+   418→    <SectionCard>
+   419→      <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+   420→        <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+   421→          <Search className="size-6 text-muted-foreground" />
+   422→        </div>
+   423→        <div>
+   424→          <p className="text-compact font-medium text-foreground">No subject loaded</p>
+   425→          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+   426→            Choose the examination, class, section and subject above, then press Search to open that
+   427→            subject&apos;s mark sheet. Only one subject is shown at a time.
+   428→          </p>
+   429→        </div>
+   430→      </div>
+   431→    </SectionCard>
+   432→  );
+   433→}
+   434→
+   435→function NotAuthorised({ onChangeSubject }: { onChangeSubject: () => void }) {
+   436→  return (
+   437→    <SectionCard>
+   438→      <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+   439→        <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
+   440→          <Lock className="size-6 text-destructive" />
+   441→        </div>
+   442→        <div>
+   443→          <p className="text-compact font-medium text-foreground">Subject not assigned to you</p>
+   444→          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+   445→            You can only enter marks for the subjects assigned to you. Pick one of your subjects, or
+   446→            ask an Academic Master for access.
+   447→          </p>
+   448→        </div>
+   449→        <Button variant="outline" size="sm" onClick={onChangeSubject}>Change subject</Button>
+   450→      </div>
+   451→    </SectionCard>
+   452→  );
+   453→}
+   454→
+   455→/* ================================================================
+   456→ * Single-subject mark sheet (one subject only — task §5)
+   457→ * ================================================================ */
+   458→
+   459→function SubjectMarkSheet({
+   460→  cls,
+   461→  cycle,
+   462→  subjectId,
+   463→  onChangeSubject,
+   464→}: {
+   465→  cls: ClassRoom;
+   466→  cycle: ReportCycle;
+   467→  subjectId: string;
+   468→  onChangeSubject: () => void;
+   469→}) {
+   470→  const { toast } = useToast();
+   471→  const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
+   472→  const classSubject = classSubjectsFor(cls.id).find((c) => c.subjectId === subjectId)!;
+   473→  const subject = subjectById(subjectId)!;
+   474→  const scheme = schemeForClass(cls.id);
+   475→  const isPrimary = isPrimaryClass(cls.id);
+   476→  const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
+   477→
+   478→  const combined = combinedComponents(cycle);
+   479→  const w1 = combined ? combined[0].weight : classSubject.caMarks;
+   480→  const w2 = combined ? combined[1].weight : classSubject.examMarks;
+   481→  const colLabel = (i: 0 | 1) => (combined ? combined[i].label : i === 0 ? "CA" : "Exam");
+   482→
+   483→  const toBaseline = (): Record<string, RowCells> =>
+   484→    Object.fromEntries(
+   485→      students.map((s) => {
+   486→        const comp = getComponents(cls.id, subjectId)[s.id];
+   487→        const enrolled = comp?.enrolled ?? true;
+   488→        const status = markStatusOf(cls.id, subjectId, s.id);
+   489→        if (!enrolled || (comp?.ca === null && comp?.exam === null && comp?.status === null)) {
+   490→          return [s.id, { ca: "", exam: "" }];
+   491→        }
+   492→        if (status) return [s.id, { ca: status, exam: "" }];
+   493→        return [s.id, { ca: String(comp?.ca ?? ""), exam: String(comp?.exam ?? "") }];
+   494→      }),
+   495→    );
+   496→
+   497→  // This component is remounted (via `key`) when the loaded subject or class
+   498→  // changes, so useState initialises fresh from the saved marks each time.
+   499→  const [baseline, setBaseline] = useState<Record<string, RowCells>>(toBaseline);
+   500→  const [working, setWorking] = useState<Record<string, RowCells>>(toBaseline);
+   501→  const [saving, setSaving] = useState(false);
+   502→
+   503→  const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+   504→  const focusCell = (r: number, c: number) => {
+   505→    const el = cellRefs.current.get(`${r}-${c}`);
+   506→    if (el) {
+   507→      el.focus();
+   508→      el.select();
+   509→    }
+   510→  };
+   511→
+   512→  const onCellKeyDown = (e: KeyboardEvent<HTMLInputElement>, studentIndex: number, col: 0 | 1) => {
+   513→    const el = e.currentTarget;
+   514→    switch (e.key) {
+   515→      case "ArrowDown":
+   516→      case "Enter":
+   517→        e.preventDefault();
+   518→        if (studentIndex + 1 < students.length) focusCell(studentIndex + 1, col);
+   519→        break;
+   520→      case "ArrowUp":
+   521→        e.preventDefault();
+   522→        if (studentIndex - 1 >= 0) focusCell(studentIndex - 1, col);
+   523→        break;
+   524→      case "ArrowLeft":
+   525→        if ((el.selectionStart ?? 0) === 0 && (el.selectionEnd ?? 0) === 0 && col === 1) {
+   526→          e.preventDefault();
+   527→          focusCell(studentIndex, 0);
+   528→        }
+   529→        break;
+   530→      case "ArrowRight": {
+   531→        const len = el.value.length;
+   532→        if ((el.selectionStart ?? 0) === len && (el.selectionEnd ?? 0) === len && col === 0) {
+   533→          e.preventDefault();
+   534→          focusCell(studentIndex, 1);
+   535→        }
+   536→        break;
+   537→      }
+   538→      case "Escape":
+   539→        e.preventDefault();
+   540→        setWorking((prev) => ({
+   541→          ...prev,
+   542→          [students[studentIndex].id]: {
+   543→            ...prev[students[studentIndex].id],
+   544→            [col === 0 ? "ca" : "exam"]: "",
+   545→          },
+   546→        }));
+   547→        break;
+   548→    }
+   549→  };
+   550→
+   551→  const setCell = (studentId: string, col: 0 | 1, value: string) =>
+   552→    setWorking((prev) => ({
+   553→      ...prev,
+   554→      [studentId]: { ...prev[studentId], [col === 0 ? "ca" : "exam"]: value },
+   555→    }));
+   556→
+   557→  const rows = students.map((s, i) => {
+   558→    const cells = working[s.id] ?? { ca: "", exam: "" };
+   559→    const enrolled = getComponents(cls.id, subjectId)[s.id]?.enrolled ?? true;
+   560→    return { student: s, index: i, cells, enrolled, mark: rowMark(cells, w1, w2) };
+   561→  });
+   562→
+   563→  const entered = rows.filter((r) => r.enrolled && r.mark.total !== null);
+   564→  const invalidCount = rows.filter(
+   565→    (r) => parseCell(r.cells.ca).state === "invalid" || parseCell(r.cells.exam).state === "invalid",
+   566→  ).length;
+   567→  const eligibleCount = eligibleStudentsFor(cls.id, subjectId).length;
+   568→  const enteredPct = eligibleCount ? Math.round((entered.length / eligibleCount) * 100) : 0;
+   569→  const classAverage = averageOf(entered.map((r) => r.mark.total as number));
+   570→
+   571→  const dirtyCount = useMemo(
+   572→    () =>
+   573→      students.filter((s) => {
+   574→        const base = baseline[s.id] ?? { ca: "", exam: "" };
+   575→        const work = working[s.id] ?? { ca: "", exam: "" };
+   576→        return (
+   577→          work.ca.trim().toUpperCase() !== base.ca.trim().toUpperCase() ||
+   578→          work.exam.trim().toUpperCase() !== base.exam.trim().toUpperCase()
+   579→        );
+   580→      }).length,
+   581→    [students, working, baseline],
+   582→  );
+   583→
+   584→  const reset = () => {
+   585→    setWorking(baseline);
+   586→    toast({ title: "Changes discarded", description: `The ${subject.name} sheet was restored.` });
+   587→  };
+   588→
+   589→  const save = () => {
+   590→    if (saving || dirtyCount === 0) return;
+   591→    setSaving(true);
+   592→    let changed = 0;
+   593→    for (const s of students) {
+   594→      const prev = getMarks(cls.id, subject.id)[s.id] ?? null;
+   595→      const next = rowMark(working[s.id] ?? { ca: "", exam: "" }, w1, w2).total;
+   596→      if (next !== prev) changed += 1;
+   597→    }
+   598→    window.setTimeout(() => {
+   599→      const base = toBaseline();
+   600→      setBaseline(base);
+   601→      setWorking(base);
+   602→      setSaving(false);
+   603→      toast({
+   604→        title: "Marks saved",
+   605→        description: `Saved ${changed} changed totals for ${subject.name}: ${cls.name}. Other subjects were not affected.`,
+   606→      });
+   607→    }, 600);
+   608→  };
+   609→
+   610→  return (
+   611→    <div className="space-y-4">
+   612→      {/* Loaded-subject banner */}
+   613→      <SectionCard>
+   614→        <div className="flex flex-wrap items-center justify-between gap-3">
+   615→          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+   616→            <Badge className="bg-[#5C0A14] text-white">{subject.name}</Badge>
+   617→            <span className="text-2xs text-muted-foreground">({subject.code})</span>
+   618→            <span className="text-compact text-muted-foreground">·</span>
+   619→            <span className="text-compact font-medium text-foreground">{cls.name}</span>
+   620→            <span className="text-compact text-muted-foreground">·</span>
+   621→            <span className="text-compact text-muted-foreground">
+   622→              {cycle.name} · {cycle.academicYear}
+   623→            </span>
+   624→          </div>
+   625→          <div className="flex items-center gap-2">
+   626→            <span className="text-2xs text-muted-foreground">Teacher: {teacherName}</span>
+   627→            <Button variant="outline" size="sm" className="gap-1.5" onClick={onChangeSubject}>
+   628→              <RotateCcw className="size-3.5" /> Change subject
+   629→            </Button>
+   630→          </div>
+   631→        </div>
+   632→      </SectionCard>
+   633→
+   634→      <div className="grid gap-3 sm:grid-cols-3">
+   635→        <StatCard
+   636→          label="Entered"
+   637→          value={`${enteredPct}%`}
+   638→          icon={ClipboardList}
+   639→          tone="primary"
+   640→          hint={`${entered.length} of ${eligibleCount} eligible · ${subject.name}`}
+   641→        />
+   642→        <StatCard
+   643→          label="Class average"
+   644→          value={entered.length > 0 ? formatAvg(classAverage) : "-"}
+   645→          icon={Percent}
+   646→          hint="Entered marks only, blanks excluded"
+   647→        />
+   648→        <StatCard
+   649→          label="Weighting"
+   650→          value={combined ? `${w1} + ${w2}` : `${classSubject.caMarks} + ${classSubject.examMarks}`}
+   651→          icon={Percent}
+   652→          hint={combined ? `${combined[0].label} + ${combined[1].label} = 100` : "CA + Exam = 100"}
+   653→        />
+   654→      </div>
+   655→
+   656→      <SectionCard
+   657→        noPadding
+   658→        title="Mark sheet"
+   659→        description={`${subject.name} (${subject.code}) · ${teacherName} · Type ABS, NA, NR, PENDING or DISQ in place of a number · Arrow keys move · Esc clears`}
+   660→        actions={
+   661→          <>
+   662→            <Button variant="outline" size="sm" className="gap-1.5" onClick={reset} disabled={dirtyCount === 0 || saving}>
+   663→              <RotateCcw className="size-4" /> Reset
+   664→            </Button>
+   665→            <Button size="sm" className="gap-1.5" onClick={save} disabled={dirtyCount === 0 || saving}>
+   666→              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+   667→              Save marks
+   668→            </Button>
+   669→          </>
+   670→        }
+   671→      >
+   672→        <div className="[&_[data-slot=table-container]]:max-h-[60vh]">
+   673→          <Table>
+   674→            <TableHeader className="sticky top-0 z-10 bg-card">
+   675→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   676→                <TableHead className="sticky left-0 z-30 w-10 bg-muted/40 text-center">#</TableHead>
+   677→                <TableHead className="sticky left-10 z-30 min-w-50 border-r border-border/60 bg-muted/40 pl-3">
+   678→                  Student
+   679→                </TableHead>
+   680→                <TableHead>Adm. no</TableHead>
+   681→                <TableHead className="text-center">
+   682→                  {colLabel(0)} /100
+   683→                  <span className="block text-3xs font-medium tracking-wide text-muted-foreground">{w1} %</span>
+   684→                </TableHead>
+   685→                <TableHead className="text-center">
+   686→                  {colLabel(1)} /100
+   687→                  <span className="block text-3xs font-medium tracking-wide text-muted-foreground">{w2} %</span>
+   688→                </TableHead>
+   689→                <TableHead className="text-center">Total /100</TableHead>
+   690→                <TableHead className="text-center">Grade</TableHead>
+   691→                {!isPrimary ? <TableHead className="text-center">Points</TableHead> : null}
+   692→                <TableHead className="min-w-55">Status / remark</TableHead>
+   693→              </TableRow>
+   694→            </TableHeader>
+   695→            <TableBody>
+   696→              {rows.map(({ student, index, cells, enrolled, mark }) => {
+   697→                const g = mark.total !== null ? gradeFor(mark.total, scheme) : undefined;
+   698→                return (
+   699→                  <TableRow key={student.id} className={cn(!enrolled && "opacity-55")}>
+   700→                    <TableCell className="sticky left-0 w-10 border-r border-border/40 bg-card text-center text-xs tabular text-muted-foreground">
+   701→                      {index + 1}
+   702→                    </TableCell>
+   703→                    <TableCell className="sticky left-10 border-r border-border/40 bg-card pl-3">
+   704→                      <p className="whitespace-nowrap text-compact font-medium text-foreground">{student.name}</p>
+   705→                      {!enrolled ? <p className="text-2xs text-muted-foreground">Not enrolled</p> : null}
+   706→                    </TableCell>
+   707→                    <TableCell className="text-xs tabular text-muted-foreground">{student.admissionNo}</TableCell>
+   708→                    <TableCell className="text-center">
+   709→                      <Input
+   710→                        value={enrolled ? cells.ca : ""}
+   711→                        onChange={(e) => setCell(student.id, 0, e.target.value)}
+   712→                        onKeyDown={(e) => onCellKeyDown(e, index, 0)}
+   713→                        ref={(el) => {
+   714→                          const key = `${index}-0`;
+   715→                          if (el) cellRefs.current.set(key, el);
+   716→                          else cellRefs.current.delete(key);
+   717→                        }}
+   718→                        disabled={!enrolled}
+   719→                        aria-invalid={parseCell(cells.ca).state === "invalid"}
+   720→                        aria-label={`${colLabel(0)} mark for ${student.name}`}
+   721→                        placeholder="-"
+   722→                        className={cn(
+   723→                          "mx-auto h-8 w-16 text-center text-compact tabular",
+   724→                          parseCell(cells.ca).state === "invalid" &&
+   725→                            "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
+   726→                        )}
+   727→                      />
+   728→                    </TableCell>
+   729→                    <TableCell className="text-center">
+   730→                      <Input
+   731→                        value={enrolled ? cells.exam : ""}
+   732→                        onChange={(e) => setCell(student.id, 1, e.target.value)}
+   733→                        onKeyDown={(e) => onCellKeyDown(e, index, 1)}
+   734→                        ref={(el) => {
+   735→                          const key = `${index}-1`;
+   736→                          if (el) cellRefs.current.set(key, el);
+   737→                          else cellRefs.current.delete(key);
+   738→                        }}
+   739→                        disabled={!enrolled}
+   740→                        aria-invalid={parseCell(cells.exam).state === "invalid"}
+   741→                        aria-label={`${colLabel(1)} mark for ${student.name}`}
+   742→                        placeholder="-"
+   743→                        className={cn(
+   744→                          "mx-auto h-8 w-16 text-center text-compact tabular",
+   745→                          parseCell(cells.exam).state === "invalid" &&
+   746→                            "border-destructive ring-destructive/30 focus-visible:ring-destructive/30",
+   747→                        )}
+   748→                      />
+   749→                    </TableCell>
+   750→                    <TableCell className="text-center text-compact font-medium tabular">
+   751→                      {!enrolled ? (
+   752→                        <span className="text-muted-foreground">—</span>
+   753→                      ) : mark.total !== null ? (
+   754→                        fmtTotalMark(mark.total)
+   755→                      ) : (
+   756→                        <span className="text-muted-foreground">—</span>
+   757→                      )}
+   758→                    </TableCell>
+   759→                    <TableCell className="text-center">
+   760→                      {g ? <GradePill grade={g.grade} /> : <span className="text-compact text-muted-foreground">-</span>}
+   761→                    </TableCell>
+   762→                    {!isPrimary ? (
+   763→                      <TableCell className="text-center text-compact tabular">
+   764→                        {g ? <span className="text-foreground">{g.points}</span> : <span className="text-muted-foreground">-</span>}
+   765→                      </TableCell>
+   766→                    ) : null}
+   767→                    <TableCell className="text-compact">
+   768→                      {mark.status ? (
+   769→                        <span className="inline-flex items-center gap-1.5" title={STATUS_MEANING[mark.status]}>
+   770→                          <Badge
+   771→                            variant="outline"
+   772→                            className={cn(
+   773→                              "h-5 px-1.5 font-mono text-2xs",
+   774→                              mark.status === "DISQ" ? "border-destructive/40 text-destructive" : "text-muted-foreground",
+   775→                            )}
+   776→                          >
+   777→                            {mark.status === "DISQ" ? <ShieldOff className="size-3" /> : null}
+   778→                            {mark.status}
+   779→                          </Badge>
+   780→                          <span className="text-2xs text-muted-foreground">{STATUS_MEANING[mark.status]}</span>
+   781→                        </span>
+   782→                      ) : (
+   783→                        <span className="text-muted-foreground">{g?.remark ?? "-"}</span>
+   784→                      )}
+   785→                    </TableCell>
+   786→                  </TableRow>
+   787→                );
+   788→              })}
+   789→            </TableBody>
+   790→          </Table>
+   791→        </div>
+   792→
+   793→        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/70 px-4 py-3 text-compact text-muted-foreground">
+   794→          <span className="tabular">
+   795→            Entered <span className="font-medium text-foreground">{entered.length}/{eligibleCount}</span>
+   796→          </span>
+   797→          <span className="tabular">
+   798→            Class average <span className="font-medium text-foreground">{entered.length > 0 ? formatAvg(classAverage) : "-"}</span>
+   799→          </span>
+   800→          {invalidCount > 0 ? (
+   801→            <span className="font-medium tabular text-destructive">
+   802→              {invalidCount} invalid {invalidCount === 1 ? "cell" : "cells"}
+   803→            </span>
+   804→          ) : null}
+   805→          {dirtyCount > 0 ? (
+   806→            <span className="ml-auto inline-flex items-center gap-1.5 font-medium text-warning">
+   807→              <span className="size-1.5 rounded-full bg-warning" />
+   808→              Unsaved changes · {dirtyCount}
+   809→            </span>
+   810→          ) : (
+   811→            <span className="ml-auto inline-flex items-center gap-1.5 text-xs">
+   812→              <Keyboard className="size-3.5" /> Arrow keys move · Enter moves down · Esc clears
+   813→            </span>
+   814→          )}
+   815→        </div>
+   816→      </SectionCard>
+   817→    </div>
+   818→  );
+   819→}
+   820→
