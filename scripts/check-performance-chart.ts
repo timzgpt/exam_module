@@ -57,14 +57,27 @@ check("strongest defaults to 0 (rule 4)", s2.strongestIdx === 0);
 const img = generateChartImage(s, "mid-term");
 check("mid image produced", img !== null && img.startsWith("data:image/svg+xml"));
 const svg = decodeURIComponent(img!);
-check("title", svg.includes("Result Analysis in Percentage"));
+check("no in-image title (dropped deliberately)", !svg.includes("Result Analysis"));
 check("y label", svg.includes("% Percentage"));
 check("x label", svg.includes(">Subjects<"));
-check("mid ymax 120 (legend_y -0.24 → tick label row)", svg.includes("#E74C3C"));
+check("achieved colour present", svg.includes("#E74C3C"));
 check("strongest darker fill", svg.includes("#C0392B"));
 check("mid in-svg legend", svg.includes("Achieved Marks") && svg.includes("Class Topper"));
 check("zero bar gets no label (y-tick '0' is the only >0</text>)", (svg.match(/>0<\/text>/g) ?? []).length === 1);
-check("value labels present", svg.includes(">77.75<"));
+check("achieved value labels present", svg.includes(">77.75<"));
+check("class-avg / topper labels omitted (print collision fix)", !svg.includes(">70<") && !svg.includes(">90<"));
+// Intra-group gap: the first blue bar must start strictly right of the first
+// red bar's right edge (bars in a group no longer touch).
+{
+  const rectRe = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)"[^>]*fill="#(E74C3C|3498DB)"/g;
+  const red = rectRe.exec(svg);
+  const blue = rectRe.exec(svg);
+  check(
+    "intra-group gap between bars",
+    !!red && !!blue && Number(blue[1]) > Number(red[1]) + Number(red[2]) + 0.5,
+    red && blue ? `gap=${(Number(blue[1]) - (Number(red[1]) + Number(red[2]))).toFixed(1)}px` : "",
+  );
+}
 
 const imgT = generateChartImage(s, "terminal");
 const svgT = decodeURIComponent(imgT!);
