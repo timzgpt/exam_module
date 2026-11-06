@@ -797,7 +797,7 @@ export function workloadFor(
 
 export function validateItem(
   data: AcademicAdminData,
-  draft: Pick<AcademicItem, "name" | "code" | "type" | "sections">,
+  draft: Pick<AcademicItem, "name" | "code" | "type" | "sections" | "category">,
   editingId?: string,
 ): string[] {
   const errors: string[] = [];

@@ -203,7 +203,13 @@ export const useAcademicAdminStore = create<AcademicAdminState>()(
         const merged = { ...existing, ...patch };
         const errors = validateItem(
           data,
-          { name: merged.name, code: merged.code, type: merged.type, sections: merged.sections },
+          {
+            name: merged.name,
+            code: merged.code,
+            type: merged.type,
+            sections: merged.sections,
+            category: merged.category,
+          },
           id,
         );
         if (errors.length > 0) return { ok: false, error: errors.join(" ") };
