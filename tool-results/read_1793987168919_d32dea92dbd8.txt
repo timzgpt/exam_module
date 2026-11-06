@@ -1,0 +1,973 @@
+     1→     1→import {
+     2→     2→  allClasses,
+     3→     3→  classSubjectsFor,
+     4→     4→  classById,
+     5→     5→  classes,
+     6→     6→  eligibleStudentsFor,
+     7→     7→  isPrimaryClass,
+     8→     8→  studentsInClass,
+     9→     9→  subjectById,
+    10→    10→  subjectTeacherOf,
+    11→    11→  subjects,
+    12→    12→  teacherById,
+    13→    13→} from "./demo-data";
+    14→    14→import {
+    15→    15→  BABY_A_AREAS,
+    16→    16→  KG1_AREAS,
+    17→    17→  KG2_AREAS,
+    18→    18→  KG3_TERMINAL_AREAS,
+    19→    19→  nurseryClasses,
+    20→    20→  nurseryStudents,
+    21→    21→} from "./nursery";
+    22→    22→import type { ClassSubject, SchoolSection, Student } from "./types";
+    23→    23→
+    24→    24→export type { SchoolSection };
+    25→    25→
+    26→    26→/* ================================================================
+    27→    27→ * Academic Administration — data model (module task §10)
+    28→    28→ * ================================================================
+    29→    29→ * The app has no server database yet: every module (report templates,
+    30→    30→ * nursery assessments, viewer roles) persists its own relational records
+    31→    31→ * in a zustand `persist` slice. This module follows the same pattern and
+    32→    32→ * implements the logical entities from task §10 as FIRST-CLASS RELATIONAL
+    33→    33→ * RECORDS (never comma-separated strings / JSON arrays):
+    34→    34→ *
+    35→    35→ *   academic_items               → AcademicItem
+    36→    36→ *   curricula + curriculum_items → Curriculum (items embedded, versioned)
+    37→    37→ *   class_curricula              → ClassCurriculumAdoption (key classId|year)
+    38→    38→ *   teacher_item_assignments     → TeacherItemAssignment (history kept)
+    39→    39→ *   subject_combinations         → SubjectCombination (+ item ids)
+    40→    40→ *   student_subject_registrations→ StudentSubjectRegistration (one row each)
+    41→    41→ *   assessment_configurations    → CurriculumItem.assessment + overrides
+    42→    42→ *   academic_years/terms         → AcademicYearDef
+    43→    43→ *   audit trail                  → AuditEntry
+    44→    44→ *
+    45→    45→ * SEEDING GUARANTEE: buildSeedAcademicState() derives every record from the
+    46→    46→ * existing demo data (subjects, classSubjectsFor, subjectTeacherOf,
+    47→    47→ * isEnrolledIn, nursery areas) deterministically. With the seed intact the
+    48→    48→ * effective* helpers below return EXACTLY what classSubjectsFor /
+    49→    49→ * eligibleStudentsFor / subjectTeacherOf return today, so marks entry,
+    50→    50→ * report cards and analytics behave identically until an administrator
+    51→    51→ * edits something.
+    52→    52→ * ================================================================ */
+    53→    53→
+    54→    54→export type AcademicItemType = "subject" | "learning-area";
+    55→    55→export type AcademicItemStatus = "active" | "inactive";
+    56→    56→export type CurriculumClassification = "core" | "optional";
+    57→    57→export type CurriculumStatus = "draft" | "published";
+    58→    58→export type RegistrationSource =
+    59→    59→  | "auto-core"
+    60→    60→  | "auto-area"
+    61→    61→  | "individual"
+    62→    62→  | "combination"
+    63→    63→  | "bulk";
+    64→    64→export type RegistrationMode = "individual" | "combinations" | "both";
+    65→    65→export type AssignmentRole = "subject-teacher" | "class-teacher";
+    66→    66→export type AssignmentStatus = "assigned" | "pending";
+    67→    67→
+    68→    68→export interface AcademicItem {
+    69→    69→  id: string;
+    70→    70→  name: string;
+    71→    71→  /** Unique within the catalogue (validated on register/edit). */
+    72→    72→  code: string;
+    73→    73→  type: AcademicItemType;
+    74→    74→  category: string;
+    75→    75→  description: string;
+    76→    76→  sections: SchoolSection[];
+    77→    77→  status: AcademicItemStatus;
+    78→    78→  createdAt: string;
+    79→    79→  updatedAt: string;
+    80→    80→}
+    81→    81→
+    82→    82→export interface CurriculumAssessment {
+    83→    83→  caMarks: number;
+    84→    84→  examMarks: number;
+    85→    85→  fullMarks: number;
+    86→    86→  /** Early Years: developmental assessment model instead of marks. */
+    87→    87→  developmentalModel: string[] | null;
+    88→    88→}
+    89→    89→
+    90→    90→export interface CurriculumItem {
+    91→    91→  itemId: string;
+    92→    92→  classification: CurriculumClassification;
+    93→    93→  /** 1-based display order within the curriculum (report-card / grid order). */
+    94→    94→  order: number;
+    95→    95→  periodsPerWeek: number;
+    96→    96→  examPapers: 1 | 2;
+    97→    97→  chartLabel: string;
+    98→    98→  assessment: CurriculumAssessment;
+    99→    99→}
+   100→   100→
+   101→   101→export interface Curriculum {
+   102→   102→  id: string;
+   103→   103→  name: string;
+   104→   104→  section: SchoolSection;
+   105→   105→  /** Class level the curriculum applies to, e.g. "Form 1", "Standard 5", "KG2". */
+   106→   106→  level: string;
+   107→   107→  academicYear: string;
+   108→   108→  items: CurriculumItem[];
+   109→   109→  version: number;
+   110→   110→  status: CurriculumStatus;
+   111→   111→  updatedAt: string;
+   112→   112→}
+   113→   113→
+   114→   114→/** One class stream adopting a curriculum for one academic year. */
+   115→   115→export interface ClassCurriculumAdoption {
+   116→   116→  classId: string;
+   117→   117→  academicYear: string;
+   118→   118→  curriculumId: string;
+   119→   119→  status: CurriculumStatus;
+   120→   120→  publishedAt: string | null;
+   121→   121→}
+   122→   122→
+   123→   123→export interface TeacherItemAssignment {
+   124→   124→  id: string;
+   125→   125→  teacherId: string;
+   126→   126→  classId: string;
+   127→   127→  itemId: string;
+   128→   128→  academicYear: string;
+   129→   129→  role: AssignmentRole;
+   130→   130→  status: AssignmentStatus;
+   131→   131→  assignedAt: string;
+   132→   132→  /** Set when reassigned — the previous row is kept for history. */
+   133→   133→  endsAt: string | null;
+   134→   134→}
+   135→   135→
+   136→   136→export interface SubjectCombination {
+   137→   137→  id: string;
+   138→   138→  name: string;
+   139→   139→  code: string;
+   140→   140→  /** Form level the combination is offered at, e.g. "Form 1". */
+   141→   141→  level: string;
+   142→   142→  itemIds: string[];
+   143→   143→  minSelections: number | null;
+   144→   144→  maxSelections: number | null;
+   145→   145→  status: AcademicItemStatus;
+   146→   146→}
+   147→   147→
+   148→   148→export interface StudentSubjectRegistration {
+   149→   149→  id: string;
+   150→   150→  studentId: string;
+   151→   151→  classId: string;
+   152→   152→  itemId: string;
+   153→   153→  academicYear: string;
+   154→   154→  classification: CurriculumClassification;
+   155→   155→  source: RegistrationSource;
+   156→   156→  combinationId: string | null;
+   157→   157→  /** Dropping keeps the row (history) — only `status` changes. */
+   158→   158→  status: "active" | "dropped";
+   159→   159→  registeredAt: string;
+   160→   160→  droppedAt: string | null;
+   161→   161→}
+   162→   162→
+   163→   163→export interface AcademicYearDef {
+   164→   164→  year: string;
+   165→   165→  terms: string[];
+   166→   166→}
+   167→   167→
+   168→   168→export interface AuditEntry {
+   169→   169→  id: string;
+   170→   170→  at: string;
+   171→   171→  actor: string;
+   172→   172→  action: string;
+   173→   173→  entity: string;
+   174→   174→  entityId: string;
+   175→   175→  detail: string;
+   176→   176→}
+   177→   177→
+   178→   178→export interface AcademicAdminData {
+   179→   179→  seedVersion: number;
+   180→   180→  items: AcademicItem[];
+   181→   181→  curricula: Curriculum[];
+   182→   182→  /** Key: `${classId}|${academicYear}`. */
+   183→   183→  adoptions: Record<string, ClassCurriculumAdoption>;
+   184→   184→  assignments: TeacherItemAssignment[];
+   185→   185→  combinations: SubjectCombination[];
+   186→   186→  registrations: StudentSubjectRegistration[];
+   187→   187→  /** Key: `${classId}|${academicYear}`. */
+   188→   188→  registrationModes: Record<string, RegistrationMode>;
+   189→   189→  /** Key: `${classId}|${itemId}` — per class-item assessment override. */
+   190→   190→  assessmentOverrides: Record<
+   191→   191→    string,
+   192→   192→    { caMarks: number; examMarks: number; fullMarks: number }
+   193→   193→  >;
+   194→   194→  years: AcademicYearDef[];
+   195→   195→  audit: AuditEntry[];
+   196→   196→}
+   197→   197→
+   198→   198→export const ACADEMIC_SEED_VERSION = 1;
+   199→   199→const NOW = "2026-01-15T08:00:00.000Z";
+   200→   200→
+   201→   201→/* ================================================================
+   202→   202→ * Seed
+   203→   203→ * ================================================================ */
+   204→   204→
+   205→   205→const EARLY_YEARS_AREA_SOURCES = [
+   206→   206→  BABY_A_AREAS,
+   207→   207→  KG1_AREAS,
+   208→   208→  KG2_AREAS,
+   209→   209→  KG3_TERMINAL_AREAS,
+   210→   210→];
+   211→   211→
+   212→   212→/** Nursery template area names → catalogue learning areas (registered once). */
+   213→   213→function seedLearningAreaItems(): AcademicItem[] {
+   214→   214→  const seen = new Map<string, AcademicItem>();
+   215→   215→  const usedCodes = new Set<string>([
+   216→   216→    ...subjects.map((s) => s.code.toUpperCase()),
+   217→   217→  ]);
+   218→   218→  const order = [
+   219→   219→    "Physical Development",
+   220→   220→    "Language Development",
+   221→   221→    "Social and Emotional Development",
+   222→   222→    "Cognitive Development",
+   223→   223→    "Kindergarten Arithmetic",
+   224→   224→    "Early Language & Communication",
+   225→   225→    "Creative Arts and Sensory Play",
+   226→   226→    "Social Skills",
+   227→   227→    "Pre-Early Language & Communication",
+   228→   228→    "Early Lifeskills (Relations)",
+   229→   229→    "Creative Art & Sensory Play",
+   230→   230→    "Social & Developmental Learning Skills",
+   231→   231→    "Early Numeracy",
+   232→   232→    "Sports, Arts & Crafts",
+   233→   233→    "Health & Environmental Care",
+   234→   234→    "Culture & Religion",
+   235→   235→  ];
+   236→   236→  for (const areas of EARLY_YEARS_AREA_SOURCES) {
+   237→   237→    for (const a of areas) {
+   238→   238→      if (seen.has(a.name)) continue;
+   239→   239→      let code = laCode(a.name);
+   240→   240→      let n = 2;
+   241→   241→      while (usedCodes.has(code)) code = `${laCode(a.name)}-${n++}`;
+   242→   242→      usedCodes.add(code);
+   243→   243→      seen.set(a.name, {
+   244→   244→        id: `item-la-${a.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`,
+   245→   245→        name: a.name,
+   246→   246→        code,
+   247→   247→        type: "learning-area",
+   248→   248→        category: learningAreaCategory(a.name),
+   249→   249→        description: `Early Years developmental learning area (curriculum structure from the school's report templates).`,
+   250→   250→        sections: ["Early Years"],
+   251→   251→        status: "active",
+   252→   252→        createdAt: NOW,
+   253→   253→        updatedAt: NOW,
+   254→   254→      });
+   255→   255→    }
+   256→   256→  }
+   257→   257→  // Keep a stable, human-friendly order in the catalogue table.
+   258→   258→  return [...seen.values()].sort(
+   259→   259→    (a, b) =>
+   260→   260→      order.indexOf(a.name) - order.indexOf(b.name) || a.name.localeCompare(b.name),
+   261→   261→  );
+   262→   262→}
+   263→   263→
+   264→   264→function laCode(name: string): string {
+   265→   265→  const words = name.replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean);
+   266→   266→  return words.map((w) => w.slice(0, 3).toUpperCase()).join("").slice(0, 6);
+   267→   267→}
+   268→   268→
+   269→   269→function learningAreaCategory(name: string): string {
+   270→   270→  const n = name.toLowerCase();
+   271→   271→  if (n.includes("numer") || n.includes("arithmetic")) return "Numeracy";
+   272→   272→  if (n.includes("language") || n.includes("communication")) return "Communication";
+   273→   273→  if (n.includes("physical") || n.includes("sports") || n.includes("health"))
+   274→   274→    return "Physical & Health";
+   275→   275→  if (n.includes("creativ") || n.includes("art") || n.includes("culture"))
+   276→   276→    return "Creative & Culture";
+   277→   277→  return "Developmental";
+   278→   278→}
+   279→   279→
+   280→   280→function seedSubjectItems(): AcademicItem[] {
+   281→   281→  return subjects.map((s) => ({
+   282→   282→    id: `item-${s.id}`,
+   283→   283→    name: s.name,
+   284→   284→    code: s.code,
+   285→   285→    type: "subject" as const,
+   286→   286→    category: s.department,
+   287→   287→    description: `${s.name} (${s.code}) — ${s.department} department.`,
+   288→   288→    sections: isPrimarySubject(s.id) ? ["Primary", "Secondary"] : ["Secondary"],
+   289→   289→    status: "active" as const,
+   290→   290→    createdAt: NOW,
+   291→   291→    updatedAt: NOW,
+   292→   292→  }));
+   293→   293→}
+   294→   294→
+   295→   295→/** In the demo every subject runs in both sections (s9 subsidiary opt-in). */
+   296→   296→function isPrimarySubject(_subjectId: string): boolean {
+   297→   297→  return true;
+   298→   298→}
+   299→   299→
+   300→   300→export function buildSeedAcademicState(): AcademicAdminData {
+   301→   301→  const items = [...seedSubjectItems(), ...seedLearningAreaItems()];
+   302→   302→  const itemBySubjectId = (sid: string) => `item-${sid}`;
+   303→   303→  const year = "2026";
+   304→   304→  const terms = ["Term 1", "Term 2", "Term 3"];
+   305→   305→
+   306→   306→  /* ── Curricula: one per class level, items copied from demo allocation ── */
+   307→   307→  const curricula: Curriculum[] = [];
+   308→   308→
+   309→   309→  const subjectCurriculumForLevel = (
+   310→   310→    id: string,
+   311→   311→    name: string,
+   312→   312→    section: SchoolSection,
+   313→   313→    level: string,
+   314→   314→  ): Curriculum => ({
+   315→   315→    id,
+   316→   316→    name,
+   317→   317→    section,
+   318→   318→    level,
+   319→   319→    academicYear: year,
+   320→   320→    version: 1,
+   321→   321→    status: "published",
+   322→   322→    updatedAt: NOW,
+   323→   323→    items: classSubjectsFor("cls-1a").map((cs, i) => {
+   324→   324→      const sub = subjectById(cs.subjectId)!;
+   325→   325→      const optional = cs.type === "subsidiary";
+   326→   326→      return {
+   327→   327→        itemId: itemBySubjectId(cs.subjectId),
+   328→   328→        classification: optional ? "optional" : "core",
+   329→   329→        order: i + 1,
+   330→   330→        periodsPerWeek: cs.periodsPerWeek,
+   331→   331→        examPapers: cs.examPapers,
+   332→   332→        chartLabel: sub.code,
+   333→   333→        assessment: {
+   334→   334→          caMarks: cs.caMarks,
+   335→   335→          examMarks: cs.examMarks,
+   336→   336→          fullMarks: cs.fullMarks,
+   337→   337→          developmentalModel: null,
+   338→   338→        },
+   339→   339→      };
+   340→   340→    }),
+   341→   341→  });
+   342→   342→
+   343→   343→  curricula.push(
+   344→   344→    subjectCurriculumForLevel(
+   345→   345→      "cur-primary-standard-5",
+   346→   346→      "Primary curriculum — Standard 5",
+   347→   347→      "Primary",
+   348→   348→      "Standard 5",
+   349→   349→    ),
+   350→   350→  );
+   351→   351→  for (const f of ["Form 1", "Form 2", "Form 3", "Form 4"]) {
+   352→   352→    curricula.push(
+   353→   353→      subjectCurriculumForLevel(
+   354→   354→        `cur-secondary-${f.toLowerCase().replace(" ", "-")}`,
+   355→   355→        `Secondary curriculum — ${f}`,
+   356→   356→        "Secondary",
+   357→   357→        f,
+   358→   358→      ),
+   359→   359→    );
+   360→   360→  }
+   361→   361→
+   362→   362→  const nurseryLevelAreas: [string, string, typeof BABY_A_AREAS][] = [
+   363→   363→    ["Baby Class", "cur-early-years-baby", BABY_A_AREAS],
+   364→   364→    ["KG1", "cur-early-years-kg1", KG1_AREAS],
+   365→   365→    ["KG2", "cur-early-years-kg2", KG2_AREAS],
+   366→   366→    ["KG3", "cur-early-years-kg3", KG3_TERMINAL_AREAS],
+   367→   367→  ];
+   368→   368→  for (const [level, id, areas] of nurseryLevelAreas) {
+   369→   369→    curricula.push({
+   370→   370→      id,
+   371→   371→      name: `Early Years curriculum — ${level}`,
+   372→   372→      section: "Early Years",
+   373→   373→      level,
+   374→   374→      academicYear: year,
+   375→   375→      version: 1,
+   376→   376→      status: "published",
+   377→   377→      updatedAt: NOW,
+   378→   378→      items: areas.map((a, i) => {
+   379→   379→        const item = items.find((it) => it.name === a.name)!;
+   380→   380→        return {
+   381→   381→          itemId: item.id,
+   382→   382→          classification: "core" as const,
+   383→   383→          order: i + 1,
+   384→   384→          periodsPerWeek: 5,
+   385→   385→          examPapers: 1 as const,
+   386→   386→          chartLabel: laCode(a.name),
+   387→   387→          assessment: {
+   388→   388→            caMarks: 0,
+   389→   389→            examMarks: 0,
+   390→   390→            fullMarks: 0,
+   391→   391→            developmentalModel: [
+   392→   392→              "Emerging",
+   393→   393→              "Developing",
+   394→   394→              "Achieved",
+   395→   395→              "Exceeding Expectations",
+   396→   396→            ],
+   397→   397→          },
+   398→   398→        };
+   399→   399→      }),
+   400→   400→    });
+   401→   401→  }
+   402→   402→
+   403→   403→  /* ── Adoptions: every existing class adopts its level curriculum ── */
+   404→   404→  const adoptions: Record<string, ClassCurriculumAdoption> = {};
+   405→   405→  for (const cls of allClasses) {
+   406→   406→    const curriculum = curricula.find(
+   407→   407→      (c) => c.level === cls.level && c.academicYear === year,
+   408→   408→    );
+   409→   409→    if (!curriculum) continue;
+   410→   410→    adoptions[`${cls.id}|${year}`] = {
+   411→   411→      classId: cls.id,
+   412→   412→      academicYear: year,
+   413→   413→      curriculumId: curriculum.id,
+   414→   414→      status: "published",
+   415→   415→      publishedAt: NOW,
+   416→   416→    };
+   417→   417→  }
+   418→   418→
+   419→   419→  /* ── Teacher assignments: mirror demo subjectTeacherOf per class ── */
+   420→   420→  const assignments: TeacherItemAssignment[] = [];
+   421→   421→  for (const cls of classes) {
+   422→   422→    for (const cs of classSubjectsFor(cls.id)) {
+   423→   423→      const teacher =
+   424→   424→        subjectTeacherOf(cs.subjectId, cls.id) ?? teacherById(cls.classTeacherId);
+   425→   425→      if (!teacher) continue;
+   426→   426→      assignments.push({
+   427→   427→        id: `ta-${cls.id}-${cs.subjectId}`,
+   428→   428→        teacherId: teacher.id,
+   429→   429→        classId: cls.id,
+   430→   430→        itemId: itemBySubjectId(cs.subjectId),
+   431→   431→        academicYear: year,
+   432→   432→        role: "subject-teacher",
+   433→   433→        status: "assigned",
+   434→   434→        assignedAt: NOW,
+   435→   435→        endsAt: null,
+   436→   436→      });
+   437→   437→    }
+   438→   438→  }
+   439→   439→  for (const cls of nurseryClasses) {
+   440→   440→    const curriculum = curricula.find((c) => c.level === cls.level);
+   441→   441→    for (const ci of curriculum?.items ?? []) {
+   442→   442→      assignments.push({
+   443→   443→        id: `ta-${cls.id}-${ci.itemId}`,
+   444→   444→        teacherId: cls.classTeacherId,
+   445→   445→        classId: cls.id,
+   446→   446→        itemId: ci.itemId,
+   447→   447→        academicYear: year,
+   448→   448→        role: "class-teacher",
+   449→   449→        status: "assigned",
+   450→   450→        assignedAt: NOW,
+   451→   451→        endsAt: null,
+   452→   452→      });
+   453→   453→    }
+   454→   454→  }
+   455→   455→
+   456→   456→  /* ── Registrations: mirror demo eligibility exactly ── */
+   457→   457→  const registrations: StudentSubjectRegistration[] = [];
+   458→   458→  const register = (
+   459→   459→    student: Student,
+   460→   460→    itemId: string,
+   461→   461→    classification: CurriculumClassification,
+   462→   462→    source: RegistrationSource,
+   463→   463→  ) =>
+   464→   464→    registrations.push({
+   465→   465→      id: `reg-${student.classId}-${student.id}-${itemId}`,
+   466→   466→      studentId: student.id,
+   467→   467→      classId: student.classId,
+   468→   468→      itemId,
+   469→   469→      academicYear: year,
+   470→   470→      classification,
+   471→   471→      source,
+   472→   472→      combinationId: null,
+   473→   473→      status: "active",
+   474→   474→      registeredAt: NOW,
+   475→   475→      droppedAt: null,
+   476→   476→    });
+   477→   477→
+   478→   478→  for (const cls of classes) {
+   479→   479→    const curriculum = curricula.find((c) => c.level === cls.level);
+   480→   480→    for (const student of studentsInClass(cls.id)) {
+   481→   481→      for (const ci of curriculum?.items ?? []) {
+   482→   482→        const subjectId = ci.itemId.replace("item-", "");
+   483→   483→        if (ci.classification === "core") {
+   484→   484→          register(student, ci.itemId, "core", "auto-core");
+   485→   485→        } else if (eligibleStudentsFor(cls.id, subjectId).some((s) => s.id === student.id)) {
+   486→   486→          // Seed mirrors isEnrolledIn so the demo behaves identically.
+   487→   487→          register(student, ci.itemId, "optional", "individual");
+   488→   488→        }
+   489→   489→      }
+   490→   490→    }
+   491→   491→  }
+   492→   492→  for (const cls of nurseryClasses) {
+   493→   493→    const curriculum = curricula.find((c) => c.level === cls.level);
+   494→   494→    for (const student of nurseryStudents.filter((s) => s.classId === cls.id)) {
+   495→   495→      for (const ci of curriculum?.items ?? []) {
+   496→   496→        register(student, ci.itemId, "core", "auto-area");
+   497→   497→      }
+   498→   498→    }
+   499→   499→  }
+   500→   500→
+   501→   501→  /* ── Combinations (school-configured, editable examples) ── */
+   502→   502→  const optionalItem = (sid: string) => itemBySubjectId(sid);
+   503→   503→  const combinations: SubjectCombination[] = [
+   504→   504→    {
+   505→   505→      id: "combo-science",
+   506→   506→      name: "Combination A — Science",
+   507→   507→      code: "SCI",
+   508→   508→      level: "Form 1",
+   509→   509→      itemIds: [
+   510→   510→        optionalItem("s4"),
+   511→   511→        optionalItem("s5"),
+   512→   512→        optionalItem("s6"),
+   513→   513→      ],
+   514→   514→      minSelections: 2,
+   515→   515→      maxSelections: 3,
+   516→   516→      status: "active",
+   517→   517→    },
+   518→   518→    {
+   519→   519→      id: "combo-humanities",
+   520→   520→      name: "Combination B — Humanities",
+   521→   521→      code: "HUM",
+   522→   522→      level: "Form 1",
+   523→   523→      itemIds: [
+   524→   524→        optionalItem("s7"),
+   525→   525→        optionalItem("s8"),
+   526→   526→        optionalItem("s9"),
+   527→   527→      ],
+   528→   528→      minSelections: 2,
+   529→   529→      maxSelections: 3,
+   530→   530→      status: "active",
+   531→   531→    },
+   532→   532→    {
+   533→   533→      id: "combo-mixed",
+   534→   534→      name: "Combination C — Mixed",
+   535→   535→      code: "MIX",
+   536→   536→      level: "Form 1",
+   537→   537→      itemIds: [
+   538→   538→        optionalItem("s4"),
+   539→   539→        optionalItem("s7"),
+   540→   540→        optionalItem("s9"),
+   541→   541→      ],
+   542→   542→      minSelections: 2,
+   543→   543→      maxSelections: 3,
+   544→   544→      status: "active",
+   545→   545→    },
+   546→   546→  ];
+   547→   547→
+   548→   548→  const registrationModes: Record<string, RegistrationMode> = {};
+   549→   549→  for (const cls of allClasses) {
+   550→   550→    registrationModes[`${cls.id}|${year}`] =
+   551→   551→      cls.level.startsWith("Form") ? "both" : "individual";
+   552→   552→  }
+   553→   553→
+   554→   554→  return {
+   555→   555→    seedVersion: ACADEMIC_SEED_VERSION,
+   556→   556→    items,
+   557→   557→    curricula,
+   558→   558→    adoptions,
+   559→   559→    assignments,
+   560→   560→    combinations,
+   561→   561→    registrations,
+   562→   562→    registrationModes,
+   563→   563→    assessmentOverrides: {},
+   564→   564→    years: [{ year, terms }],
+   565→   565→    audit: [
+   566→   566→      {
+   567→   567→        id: "audit-seed",
+   568→   568→        at: NOW,
+   569→   569→        actor: "system",
+   570→   570→        action: "seed",
+   571→   571→        entity: "module",
+   572→   572→        entityId: "academic-admin",
+   573→   573→        detail:
+   574→   574→          "Catalogue, curricula, adoptions, teacher assignments and registrations seeded from the school's existing allocation.",
+   575→   575→      },
+   576→   576→    ],
+   577→   577→  };
+   578→   578→}
+   579→   579→
+   580→   580→/* ================================================================
+   581→   581→ * Pure helpers — everything the pages and integrations need.
+   582→   582→ * All take data slices explicitly so they are unit-testable (bun).
+   583→   583→ * ================================================================ */
+   584→   584→
+   585→   585→export const adoptionKey = (classId: string, year: string) => `${classId}|${year}`;
+   586→   586→export const assessmentKey = (classId: string, itemId: string) => `${classId}|${itemId}`;
+   587→   587→
+   588→   588→export function itemById(
+   589→   589→  data: Pick<AcademicAdminData, "items">,
+   590→   590→  id: string,
+   591→   591→): AcademicItem | undefined {
+   592→   592→  return data.items.find((i) => i.id === id);
+   593→   593→}
+   594→   594→
+   595→   595→export function itemBySubject(data: AcademicAdminData, subjectId: string): AcademicItem | undefined {
+   596→   596→  return data.items.find((i) => i.id === `item-${subjectId}`);
+   597→   597→}
+   598→   598→
+   599→   599→/** Curriculum adopted by a class for an academic year (undefined = none). */
+   600→   600→export function adoptedCurriculum(
+   601→   601→  data: Pick<AcademicAdminData, "adoptions" | "curricula">,
+   602→   602→  classId: string,
+   603→   603→  year = "2026",
+   604→   604→): Curriculum | undefined {
+   605→   605→  const adoption = data.adoptions[adoptionKey(classId, year)];
+   606→   606→  return adoption ? data.curricula.find((c) => c.id === adoption.curriculumId) : undefined;
+   607→   607→}
+   608→   608→
+   609→   609→const DEMO_WEIGHTS = { caMarks: 25, examMarks: 75, fullMarks: 100 };
+   610→   610→
+   611→   611→/**
+   612→   612→ * Effective per-class subject allocation (report-card / marks-grid order)
+   613→   613→ * built from the adopted curriculum. Falls back to the demo allocation when
+   614→   614→ * the class has no adoption, so existing pipelines never break.
+   615→   615→ */
+   616→   616→export function effectiveClassSubjectsFor(
+   617→   617→  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "assessmentOverrides">,
+   618→   618→  classId: string,
+   619→   619→  year = "2026",
+   620→   620→): ClassSubject[] {
+   621→   621→  const curriculum = adoptedCurriculum(data, classId, year);
+   622→   622→  if (!curriculum) return classSubjectsFor(classId);
+   623→   623→  const cls = classById(classId);
+   624→   624→  return curriculum.items
+   625→   625→    .slice()
+   626→   626→    .sort((a, b) => a.order - b.order)
+   627→   627→    .map((ci): ClassSubject => {
+   628→   628→      const subject = subjectById(ci.itemId.replace("item-", ""));
+   629→   629→      const assignment = activeAssignmentFor(data, classId, ci.itemId);
+   630→   630→      const override = data.assessmentOverrides[assessmentKey(classId, ci.itemId)];
+   631→   631→      const ca = override?.caMarks ?? ci.assessment.caMarks;
+   632→   632→      const exam = override?.examMarks ?? ci.assessment.examMarks;
+   633→   633→      return {
+   634→   634→        subjectId: ci.itemId.replace("item-", ""),
+   635→   635→        classId,
+   636→   636→        type: ci.classification === "core" ? "core" : "subsidiary",
+   637→   637→        chartLabel: ci.chartLabel || subject?.code || "",
+   638→   638→        teacherId:
+   639→   639→          assignment?.teacherId ??
+   640→   640→          subjectTeacherOf(ci.itemId.replace("item-", ""), classId)?.id ??
+   641→   641→          cls?.classTeacherId ??
+   642→   642→          teacherById("")?.id ??
+   643→   643→          "",
+   644→   644→        periodsPerWeek: ci.periodsPerWeek,
+   645→   645→        examPapers: ci.examPapers,
+   646→   646→        caMarks: ca,
+   647→   647→        examMarks: exam,
+   648→   648→        fullMarks: override?.fullMarks ?? (ca + exam || ci.assessment.fullMarks),
+   649→   649→      };
+   650→   650→    });
+   651→   651→}
+   652→   652→
+   653→   653→/** Active teacher assignment for one class + item (latest wins). */
+   654→   654→export function activeAssignmentFor(
+   655→   655→  data: Pick<AcademicAdminData, "assignments">,
+   656→   656→  classId: string,
+   657→   657→  itemId: string,
+   658→   658→  year = "2026",
+   659→   659→): TeacherItemAssignment | undefined {
+   660→   660→  const rows = data.assignments.filter(
+   661→   661→    (a) =>
+   662→   662→      a.classId === classId &&
+   663→   663→      a.itemId === itemId &&
+   664→   664→      a.status === "assigned" &&
+   665→   665→      a.endsAt === null &&
+   666→   666→      a.academicYear === year,
+   667→   667→  );
+   668→   668→  return rows.sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))[0];
+   669→   669→}
+   670→   670→
+   671→   671→/**
+   672→   672→ * Subject ids the viewer may enter marks for in a class (task §12/§13).
+   673→   673→ * When the academic store holds teacher assignments for the class they are
+   674→   674→ * authoritative and the scoping is strict: a subject teacher with no active
+   675→   675→ * assignment rows in a configured class sees NOTHING there. Classes without
+   676→   676→ * any assignment rows fall back to the legacy demo derivation so the app
+   677→   677→ * keeps working if configuration is reset.
+   678→   678→ */
+   679→   679→export function effectiveAssignedSubjectIds(
+   680→   680→  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "assessmentOverrides">,
+   681→   681→  viewer: { role: string; teacherId: string | null },
+   682→   682→  classId: string,
+   683→   683→): string[] {
+   684→   684→  const all = effectiveClassSubjectsFor(data, classId).map((cs) => cs.subjectId);
+   685→   685→  if (viewer.role !== "subject-teacher" || !viewer.teacherId) return all;
+   686→   686→  const classConfigured = data.assignments.some(
+   687→   687→    (a) => a.classId === classId && a.academicYear === "2026",
+   688→   688→  );
+   689→   689→  if (!classConfigured) {
+   690→   690→    return all.filter((sid) => subjectTeacherOf(sid, classId)?.id === viewer.teacherId);
+   691→   691→  }
+   692→   692→  const mine = data.assignments.filter(
+   693→   693→    (a) =>
+   694→   694→      a.classId === classId &&
+   695→   695→      a.teacherId === viewer.teacherId &&
+   696→   696→      a.status === "assigned" &&
+   697→   697→      a.endsAt === null &&
+   698→   698→      a.academicYear === "2026",
+   699→   699→  );
+   700→   700→  const mineItems = new Set(mine.map((a) => a.itemId));
+   701→   701→  return all.filter((sid) => mineItems.has(`item-${sid}`));
+   702→   702→}
+   703→   703→
+   704→   704→/**
+   705→   705→ * Students actively registered for a class item. Returns null when the
+   706→   706→ * class has no registration records yet (caller falls back to demo
+   707→   707→ * eligibility).
+   708→   708→ */
+   709→   709→export function registeredStudentsFor(
+   710→   710→  data: Pick<AcademicAdminData, "registrations">,
+   711→   711→  classId: string,
+   712→   712→  itemId: string,
+   713→   713→  year = "2026",
+   714→   714→): Student[] | null {
+   715→   715→  const rows = data.registrations.filter(
+   716→   716→    (r) => r.classId === classId && r.itemId === itemId && r.academicYear === year,
+   717→   717→  );
+   718→   718→  if (rows.length === 0) return null;
+   719→   719→  const active = new Set(rows.filter((r) => r.status === "active").map((r) => r.studentId));
+   720→   720→  return studentsInClass(classId).filter((s) => active.has(s.id));
+   721→   721→}
+   722→   722→
+   723→   723→export function registeredItemIdsForStudent(
+   724→   724→  data: Pick<AcademicAdminData, "registrations">,
+   725→   725→  classId: string,
+   726→   726→  studentId: string,
+   727→   727→  year = "2026",
+   728→   728→): string[] | null {
+   729→   729→  const rows = data.registrations.filter(
+   730→   730→    (r) => r.classId === classId && r.studentId === studentId && r.academicYear === year,
+   731→   731→  );
+   732→   732→  if (rows.length === 0) return null;
+   733→   733→  return rows.filter((r) => r.status === "active").map((r) => r.itemId);
+   734→   734→}
+   735→   735→
+   736→   736→/** Whether an item can be removed from a class allocation (no history). */
+   737→   737→export function itemHasHistory(
+   738→   738→  data: AcademicAdminData,
+   739→   739→  itemId: string,
+   740→   740→  classId?: string,
+   741→   741→): boolean {
+   742→   742→  const inRegistrations = data.registrations.some(
+   743→   743→    (r) => r.itemId === itemId && (!classId || r.classId === classId),
+   744→   744→  );
+   745→   745→  const inAssignments = data.assignments.some(
+   746→   746→    (a) => a.itemId === itemId && (!classId || a.classId === classId),
+   747→   747→  );
+   748→   748→  return inRegistrations || inAssignments;
+   749→   749→}
+   750→   750→
+   751→   751→export interface ItemUsage {
+   752→   752→  curricula: Curriculum[];
+   753→   753→  adoptions: { classId: string; curriculumId: string }[];
+   754→   754→  registrations: number;
+   755→   755→  assignments: number;
+   756→   756→}
+   757→   757→
+   758→   758→export function itemUsage(
+   759→   759→  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "registrations">,
+   760→   760→  itemId: string,
+   761→   761→): ItemUsage {
+   762→   762→  return {
+   763→   763→    curricula: data.curricula.filter((c) => c.items.some((ci) => ci.itemId === itemId)),
+   764→   764→    adoptions: Object.values(data.adoptions)
+   765→   765→      .filter((a) => {
+   766→   766→        const c = data.curricula.find((x) => x.id === a.curriculumId);
+   767→   767→        return c?.items.some((ci) => ci.itemId === itemId);
+   768→   768→      })
+   769→   769→      .map((a) => ({ classId: a.classId, curriculumId: a.curriculumId })),
+   770→   770→    registrations: data.registrations.filter((r) => r.itemId === itemId && r.status === "active")
+   771→   771→      .length,
+   772→   772→    assignments: data.assignments.filter((a) => a.itemId === itemId && a.endsAt === null).length,
+   773→   773→  };
+   774→   774→}
+   775→   775→
+   776→   776→/** Teacher workload: distinct classes and items from active assignments. */
+   777→   777→export function workloadFor(
+   778→   778→  data: Pick<AcademicAdminData, "assignments" | "curricula">,
+   779→   779→  teacherId: string,
+   780→   780→  year = "2026",
+   781→   781→): { classes: string[]; items: { itemId: string; classId: string }[]; periods: number } {
+   782→   782→  const rows = data.assignments.filter(
+   783→   783→    (a) => a.teacherId === teacherId && a.status === "assigned" && a.endsAt === null && a.academicYear === year,
+   784→   784→  );
+   785→   785→  const items = rows.map((a) => ({ itemId: a.itemId, classId: a.classId }));
+   786→   786→  let periods = 0;
+   787→   787→  for (const r of rows) {
+   788→   788→    const curriculum = data.curricula.find((c) =>
+   789→   789→      c.items.some((ci) => ci.itemId === r.itemId),
+   790→   790→    );
+   791→   791→    periods += curriculum?.items.find((ci) => ci.itemId === r.itemId)?.periodsPerWeek ?? 0;
+   792→   792→  }
+   793→   793→  return { classes: [...new Set(rows.map((a) => a.classId))], items, periods };
+   794→   794→}
+   795→   795→
+   796→   796→/* ── Catalogue validation ─────────────────────────────────────────── */
+   797→   797→
+   798→   798→export function validateItem(
+   799→   799→  data: AcademicAdminData,
+   800→   800→  draft: Pick<AcademicItem, "name" | "code" | "type" | "sections" | "category">,
+   801→   801→  editingId?: string,
+   802→   802→): string[] {
+   803→   803→  const errors: string[] = [];
+   804→   804→  if (!draft.name.trim()) errors.push("Name is required.");
+   805→   805→  if (!draft.code.trim()) errors.push("Code is required.");
+   806→   806→  if (!draft.category?.trim()) errors.push("Category is required.");
+   807→   807→  if (draft.sections.length === 0)
+   808→   808→    errors.push("Choose at least one applicable school section.");
+   809→   809→  const code = draft.code.trim().toUpperCase();
+   810→   810→  const clash = data.items.find(
+   811→   811→    (i) => i.code.toUpperCase() === code && i.id !== editingId,
+   812→   812→  );
+   813→   813→  if (clash) errors.push(`Code ${code} is already used by ${clash.name}.`);
+   814→   814→  const nameClash = data.items.find(
+   815→   815→    (i) => i.name.trim().toLowerCase() === draft.name.trim().toLowerCase() && i.id !== editingId,
+   816→   816→  );
+   817→   817→  if (nameClash) errors.push(`An item named "${nameClash.name}" already exists.`);
+   818→   818→  return errors;
+   819→   819→}
+   820→   820→
+   821→   821→/* ── Registration validation (task §5.C Step 4 / §8) ──────────────── */
+   822→   822→
+   823→   823→export interface RegistrationValidation {
+   824→   824→  errors: string[];
+   825→   825→  warnings: string[];
+   826→   826→}
+   827→   827→
+   828→   828→export function validateRegistration(
+   829→   829→  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "registrations" | "items" | "combinations" | "registrationModes">,
+   830→   830→  studentId: string,
+   831→   831→  classId: string,
+   832→   832→  optionalItemIds: string[],
+   833→   833→  combinationId: string | null = null,
+   834→   834→  year = "2026",
+   835→   835→): RegistrationValidation {
+   836→   836→  const errors: string[] = [];
+   837→   837→  const warnings: string[] = [];
+   838→   838→  const curriculum = adoptedCurriculum(data, classId, year);
+   839→   839→  if (!curriculum) {
+   840→   840→    errors.push("The class has no adopted curriculum.");
+   841→   841→    return { errors, warnings };
+   842→   842→  }
+   843→   843→  const optionalAvailable = curriculum.items.filter((ci) => ci.classification === "optional");
+   844→   844→  const availableIds = new Set(optionalAvailable.map((ci) => ci.itemId));
+   845→   845→  const active = new Set(
+   846→   846→    data.registrations
+   847→   847→      .filter(
+   848→   848→        (r) =>
+   849→   849→          r.classId === classId &&
+   850→   850→          r.studentId === studentId &&
+   851→   851→          r.academicYear === year &&
+   852→   852→          r.status === "active" &&
+   853→   853→          r.classification === "optional",
+   854→   854→      )
+   855→   855→      .map((r) => r.itemId),
+   856→   856→  );
+   857→   857→  const activeAny = new Set(
+   858→   858→    data.registrations
+   859→   859→      .filter(
+   860→   860→        (r) =>
+   861→   861→          r.classId === classId &&
+   862→   862→          r.studentId === studentId &&
+   863→   863→          r.academicYear === year &&
+   864→   864→          r.status === "active",
+   865→   865→      )
+   866→   866→      .map((r) => r.itemId),
+   867→   867→  );
+   868→   868→  for (const id of optionalItemIds) {
+   869→   869→    if (!availableIds.has(id))
+   870→   870→      errors.push(`${itemById(data, id)?.name ?? id} is not offered by this class's curriculum.`);
+   871→   871→    if (activeAny.has(id))
+   872→   872→      errors.push(`${itemById(data, id)?.name ?? id} is already registered.`);
+   873→   873→  }
+   874→   874→  const total = [...active].length + optionalItemIds.filter((id) => !active.has(id)).length;
+   875→   875→  const mode = data.registrationModes[adoptionKey(classId, year)] ?? "individual";
+   876→   876→  if (combinationId) {
+   877→   877→    const combo = data.combinations.find((c) => c.id === combinationId);
+   878→   878→    if (!combo) errors.push("Selected combination not found.");
+   879→   879→    else {
+   880→   880→      if (combo.level !== curriculum.level)
+   881→   881→        errors.push(`${combo.name} is offered for ${combo.level}, not ${curriculum.level}.`);
+   882→   882→      for (const id of optionalItemIds)
+   883→   883→        if (!combo.itemIds.includes(id))
+   884→   884→          errors.push(
+   885→   885→            `${itemById(data, id)?.name ?? id} is not part of ${combo.name}.`,
+   886→   886→          );
+   887→   887→    }
+   888→   888→  }
+   889→   889→  if (mode !== "individual") {
+   890→   890→    const combo = data.combinations.find((c) => c.id === combinationId);
+   891→   891→    const min = combo?.minSelections ?? null;
+   892→   892→    const max = combo?.maxSelections ?? null;
+   893→   893→    if (min !== null && total < min)
+   894→   894→      errors.push(`At least ${min} optional subjects must be selected.`);
+   895→   895→    if (max !== null && total > max)
+   896→   896→      errors.push(`At most ${max} optional subjects may be selected.`);
+   897→   897→  }
+   898→   898→  return { errors, warnings };
+   899→   899→}
+   900→   900→
+   901→   901→/* ── Class configuration completeness (task §2 / §13) ─────────────── */
+   902→   902→
+   903→   903→export interface ClassCompleteness {
+   904→   904→  allocation: boolean;
+   905→   905→  teachers: boolean;
+   906→   906→  registrations: boolean;
+   907→   907→  assessment: boolean;
+   908→   908→  score: number; // 0-100
+   909→   909→}
+   910→   910→
+   911→   911→export function classCompleteness(
+   912→   912→  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "registrations" | "items">,
+   913→   913→  classId: string,
+   914→   914→  year = "2026",
+   915→   915→): ClassCompleteness {
+   916→   916→  const curriculum = adoptedCurriculum(data, classId, year);
+   917→   917→  const allocation = !!curriculum;
+   918→   918→  const items = curriculum?.items ?? [];
+   919→   919→  const teachers =
+   920→   920→    items.length > 0 &&
+   921→   921→    items.every((ci) => activeAssignmentFor(data, classId, ci.itemId, year));
+   922→   922→  const students =
+   923→   923→    classById(classId) && !nurseryClasses.some((c) => c.id === classId)
+   924→   924→      ? studentsInClass(classId)
+   925→   925→      : nurseryStudents.filter((s) => s.classId === classId);
+   926→   926→  const registrations =
+   927→   927→    items.length > 0 &&
+   928→   928→    students.length > 0 &&
+   929→   929→    students.every((s) => {
+   930→   930→      const rows = data.registrations.filter(
+   931→   931→        (r) =>
+   932→   932→          r.classId === classId && r.studentId === s.id && r.academicYear === year && r.status === "active",
+   933→   933→      );
+   934→   934→      return rows.length > 0;
+   935→   935→    });
+   936→   936→  const assessment =
+   937→   937→    items.length > 0 &&
+   938→   938→    items.every(
+   939→   939→      (ci) =>
+   940→   940→        ci.assessment.developmentalModel !== null ||
+   941→   941→        ci.assessment.caMarks + ci.assessment.examMarks > 0,
+   942→   942→    );
+   943→   943→  const flags = [allocation, teachers, registrations, assessment];
+   944→   944→  const score = Math.round((flags.filter(Boolean).length / flags.length) * 100);
+   945→   945→  return { allocation, teachers, registrations, assessment, score };
+   946→   946→}
+   947→   947→
+   948→   948→/** Class levels per section, from the real class lists. */
+   949→   949→export function levelsForSection(section: SchoolSection): string[] {
+   950→   950→  if (section === "Early Years")
+   951→   951→    return [...new Set(nurseryClasses.map((c) => c.level))];
+   952→   952→  return [...new Set(classes.filter((c) => section === "Secondary" === c.level.startsWith("Form")).map((c) => c.level))];
+   953→   953→}
+   954→   954→
+   955→   955→/** Classes in a section, optionally filtered by level. */
+   956→   956→export function classesForSection(section: SchoolSection, level?: string) {
+   957→   957→  return allClasses.filter((c) => {
+   958→   958→    const isNursery = nurseryClasses.some((n) => n.id === c.id);
+   959→   959→    const belongs =
+   960→   960→      section === "Early Years"
+   961→   961→        ? isNursery
+   962→   962→        : !isNursery && (section === "Secondary") === c.level.startsWith("Form");
+   963→   963→    return belongs && (!level || c.level === level);
+   964→   964→  });
+   965→   965→}
+   966→   966→
+   967→   967→/** Sections an item serves (catalogue availability). */
+   968→   968→export function itemSectionLabel(item: AcademicItem): string {
+   969→   969→  return item.sections.join(" · ");
+   970→   970→}
+   971→   971→
+   972→   972→export const DEMO_ASSESSMENT = DEMO_WEIGHTS;
+   973→   973→
