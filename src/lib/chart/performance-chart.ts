@@ -9,10 +9,11 @@
  *    all in uniform colours. The strongest subject is called out by the
  *    ★ badge above the chart, NOT by a darker bar (per the school's
  *    reference chart of Nov 2025, which colours every achieved bar alike).
- *  - The student's achieved bar carries its bold value label above it; the
- *    Class Avg / Class Topper bars are visual references read against the
- *    y-axis and legend. Labelling all three made adjacent labels of
- *    similar-height bars collide into unreadable mush in print (Nov 2026).
+ *  - Every non-zero bar carries its value label above it — bold on the
+ *    student's achieved bar, smaller on the Class Avg / Class Topper bars.
+ *    Labels print as integers: 2-dp labels of adjacent similar-height bars
+ *    collided into unreadable mush in print (Nov 2026); exact marks remain
+ *    in the subject table above the chart.
  *  - Bars inside a group keep a fixed intra-group gap (they used to touch
  *    edge-to-edge, which read as one fat block).
  *  - Subjects without a total are excluded (same rule as the table).
@@ -250,7 +251,8 @@ interface Layout {
   ymax: number;
   rotation: number;
   tickFs: number; // pt
-  achievedFs: number; // pt (achieved-bar value labels)
+  achievedFs: number; // pt (achieved-bar value labels, bold)
+  statFs: number; // pt (class avg / class topper value labels)
   legendY: number | null; // axes-fraction below the axes; null → no in-SVG legend
 }
 
@@ -268,13 +270,14 @@ function midTermLayout(n: number): Layout {
     right: 0.98,
     top: 0.95, // no in-image title — the plot starts near the top edge
     bottom: rotation === 0 ? 0.2 : 0.26,
-    barW: 0.22, // fixed for all subject counts
+    barW: 0.24, // fixed for all subject counts
     barGap: 0.05,
     xPad: 0.55,
     ymax: 100, // reference chart: axis ends at 100, not 120
     rotation,
     tickFs: n <= 7 ? 10 : n <= 10 ? 9 : 8,
     achievedFs: n <= 8 ? 8.5 : 7.5,
+    statFs: n <= 8 ? 7.5 : 6.5,
     legendY: rotation === 0 ? -0.18 : -0.24,
   };
 }
@@ -289,13 +292,17 @@ function terminalLayout(n: number): Layout {
     right: 0.99,
     top: 0.95,
     bottom: 0.36,
-    barW: Math.min(0.22, Math.max(0.12, 0.65 / n)), // adaptive
+    // Wider bars (Nov 2026): the old 0.12 floor read skinny next to the
+    // intra-group gap; 0.18 floor + 0.8/n spread keeps 3 bars + gaps ≤ 0.64
+    // of the unit at any subject count.
+    barW: Math.min(0.22, Math.max(0.18, 0.8 / n)), // adaptive
     barGap: 0.05,
     xPad: 0.55,
     ymax: 100, // reference chart: axis ends at 100, not 115
     rotation: n > 6 ? 40 : 28,
     tickFs: n > 10 ? 6 : n > 7 ? 7 : 8,
-    achievedFs: 8,
+    achievedFs: 7.5,
+    statFs: 6.5,
     legendY: null, // Terminal renders its legend in HTML, not in the image
   };
 }
@@ -304,9 +311,13 @@ function terminalLayout(n: number): Layout {
  * SVG generation (prompt Sections 1, 2, 6, 7)
  * ================================================================ */
 
-/** Format a value label the way the card prints totals: 2 dp, trimmed. */
-function fmtValue(v: number): string {
-  return parseFloat(v.toFixed(2)).toString();
+/**
+ * Value labels print as integers: 2-dp labels of adjacent similar-height
+ * bars collided in print. Exact marks live in the subject table above the
+ * chart.
+ */
+function fmtInt(v: number): string {
+  return String(Math.round(v));
 }
 
 function esc(s: string): string {
@@ -371,16 +382,17 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
 
   // ---- Bars + value labels (3 grouped series per subject, prompt §2).
   //      Group geometry: bar width L.barW, gap L.barGap between adjacent
-  //      edges → centres step L.barW + L.barGap. Only the achieved bar is
-  //      labelled (see header note). ----
+  //      edges → centres step L.barW + L.barGap. Every non-zero bar is
+  //      labelled — bold on the achieved bar, smaller on the stats; integer
+  //      labels keep adjacent same-height labels collision-free. ----
   for (let i = 0; i < n; i++) {
     // Uniform red for EVERY achieved bar — the strongest subject is called
     // out by the ★ badge above the chart, not by a darker bar (reference).
     const step = L.barW + L.barGap;
-    const bars: { cx: number; v: number; fill: string; edge: string; label: boolean }[] = [
-      { cx: i - step, v: achieved[i], fill: COLORS.achieved, edge: COLORS.achievedEdge, label: true },
-      { cx: i, v: avg[i], fill: COLORS.avg, edge: COLORS.avgEdge, label: false },
-      { cx: i + step, v: top[i], fill: COLORS.top, edge: COLORS.topEdge, label: false },
+    const bars: { cx: number; v: number; fill: string; edge: string; fs: number; bold: boolean }[] = [
+      { cx: i - step, v: achieved[i], fill: COLORS.achieved, edge: COLORS.achievedEdge, fs: L.achievedFs, bold: true },
+      { cx: i, v: avg[i], fill: COLORS.avg, edge: COLORS.avgEdge, fs: L.statFs, bold: false },
+      { cx: i + step, v: top[i], fill: COLORS.top, edge: COLORS.topEdge, fs: L.statFs, bold: false },
     ];
     for (const b of bars) {
       const x0 = X(b.cx - L.barW / 2);
@@ -392,13 +404,12 @@ export function generateChartImage(series: ChartSeries, variant: ChartVariant): 
           `width="${Math.max(0.5, x1 - x0).toFixed(1)}" height="${Math.max(0, y1 - y0).toFixed(1)}" ` +
           `fill="${b.fill}" stroke="${b.edge}" stroke-width="${barEdgeW.toFixed(1)}"/>`,
       );
-      // Only the achieved bar is labelled; bars with height 0 or less are
-      // skipped — no label printed above them.
-      if (b.label && b.v > 0) {
+      // Bars with height 0 or less are skipped — no label printed above them.
+      if (b.v > 0) {
         p.push(
           `<text x="${X(b.cx).toFixed(1)}" y="${Y(b.v + 1.5).toFixed(1)}" ` +
-            `font-size="${(L.achievedFs * PT).toFixed(1)}" font-weight="bold" ` +
-            `fill="${COLORS.label}" text-anchor="middle">${esc(fmtValue(b.v))}</text>`,
+            `font-size="${(b.fs * PT).toFixed(1)}"${b.bold ? ' font-weight="bold"' : ""} ` +
+            `fill="${COLORS.label}" text-anchor="middle">${esc(fmtInt(b.v))}</text>`,
         );
       }
     }

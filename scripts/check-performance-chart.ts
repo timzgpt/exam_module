@@ -64,8 +64,8 @@ check("achieved colour present", svg.includes("#E74C3C"));
 check("strongest darker fill", svg.includes("#C0392B"));
 check("mid in-svg legend", svg.includes("Achieved Marks") && svg.includes("Class Topper"));
 check("zero bar gets no label (y-tick '0' is the only >0</text>)", (svg.match(/>0<\/text>/g) ?? []).length === 1);
-check("achieved value labels present", svg.includes(">77.75<"));
-check("class-avg / topper labels omitted (print collision fix)", !svg.includes(">70<") && !svg.includes(">90<"));
+check("achieved value label present (integer, rounded)", svg.includes(">78<"));
+check("class-avg / topper labels present (all bars numbered)", svg.includes(">70<") && svg.includes(">90<"));
 // Intra-group gap: the first blue bar must start strictly right of the first
 // red bar's right edge (bars in a group no longer touch).
 {
