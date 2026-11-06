@@ -35,7 +35,7 @@ import {
   studentResultOf,
   studentsInClass,
   subjectById,
-  subjectRemark,
+  subjectComment,
   teacherById,
 } from "@/lib/demo-data";
 import {
@@ -231,7 +231,14 @@ export default function ReportCardPage() {
     const enrolled = comp?.enrolled ?? true;
     const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
     const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
-    return { subject, enrolled, mark, grade, ca: comp?.ca ?? null, exam: comp?.exam ?? null };
+    return {
+      subject,
+      enrolled,
+      mark,
+      grade,
+      ca: comp?.ca ?? null,
+      exam: comp?.exam ?? null,
+    };
   });
   // A subject with no mark at all (both components ABS/NA/NR/PENDING) is
   // omitted from the card entirely; non-enrolled subsidiaries stay with "—".
@@ -682,9 +689,10 @@ export default function ReportCardPage() {
                         )}
                       </td>
                     </tr>
-                    {/* Subject teacher's remark — terminal/annual cards only
+                    {/* Subject teacher's comment — terminal/annual cards only
                         (mid-term and monthly templates have no subject
-                        comments), printed without a caption. */}
+                        comments), three personalised sentences, printed
+                        without a caption. */}
                     {isTerminalLike ? (
                       <tr>
                         <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
@@ -692,7 +700,10 @@ export default function ReportCardPage() {
                             {!enrolled
                               ? "Not taking this subject."
                               : mark !== null
-                                ? subjectRemark(mark, scheme)
+                                ? subjectComment(student.id, subject.id, mark, scheme, {
+                                    ca,
+                                    exam,
+                                  })
                                 : "Not assessed."}
                           </span>
                         </td>

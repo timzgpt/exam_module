@@ -15,7 +15,7 @@ import {
   schemeForClass,
   studentResultOf,
   subjectById,
-  subjectRemark,
+  subjectComment,
   studentsInClass,
   targetFor,
   teacherById,
@@ -63,11 +63,16 @@ export function ProgressView({ child }: { child: Student }) {
 
   // Class-subject order (set on the Class subjects page); non-enrolled
   // subsidiaries stay in the list with "—".
-  const subjectRows = classSubjectsFor(child.classId).map((cs) => ({
-    sub: subjectById(cs.subjectId)!,
-    enrolled: getComponents(child.classId, cs.subjectId)[child.id]?.enrolled ?? true,
-    mark: result ? result.marks[cs.subjectId] ?? null : null,
-  }));
+  const subjectRows = classSubjectsFor(child.classId).map((cs) => {
+    const comp = getComponents(child.classId, cs.subjectId)[child.id];
+    return {
+      sub: subjectById(cs.subjectId)!,
+      enrolled: comp?.enrolled ?? true,
+      mark: result ? result.marks[cs.subjectId] ?? null : null,
+      ca: comp?.ca ?? null,
+      exam: comp?.exam ?? null,
+    };
+  });
 
   const marked = subjectRows
     .filter((row) => row.mark !== null)
@@ -126,7 +131,7 @@ export function ProgressView({ child }: { child: Student }) {
         description="This term's mark, the change from last term and progress toward the target average."
       >
         <div className="divide-y divide-border/70">
-          {subjectRows.map(({ sub, enrolled, mark }) => {
+          {subjectRows.map(({ sub, enrolled, mark, ca, exam }) => {
             const grade = mark !== null ? gradeFor(mark, scheme)?.grade ?? null : null;
             const delta = mark !== null ? prevTermDelta(sub.id, child.id) : 0;
             const up = delta > 0;
@@ -141,7 +146,10 @@ export function ProgressView({ child }: { child: Student }) {
                       {!enrolled
                         ? "Not taking this subject"
                         : mark !== null
-                          ? subjectRemark(mark, scheme)
+                          ? subjectComment(child.id, sub.id, mark, scheme, {
+                              ca,
+                              exam,
+                            })
                           : "Not assessed yet"}
                     </p>
                   </div>

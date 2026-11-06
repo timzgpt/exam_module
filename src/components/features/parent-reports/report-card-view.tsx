@@ -26,7 +26,7 @@ import {
   schemeForClass,
   studentResultOf,
   subjectById,
-  subjectRemark,
+  subjectComment,
   teacherById,
 } from "@/lib/demo-data";
 import { divisionFor, fmtTotalMark, formatAvg, gradeFor, subjectsPassed } from "@/lib/grading";
@@ -73,10 +73,18 @@ export function ReportCardView({ child }: { child: Student }) {
   const rows = classSubjectsFor(child.classId)
     .map((cs) => {
       const subject = subjectById(cs.subjectId)!;
-      const enrolled = getComponents(child.classId, cs.subjectId)[child.id]?.enrolled ?? true;
+      const comp = getComponents(child.classId, cs.subjectId)[child.id];
+      const enrolled = comp?.enrolled ?? true;
       const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
       const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
-      return { subject, enrolled, mark, grade };
+      return {
+        subject,
+        enrolled,
+        mark,
+        grade,
+        ca: comp?.ca ?? null,
+        exam: comp?.exam ?? null,
+      };
     })
     .filter((r) => !r.enrolled || r.mark !== null);
   const taken = rows.filter((r) => r.enrolled && r.grade).length;
@@ -139,14 +147,14 @@ export function ReportCardView({ child }: { child: Student }) {
                 <TableHead className="text-right">Mark</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
                 {SHOW_SUBJECT_REMARKS ? (
-                  <TableHead className="min-w-50" aria-label="Subject remark">
+                  <TableHead className="min-w-50" aria-label="Subject comment">
                     {""}
                   </TableHead>
                 ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ subject, enrolled, mark, grade }) => (
+              {rows.map(({ subject, enrolled, mark, grade, ca, exam }) => (
                 <TableRow key={subject.id}>
                   <TableCell className="font-medium text-foreground">{subject.name}</TableCell>
                   <TableCell className="text-right tabular">
@@ -160,11 +168,14 @@ export function ReportCardView({ child }: { child: Student }) {
                     )}
                   </TableCell>
                   {SHOW_SUBJECT_REMARKS ? (
-                    <TableCell className="text-compact text-muted-foreground">
+                    <TableCell className="text-compact leading-relaxed text-muted-foreground">
                       {!enrolled
                         ? "Not taking this subject"
                         : mark !== null
-                          ? subjectRemark(mark, scheme)
+                          ? subjectComment(child.id, subject.id, mark, scheme, {
+                              ca,
+                              exam,
+                            })
                           : "Not assessed"}
                     </TableCell>
                   ) : null}

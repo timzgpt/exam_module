@@ -6,7 +6,17 @@
  *  - missing set → both null + draft; draft set → draft status
  *  - no placeholder braces leak into the text
  */
-import { commentFor, studentsInClass, classes, classResults } from "../src/lib/demo-data";
+import {
+  commentFor,
+  studentsInClass,
+  classes,
+  classResults,
+  classSubjectsFor,
+  getComponents,
+  subjectComment,
+  studentById,
+  schemeForClass,
+} from "../src/lib/demo-data";
 
 let failures = 0;
 let checked = 0;
@@ -75,7 +85,63 @@ if (missingProbe) {
   }
 }
 
-console.log(`Checked ${checked} students across ${classes.length} classes.`);
+// ---- Subject comments: 3 sentences for every enrolled, assessed subject ----
+let subjectChecked = 0;
+for (const cls of classes) {
+  const scheme = schemeForClass(cls.id);
+  for (const s of studentsInClass(cls.id)) {
+    const result = classResults(cls.id).find((r) => r.student.id === s.id);
+    if (!result) continue;
+    for (const cs of classSubjectsFor(cls.id)) {
+      const mark = result.marks[cs.subjectId];
+      if (mark === null || mark === undefined) continue;
+      const comp = getComponents(cls.id, cs.subjectId)[s.id];
+      subjectChecked += 1;
+      const text = subjectComment(s.id, cs.subjectId, mark, scheme, {
+        ca: comp?.ca ?? null,
+        exam: comp?.exam ?? null,
+      });
+      const n = sentenceCount(text);
+      if (n !== 3) fail(`${cls.name}/${s.name}/${cs.subjectId}: ${n} sentences (want 3) — "${text}"`);
+      if (/\{\w+\}/.test(text)) fail(`${cls.name}/${s.name}/${cs.subjectId}: placeholder leak — "${text}"`);
+      const first = text.split(/[.!?](?:\s|$)/)[0];
+      const firstName = s.name.split(" ")[0];
+      if (!first.includes(firstName)) {
+        fail(`${cls.name}/${s.name}/${cs.subjectId}: opening omits student name — "${first}"`);
+      }
+      if (!first.includes(mark.toFixed(2))) {
+        fail(`${cls.name}/${s.name}/${cs.subjectId}: opening omits mark ${mark.toFixed(2)} — "${first}"`);
+      }
+      // Determinism
+      const again = subjectComment(s.id, cs.subjectId, mark, scheme, {
+        ca: comp?.ca ?? null,
+        exam: comp?.exam ?? null,
+      });
+      if (again !== text) fail(`${cls.name}/${s.name}/${cs.subjectId}: not deterministic`);
+      // With both components recorded the middle sentence compares CA and exam.
+      if (comp?.ca != null && comp?.exam != null && !(/CA/.test(text) && /exam/i.test(text) && /%/.test(text))) {
+        fail(`${cls.name}/${s.name}/${cs.subjectId}: component sentence missing CA/exam % — "${text}"`);
+      }
+      // Percentages must stay within 0–100.
+      const pcts = [...text.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+      if (pcts.some((p) => p < 0 || p > 100)) {
+        fail(`${cls.name}/${s.name}/${cs.subjectId}: percentage out of range — "${text}"`);
+      }
+    }
+  }
+}
+
+// F-grade (secondary) must map onto the E-tone pool, not the C tone.
+const fProbe = studentById("st1")!;
+const fText = subjectComment(fProbe.id, "sub-math", 10, schemeForClass(fProbe.classId));
+if (!/difficult|low result|below|rebuilding|Rebuild/i.test(fText)) {
+  fail(`F-grade subject comment should use the failing tone — "${fText}"`);
+}
+// Missing components fall back to the steady-effort sentence (still 3 sentences).
+const missText = subjectComment(fProbe.id, "sub-math", 70, schemeForClass(fProbe.classId), {});
+if (sentenceCount(missText) !== 3) fail(`missing-components comment has ${sentenceCount(missText)} sentences (want 3)`);
+
+console.log(`Checked ${checked} students and ${subjectChecked} subject comments across ${classes.length} classes.`);
 if (failures > 0) {
   console.error(`FAILED with ${failures} problem(s).`);
   process.exit(1);

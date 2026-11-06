@@ -860,7 +860,13 @@ export function commentFor(classId: string, studentId: string): CommentRecord {
   }
 
   const size = classResults(classId).length;
-  const band = CLASS_TEACHER_POOLS[result.grade] ? result.grade : "C";
+  // Secondary scheme grades failing students "F" (primary uses "E"); the
+  // pools are keyed A–E, so map F onto the E ("can do better") tone.
+  const band = CLASS_TEACHER_POOLS[result.grade]
+    ? result.grade
+    : result.grade === "F"
+      ? "E"
+      : "C";
   const vars = {
     name,
     avg: result.average.toFixed(2),
@@ -1483,14 +1489,136 @@ export function studentEffort(studentId: string, subjectId: string): string {
   return ["A", "A", "B", "B", "C"][Math.floor(rnd() * 5)];
 }
 
-export function subjectRemark(mark: number, scheme: GradingScheme = defaultScheme): string {
-  const g = gradeFor(mark, scheme)?.grade ?? scheme.boundaries[scheme.boundaries.length - 1].grade;
-  if (g === "A") return "Excellent understanding of the topic.";
-  if (g === "B") return "Very good performance. Keep improving.";
-  if (g === "C") return "Good effort; revise weaker areas.";
-  if (g === "D") return "Satisfactory; needs more practice.";
-  if (g === "E") return "Pass; attend remedial sessions.";
-  return "Must put in more effort next term.";
+/* ---------------------------------------------------------------
+ * Three-sentence subject comment (school convention).
+ *
+ * Every assessed subject on Terminal/Annual cards carries a short
+ * personalised paragraph of exactly three sentences: (1) a band-aware
+ * opening naming the student, subject and total mark, (2) a CA vs
+ * exam comparison from the recorded components (falls back to a
+ * steady-effort line when a component is missing), and (3) a
+ * band-aware action for next term. Picks come from a seeded PRNG so
+ * the same student × subject always shows the same paragraph.
+ * --------------------------------------------------------------- */
+
+export interface SubjectCommentOpts {
+  /** Monthly/CA component as a percentage (0–100), as stored by getComponents. */
+  ca?: number | null;
+  /** Exam component as a percentage (0–100), as stored by getComponents. */
+  exam?: number | null;
+}
+
+const SUBJECT_OPEN_POOLS: Record<string, string[]> = {
+  A: [
+    "{name} shows excellent command of {subject}, finishing the term at {mark}.",
+    "{name} produced an outstanding {subject} result at {mark}; the topic is fully understood.",
+    "{subject} was handled with confidence by {name} all term, closing at {mark}.",
+  ],
+  B: [
+    "{name} performs very well in {subject}, finishing at {mark}.",
+    "{name} has a very good grasp of {subject}, ending the term at {mark}.",
+    "{name} worked consistently in {subject} and closed at {mark}.",
+  ],
+  C: [
+    "{name} shows a good understanding of {subject}, reaching {mark}.",
+    "{name} achieved a fair result in {subject} at {mark}; the basics are in place.",
+    "{name} passed {subject} comfortably at {mark}.",
+  ],
+  D: [
+    "{name} achieves a satisfactory result in {subject} at {mark}.",
+    "{name} closed {subject} at {mark}, a modest but passing result.",
+    "{name} met the minimum standard in {subject} ({mark}).",
+  ],
+  E: [
+    "{name} finds {subject} difficult, finishing at {mark}.",
+    "{name} recorded a low result in {subject} ({mark}); the fundamentals need rebuilding.",
+    "{subject} closed at {mark}, well below {name}'s capability.",
+  ],
+};
+
+const SUBJECT_EXAM_STRONGER: string[] = [
+  "The exam ({examPct}%) was stronger than the CA ({caPct}%), showing good exam temperament.",
+  "Performance peaked in the exam ({examPct}%) against a CA of {caPct}%; carry that form into coursework too.",
+];
+
+const SUBJECT_CA_STRONGER: string[] = [
+  "Coursework led the way — CA {caPct}% against an exam of {examPct}%; exam technique needs polishing.",
+  "The CA ({caPct}%) outshone the exam ({examPct}%); more past-paper practice will close the gap.",
+];
+
+const SUBJECT_BALANCED: string[] = [
+  "CA ({caPct}%) and exam ({examPct}%) were well matched through the term.",
+  "Both assessments agreed — CA {caPct}%, exam {examPct}% — a steady, consistent effort.",
+];
+
+const SUBJECT_COMPONENT_MISSING: string[] = [
+  "Performance stayed consistent across the term's assessments.",
+  "The term's work was steady from start to finish.",
+];
+
+const SUBJECT_ACTION_POOLS: Record<string, string[]> = {
+  A: [
+    "Maintain this excellent standard in {subject} next term.",
+    "Keep challenging yourself with extension work in {subject}.",
+  ],
+  B: [
+    "A little more revision will push {subject} into the A band.",
+    "Keep practising {subject} past papers to secure the top band.",
+  ],
+  C: [
+    "Regular revision of {subject} notes will lift this grade further.",
+    "Set a weekly target in {subject} to move into the B band.",
+  ],
+  D: [
+    "Attend remedial sessions in {subject} and complete all assignments.",
+    "More consistent homework in {subject} is needed to raise this grade.",
+  ],
+  E: [
+    "A recovery plan with daily supervised practice in {subject} is essential.",
+    "Rebuild the {subject} fundamentals with teacher and home support.",
+  ],
+};
+
+export function subjectComment(
+  studentId: string,
+  subjectId: string,
+  mark: number,
+  scheme: GradingScheme = defaultScheme,
+  opts: SubjectCommentOpts = {},
+): string {
+  const rnd = mulberry32(hashStr(`subjectComment|${studentId}|${subjectId}`));
+  const name = studentById(studentId)?.name.split(" ")[0] ?? "The student";
+  const subject = subjectById(subjectId)?.name ?? "this subject";
+  const g = gradeFor(mark, scheme)?.grade ?? "C";
+  // Secondary grades failures "F", primary "E" — both share the E-tone pools.
+  const band = SUBJECT_OPEN_POOLS[g] ? g : g === "F" ? "E" : "C";
+
+  const s1 = fill(pick(SUBJECT_OPEN_POOLS[band], rnd), {
+    name,
+    subject,
+    mark: mark.toFixed(2),
+  });
+
+  const { ca, exam } = opts;
+  let s2: string;
+  if (typeof ca === "number" && typeof exam === "number") {
+    // getComponents stores both components as percentages (0–100).
+    const caPct = Math.round(ca);
+    const examPct = Math.round(exam);
+    const pool =
+      examPct - caPct >= 10
+        ? SUBJECT_EXAM_STRONGER
+        : caPct - examPct >= 10
+          ? SUBJECT_CA_STRONGER
+          : SUBJECT_BALANCED;
+    s2 = fill(pick(pool, rnd), { caPct: String(caPct), examPct: String(examPct) });
+  } else {
+    s2 = pick(SUBJECT_COMPONENT_MISSING, rnd);
+  }
+
+  const s3 = fill(pick(SUBJECT_ACTION_POOLS[band], rnd), { subject });
+
+  return [s1, s2, s3].join(" ");
 }
 
 /**
