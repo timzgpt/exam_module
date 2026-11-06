@@ -1,11 +1,16 @@
 "use client";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { SectionCard } from "@/components/shared/section-card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
+import { isNurseryTemplateKind } from "@/lib/report-templates";
 import { ResultsAnalysisView } from "./results-analysis-view";
 import { TargetsView } from "./targets-view";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 const TAB_VALUES = ["results", "targets"] as const;
 type TabValue = (typeof TAB_VALUES)[number];
@@ -27,6 +32,9 @@ interface ResultsTargetsHostProps {
 export function ResultsTargetsHost({ initialTab = "results" }: ResultsTargetsHostProps) {
   const { klass: cls } = useClassContext();
   const { cycle } = useCycleContext();
+  // Early Years classes have no marks to analyse — point at the surfaces
+  // that actually apply to them (template config + assessment entry).
+  const templateKind = useClassTemplateKind(cls.id);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -39,6 +47,37 @@ export function ResultsTargetsHost({ initialTab = "results" }: ResultsTargetsHos
     params.set("tab", next);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+
+  if (isNurseryTemplateKind(templateKind)) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title={`Results & targets: ${cls.name}`}
+          description={`${cycle.name} · Early Years class — reports carry observations and competency levels, not marks.`}
+        />
+        <SectionCard className="py-10 text-center">
+          <p className="text-sm font-medium text-foreground">
+            No marks analysis for Early Years classes
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            {cls.name} is assessed on learning-area benchmarks (descriptive remarks or
+            B/D/C/HC competency levels). Configure the class template or enter the
+            term&apos;s assessments instead.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button asChild>
+              <Link href="/academic/report-templates">Open Report templates</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/academic/report-cycles/${cycle.id}/classes/${cls.id}/marks`}>
+                Enter assessments
+              </Link>
+            </Button>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

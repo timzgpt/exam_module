@@ -64,6 +64,7 @@ export function resolveHref(
 export const routes = {
   exams: "/academic/exams",
   gradingSchemes: "/academic/grading-schemes",
+  reportTemplates: "/academic/report-templates",
   reportCycles: "/academic/report-cycles",
   readiness: (cycleId = DEMO_IDS.reportCycleId) =>
     `/academic/report-cycles/${cycleId}/readiness`,

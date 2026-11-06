@@ -357,3 +357,103 @@ export interface NavigationContext {
   classId: string;
   studentId: string;
 }
+
+/* ---------------- Nursery / Early Years report templates ---------------- */
+
+/** The three education sections that each carry their own report cards. */
+export type SchoolSection = "Early Years" | "Primary" | "Secondary";
+
+/**
+ * The report-card engines. Primary and Secondary are the existing
+ * marks-based cards; the four Early Years kinds are observation /
+ * competency templates selected per class (task §3).
+ */
+export type ReportTemplateKind =
+  | "baby-class-a"
+  | "baby-class-b"
+  | "kg1"
+  | "kg2"
+  | "kg3"
+  | "primary"
+  | "secondary";
+
+/** Codes of the Early Years competency grading scale (KG2 / KG3). */
+export type CompetencyCode = "B" | "D" | "C" | "HC";
+
+export interface CompetencyLevel {
+  code: CompetencyCode;
+  label: string;
+  description: string;
+}
+
+export interface CompetencyScale {
+  name: string;
+  levels: CompetencyLevel[];
+}
+
+/** One developmental milestone / benchmark inside a learning area. */
+export interface TemplateBenchmark {
+  id: string;
+  text: string;
+}
+
+/** One learning area (or developmental domain) of a nursery template. */
+export interface TemplateLearningArea {
+  id: string;
+  name: string;
+  benchmarks: TemplateBenchmark[];
+}
+
+/** An authorizing signature slot printed at the foot of every template. */
+export interface TemplateSignature {
+  id: string;
+  title: string;
+  name: string;
+}
+
+/**
+ * Full configuration of ONE class's report template. Assignments are per
+ * class (not per term), so a template is reusable across academic terms
+ * without duplicating the design (task §4).
+ */
+export interface NurseryTemplateConfig {
+  kind: Exclude<ReportTemplateKind, "primary" | "secondary">;
+  classId: string;
+  /** Printed inside the maroon title band, e.g. "DEVELOPMENTAL ASSESSMENT REPORT". */
+  title: string;
+  /** Caption of the assessment-date field (Template A: "Date of assessment"). */
+  assessmentDateLabel: string;
+  areas: TemplateLearningArea[];
+  /** KG2 / KG3 competency scale; null where the template prints no grades. */
+  scale: CompetencyScale | null;
+  /** Benchmarks carry an individual competency grade (KG2 / KG3). */
+  gradesPerBenchmark: boolean;
+  /** Column caption for per-area remark text (Baby A / B, KG1); null = not printed. */
+  areaRemarkLabel: string | null;
+  /** Caption of the dedicated per-area comment row (KG2 / KG3); null = not printed. */
+  areaCommentLabel: string | null;
+  /** Caption above the class teacher's comment block. */
+  classTeacherCommentLabel: string;
+  signatures: TemplateSignature[];
+}
+
+/**
+ * One learner's Early Years assessment for a cycle. Competency grades and
+ * teacher remarks are stored independently, learning-area comments stay
+ * separate from the class teacher's comment (task §5).
+ */
+export interface NurseryAssessment {
+  classId: string;
+  studentId: string;
+  cycleId: string;
+  /** Date of assessment printed on the card (Template A field). */
+  assessedOn: string;
+  /** areaId -> teacher remark / observation (Baby A, Baby B, KG1). */
+  areaRemarks: Record<string, string>;
+  /** benchmarkId -> competency grade (KG2, KG3). */
+  benchmarkGrades: Record<string, CompetencyCode | null>;
+  /** areaId -> dedicated learning-area comment (KG2, KG3). */
+  areaComments: Record<string, string>;
+  /** The class teacher's concluding comment — never mixed with area text. */
+  classTeacherComment: string;
+}

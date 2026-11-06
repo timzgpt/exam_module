@@ -10,8 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePrintDownload } from "@/hooks/use-print-download";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
 import { useCycleContext } from "@/hooks/use-academic-context";
 import { DEMO_IDS, SCHOOL } from "@/lib/demo-config";
+import { BRAND, CELL, CELL_LABEL, COL_HEAD, SECTION_BAR, TBL } from "@/components/features/report-card/card-chrome";
+import { NurseryReportCard } from "@/components/features/nursery-reports/nursery-report-card";
+import { isNurseryTemplateKind } from "@/lib/report-templates";
 import {
   buildChartSeries,
   CHART_FALLBACK_TEXT,
@@ -36,6 +40,7 @@ import {
   subjectById,
   subjectComment,
   teacherById,
+  allClasses,
 } from "@/lib/demo-data";
 import {
   DIVISION_BANDS,
@@ -59,21 +64,9 @@ import { useParams, useRouter } from "next/navigation";
  * the Josephian Schools shield — used for the title band and every table
  * header row; all other fills are white.
  */
-const BRAND = "#5C0A14";
 
-/* Shared chrome for the card's tables. */
-const TBL = "w-full table-fixed border-collapse";
-/** Full-width maroon section bar (first row of each section table). */
-const SECTION_BAR =
-  "border border-border bg-[#5C0A14] px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-white";
-/** Maroon column-heading cell. */
-const COL_HEAD =
-  "border border-border bg-[#5C0A14] px-2 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white";
-/** Standard bordered body cell (white). */
-const CELL = "border border-border bg-white px-2 py-1.5 align-middle";
-/** Tiny uppercase label used inside bordered cells. */
-const CELL_LABEL =
-  "text-3xs font-semibold uppercase tracking-[0.12em] text-muted-foreground";
+/* Shared chrome for the card's tables — imported from card-chrome.ts so the
+   marks-based card and the Early Years templates print with one identity. */
 
 interface ChartRow {
   name: string;
@@ -192,6 +185,11 @@ export default function ReportCardPage() {
   const router = useRouter();
   const { cycle } = useCycleContext();
   const student = studentById(params.studentId ?? "") ?? studentById(DEMO_IDS.studentId)!;
+  // The learner's school section selects the report engine (task §3):
+  // Early Years classes render the observation/competency templates, every
+  // other class the existing marks-based card below.
+  const templateKind = useClassTemplateKind(student.classId);
+  const isNursery = isNurseryTemplateKind(templateKind);
 
   const result = studentResultOf(student.id);
   const classmates = studentsInClass(student.classId);
@@ -412,7 +410,7 @@ export default function ReportCardPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {classes.map((c) => (
+              {allClasses.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
                 </SelectItem>
@@ -445,8 +443,9 @@ export default function ReportCardPage() {
       </div>
 
       {/* Legacy rule 7: a student with no marks at all renders an empty
-          subject table — warn before printing instead of generating. */}
-      {assessed.length === 0 ? (
+          subject table — warn before printing instead of generating.
+          Early Years learners have no marks table at all. */}
+      {!isNursery && assessed.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-compact text-destructive print:hidden">
           <AlertTriangle className="size-4 shrink-0" />
           No marks have been entered for this student yet — report cards are generated only after marks exist.
@@ -454,8 +453,12 @@ export default function ReportCardPage() {
       ) : null}
 
       {/* The printable card: scrollable on a phone, exact A4 sheet in print.
-          Totally white paper; every section is a bordered table. */}
+          Totally white paper; every section is a bordered table. Early Years
+          learners render their class's observation/competency template. */}
       <div className="overflow-x-auto print:overflow-visible">
+        {isNursery ? (
+          <NurseryReportCard student={student} cycle={cycle} />
+        ) : (
         <div className="print-area mx-auto w-full max-w-205 border border-border bg-white p-8 font-serif text-foreground shadow-sm">
           {/* School header: logo + school block on white */}
           <div className="flex items-center gap-4">
@@ -1015,6 +1018,7 @@ export default function ReportCardPage() {
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

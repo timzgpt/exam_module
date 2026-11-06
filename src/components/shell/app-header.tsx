@@ -19,7 +19,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SCHOOL } from "@/lib/demo-config";
 import { breadcrumbFor } from "@/lib/nav";
-import { classes, marksDeadlines, cycleById, studentsInClass } from "@/lib/demo-data";
+import { allClasses, marksDeadlines, cycleById, studentsInClass } from "@/lib/demo-data";
 import { selectCycles, useAppContext } from "@/lib/store";
 import { useUiStore } from "@/lib/ui-store";
 import { Bell, Search } from "lucide-react";
@@ -168,7 +168,7 @@ export function AppHeader() {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Class context
             </DropdownMenuLabel>
-            {classes.map((c) => (
+            {allClasses.map((c) => (
               <SelectItem key={c.id} value={c.id} className="text-compact">
                 {c.name}
               </SelectItem>

@@ -10,6 +10,7 @@ import {
   IdCard,
   Layers,
   LayoutDashboard,
+  LayoutTemplate,
   ListChecks,
   MessageSquareText,
   PenLine,
@@ -81,6 +82,14 @@ export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
         hrefTemplate: "/academic/report-cycles/{cycleId}/classes/{classId}/comments",
         icon: MessageSquareText,
         description: "Teacher comments and templates",
+      },
+      {
+        key: "report-templates",
+        label: "Report templates",
+        group: "Report cards",
+        hrefTemplate: "/academic/report-templates",
+        icon: LayoutTemplate,
+        description: "Class template assignment and benchmark configuration",
       },
       {
         key: "report-card",

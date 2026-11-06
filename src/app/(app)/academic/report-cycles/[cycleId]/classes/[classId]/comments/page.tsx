@@ -10,11 +10,14 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
+import { isNurseryTemplateKind } from "@/lib/report-templates";
 import { commentFor, studentsInClass } from "@/lib/demo-data";
 import type { CommentRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ChevronRight, MessageSquareText, PenLine, Search, Send } from "lucide-react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 const REMARK_MAX = 240;
 
@@ -22,7 +25,46 @@ const REMARK_MAX = 240;
 const isComplete = (rec: CommentRecord | undefined): rec is CommentRecord =>
   !!rec && rec.classTeacher !== null && rec.parentalInvolvement !== null;
 
+/**
+ * Comments route. Early Years classes are diverted before the editor
+ * mounts: their class teacher's comment is written inside the assessment
+ * editor together with the learning-area remarks (task §5).
+ */
 export default function CommentsPage() {
+  const { klass: cls } = useClassContext();
+  const { cycle } = useCycleContext();
+  const templateKind = useClassTemplateKind(cls.id);
+  if (isNurseryTemplateKind(templateKind)) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title={`Comments: ${cls.name}`}
+          description="Early Years class — comments are part of the assessment editor."
+        />
+        <SectionCard className="py-10 text-center">
+          <p className="text-sm font-medium text-foreground">
+            Comments are entered with the assessments
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            On {cls.name} cards the class teacher&apos;s comment is written alongside the
+            learning-area remarks in the Early Years assessment editor, so it always
+            reflects the term&apos;s observations.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <Button asChild>
+              <Link href={`/academic/report-cycles/${cycle.id}/classes/${cls.id}/marks`}>
+                Open assessment entry
+              </Link>
+            </Button>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+  return <CommentsEditor key={cls.id} />;
+}
+
+function CommentsEditor() {
   const { toast } = useToast();
   const { klass: cls } = useClassContext();
   const { cycle } = useCycleContext();

@@ -1,6 +1,7 @@
 import { DEFAULT_SCHEME_ID, divisionFor, gradeFor, subjectTotal, subjectsPassed } from "./grading";
 import { computeAttendanceSummary, possibleSchoolDays } from "./attendance";
 import { ACADEMIC_APPROVER, DEMO_IDS } from "./demo-config";
+import { nurseryClasses, nurseryStudents } from "./nursery";
 import type {
   AttendanceSummary,
   AttendanceStatus,
@@ -106,6 +107,16 @@ export function isPrimaryClass(classId: string): boolean {
 }
 
 /**
+ * Every class the app knows: the marks-based classes (which drive all
+ * marks/deadlines/analytics pipelines) plus the Early Years classes, whose
+ * report cards come from the observation/competency template engines
+ * (see lib/report-templates.ts). Class pickers that must offer the whole
+ * school — the header switcher, the card preview and the template admin —
+ * render from this list; pipeline screens keep using `classes`.
+ */
+export const allClasses: ClassRoom[] = [...classes, ...nurseryClasses];
+
+/**
  * Grading scheme for a class: the Primary A-E bands for Standard classes,
  * the NECTA CSEE bands otherwise. Every grade lookup, distribution and pass
  * rate goes through this so a class is never graded with the wrong bands.
@@ -115,7 +126,7 @@ export function schemeForClass(classId: string): GradingScheme {
 }
 
 export const classById = (id: string): ClassRoom | undefined =>
-  classes.find((c) => c.id === id);
+  classes.find((c) => c.id === id) ?? nurseryClasses.find((c) => c.id === id);
 
 export function classNameOf(id: string): string {
   return classById(id)?.name ?? "Class";
@@ -160,7 +171,7 @@ function buildStudents(): Student[] {
   return list;
 }
 
-export const students: Student[] = buildStudents();
+export const students: Student[] = [...buildStudents(), ...nurseryStudents];
 
 export const studentsInClass = (classId: string): Student[] =>
   students.filter((s) => s.classId === classId);
@@ -1623,10 +1634,15 @@ export function subjectComment(
 
 /**
  * Convenience accessor for the demo parent, consumed by useParentChildren()
- * across the portal. Two children so hold/release states are visible (Form 1B
- * has a fees hold; the demo student's class does not).
+ * across the portal. Three children so every template family is visible:
+ * the demo student (secondary card), a Form 1B pupil with a fees hold, and
+ * a KG2 learner whose card renders the KG2 competency template.
  */
 export const demoParent = {
   name: "Mr. Joseph Mwakalinga",
-  children: [studentById(DEMO_IDS.studentId)!, studentById("f1b-04")!],
+  children: [
+    studentById(DEMO_IDS.studentId)!,
+    studentById("f1b-04")!,
+    studentById("kg2-01")!,
+  ],
 };

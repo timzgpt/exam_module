@@ -18,8 +18,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
+import { NurseryAssessmentEntry } from "@/components/features/nursery-reports/nursery-assessment-entry";
+import { isNurseryTemplateKind } from "@/lib/report-templates";
 import { combinedComponents } from "@/lib/cycle-components";
 import {
+  classById,
   classSubjectsFor,
   eligibleStudentsFor,
   getComponents,
@@ -32,7 +36,7 @@ import {
   subjectById,
   subjectTeacherOf,
 } from "@/lib/demo-data";
-import type { MarkStatusCode } from "@/lib/types";
+import type { MarkStatusCode, ReportCycle } from "@/lib/types";
 import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import {
@@ -99,10 +103,31 @@ function rowMark(
   return { total: subjectTotal(caVal, examVal, w1, w2), status: null };
 }
 
+/**
+ * Marks entry route (knowledge base B1.4). The learner's class selects the
+ * entry surface: Early Years classes get the observation/competency
+ * assessment editor, every other class the spreadsheet-style marks grid
+ * (teachers only ever enter assessments relevant to their class).
+ */
 export default function MarksEntryPage() {
-  const { toast } = useToast();
   const { klass: cls } = useClassContext();
   const { cycle } = useCycleContext();
+  const templateKind = useClassTemplateKind(cls.id);
+  if (isNurseryTemplateKind(templateKind)) {
+    return <NurseryAssessmentEntry classId={cls.id} cycle={cycle} />;
+  }
+  return <MarksEntryGrid classId={cls.id} cycle={cycle} />;
+}
+
+function MarksEntryGrid({
+  classId,
+  cycle,
+}: {
+  classId: string;
+  cycle: ReportCycle;
+}) {
+  const { toast } = useToast();
+  const cls = classById(classId)!;
   const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
   const classSubjects = useMemo(() => classSubjectsFor(cls.id), [cls.id]);
 

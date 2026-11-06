@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePrintDownload } from "@/hooks/use-print-download";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
 import { SCHOOL } from "@/lib/demo-config";
 import {
   attendanceRecordFor,
@@ -31,6 +32,8 @@ import {
 } from "@/lib/demo-data";
 import { divisionFor, fmtTotalMark, formatAvg, gradeFor, subjectsPassed } from "@/lib/grading";
 import { firstName } from "@/lib/format";
+import { isNurseryTemplateKind, templateKindLabel } from "@/lib/report-templates";
+import { NurseryReportCard } from "@/components/features/nursery-reports/nursery-report-card";
 import type { Student } from "@/lib/types";
 import { Download } from "lucide-react";
 
@@ -54,6 +57,11 @@ export function ReportCardView({ child }: { child: Student }) {
   const downloadPdf = usePrintDownload(
     "Use 'Save as PDF' in the print dialog to keep a copy of the card.",
   );
+  // The child's school section selects the template (task §3): Early Years
+  // children render their class's observation/competency template instead
+  // of the marks-based portal card below.
+  const templateKind = useClassTemplateKind(child.classId);
+  const isNursery = isNurseryTemplateKind(templateKind);
 
   const result = studentResultOf(child.id);
   const attendance = attendanceRecordFor(child.id);
@@ -88,6 +96,28 @@ export function ReportCardView({ child }: { child: Student }) {
     : divisionFor(rows.map((r) => (r.enrolled ? r.grade?.points ?? null : null)));
   const overallGrade =
     result && result.count > 0 ? gradeFor(result.average, scheme)?.grade ?? null : null;
+
+  if (isNursery) {
+    return (
+      <SectionCard>
+        {/* Toolbar: screen only */}
+        <div className="print:hidden mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-compact font-medium text-foreground">
+              {currentCycle.name} · {firstName(child.name)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {templateKindLabel(templateKind)} — use &quot;Save as PDF&quot; in the print dialog to keep a copy.
+            </p>
+          </div>
+          <Button size="sm" className="shrink-0 gap-1.5" onClick={downloadPdf}>
+            <Download className="size-4" /> Download PDF
+          </Button>
+        </div>
+        <NurseryReportCard student={child} cycle={currentCycle} />
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard>

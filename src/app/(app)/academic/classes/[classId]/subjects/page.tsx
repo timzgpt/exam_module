@@ -3,6 +3,9 @@
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatCard } from "@/components/shared/stat-card";
+import { useClassTemplateKind } from "@/hooks/use-class-template";
+import { isNurseryTemplateKind } from "@/lib/report-templates";
+import Link from "next/link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,7 +74,44 @@ import { Switch } from "@/components/ui/switch";
 
 const MAX_PERIODS = 40;
 
+/**
+ * Class subjects route. Early Years classes are diverted BEFORE the editor
+ * mounts: they have no subject allocation — their learning areas, skills
+ * and benchmarks live in the report-template configuration.
+ */
 export default function ClassSubjectsPage() {
+  const { klass: cls } = useClassContext();
+  const templateKind = useClassTemplateKind(cls.id);
+  if (isNurseryTemplateKind(templateKind)) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title={`Class subjects: ${cls.name}`}
+          description="Early Years class — learning areas are managed as report-template configuration."
+        />
+        <SectionCard>
+          <EmptyState
+            title="No subject allocation for Early Years classes"
+            description={`${cls.name} reports are built from learning areas, skills and benchmarks — not subjects and marks. Configure the class's template learning areas on the Report templates page, and enter observations and competency grades on the assessment editor.`}
+          />
+          <div className="flex justify-center gap-2 pb-6">
+            <Button asChild>
+              <Link href="/academic/report-templates">Open Report templates</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/academic/report-cycles/cy1/classes/${cls.id}/marks`}>
+                Enter assessments
+              </Link>
+            </Button>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+  return <ClassSubjectsEditor key={cls.id} />;
+}
+
+function ClassSubjectsEditor() {
   const { toast } = useToast();
   const { klass: cls } = useClassContext();
   const classTeacher = teacherById(cls.classTeacherId);
