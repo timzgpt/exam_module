@@ -983,11 +983,7 @@ export default function ReportCardPage() {
             </tbody>
           </table>
 
-          {/* Footer: parents' day + signatures */}
-          <p className="mt-5 text-center text-xs text-muted-foreground">
-            Parents&apos; consultation day: {fmtLongDate(cycle.parentsDayDate)}
-          </p>
-          {/* Three signature slots (A4 section 10): Class Teacher · Academic
+          {/* Signature slots (A4 section 10): Class Teacher · Academic
               Dean · Principal. A real sign-off adds images and timestamps. */}
           <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
             <div>

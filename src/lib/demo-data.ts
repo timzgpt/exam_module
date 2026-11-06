@@ -646,47 +646,277 @@ export const marksDeadlines: MarksDeadline[] = classes.flatMap((cls) =>
  * Comments
  * ================================================================ */
 
-export const commentTemplates: string[] = [
-  "A diligent and focused student who consistently produces work of a high standard. Keep it up.",
-  "Shows steady improvement this term. With more consistent revision, results will improve further.",
-  "An active participant in class discussions. Encourage more practice in written exercises at home.",
-  "A cheerful member of the class who works well with others. Aim for a higher standard in assignments.",
-  "Capable of excellent results. Needs to submit homework on time and revise regularly.",
-  "Very strong in practical work. Continue building confidence in theory sections.",
-  "Excellent attendance and attitude. A role model to peers. Very proud of this term's effort.",
-  "Should make greater use of the library and attempt more past examination papers.",
+/* ---------------------------------------------------------------
+ * Four-sentence remark generator (school convention).
+ *
+ * The class teacher's remark is a full paragraph of exactly four
+ * sentences: (1) band-aware opening quoting the term average and
+ * class rank, (2) the strongest subject with its mark, (3) an
+ * unassessed-subject note or the weakest-subject focus area, and
+ * (4) a closing recommendation for the next term. The parental
+ * involvement note is likewise four sentences drawn from home
+ * support pools. All picks come from seeded PRNGs so every render
+ * shows the same paragraph for the same student.
+ * --------------------------------------------------------------- */
+
+/** Band-keyed opening / focus / closing sentence pools (A–E scale). */
+const CLASS_TEACHER_POOLS: Record<
+  string,
+  { open: string[]; focus: string[]; close: string[] }
+> = {
+  A: {
+    open: [
+      "{name} closes the term on an outstanding average of {avg}, ranked {rank} of {size} in {class}.",
+      "An excellent term for {name}: {avg} overall and position {rank} of {size} in {class}.",
+      "{name} has sustained an outstanding standard this term, finishing on {avg} at position {rank} of {size} in {class}.",
+    ],
+    focus: [
+      "Even at this level, {subject} ({mark}) offers room to push for full marks.",
+      "The closest gap to perfection is in {subject} ({mark}); steady revision will close it.",
+      "Attention to {subject} ({mark}) would make a strong record exceptional.",
+    ],
+    close: [
+      "Maintain this discipline and aim even higher next term.",
+      "Keep up the outstanding work; the sky is the limit.",
+      "This is excellent work — sustain the momentum into the new term.",
+    ],
+  },
+  B: {
+    open: [
+      "{name} finishes the term with a very good average of {avg}, ranked {rank} of {size} in {class}.",
+      "A very good term for {name}: {avg} overall at position {rank} of {size} in {class}.",
+      "{name} has worked steadily to a very good standard, closing on {avg} and rank {rank} of {size} in {class}.",
+    ],
+    focus: [
+      "{subject} ({mark}) is the one area holding the average back; targeted revision will lift it.",
+      "Extra practice in {subject} ({mark}) is the surest route to the A band.",
+      "A little more consistency in {subject} ({mark}) would move the whole result up.",
+    ],
+    close: [
+      "With sustained effort, top grades are well within reach next term.",
+      "Keep pushing — a small lift in the weaker area earns a higher grade.",
+      "Very good work overall; convert it to excellence with regular revision.",
+    ],
+  },
+  C: {
+    open: [
+      "{name} ends the term with a good average of {avg}, ranked {rank} of {size} in {class}.",
+      "A fair term's work from {name}: {avg} overall, position {rank} of {size} in {class}.",
+      "{name} has achieved a good pass standard this term, averaging {avg} at rank {rank} of {size} in {class}.",
+    ],
+    focus: [
+      "{subject} ({mark}) drags the average down; a revision timetable should start there.",
+      "More consistent effort is needed in {subject} ({mark}) to raise the overall grade.",
+      "Extra attention to {subject} ({mark}) would lift {name} into the B band.",
+    ],
+    close: [
+      "Good effort; revise weaker areas and results will improve.",
+      "There is clear potential here — more consistent revision will show it.",
+      "Aim higher next term by revising the weak subjects early.",
+    ],
+  },
+  D: {
+    open: [
+      "{name} finishes with a satisfactory average of {avg}, ranked {rank} of {size} in {class}, but is capable of more.",
+      "A satisfactory but modest term for {name}: {avg} overall, position {rank} of {size} in {class}.",
+      "{name} passed the term at a satisfactory level, averaging {avg} and ranking {rank} of {size} in {class}.",
+    ],
+    focus: [
+      "{subject} ({mark}) needs urgent attention; remedial practice at home and school is advised.",
+      "Serious catch-up work is required in {subject} ({mark}) before the next assessment.",
+      "The mark in {subject} ({mark}) shows the gap to close first.",
+    ],
+    close: [
+      "Greater commitment to studies next term is strongly encouraged.",
+      "Attendance at remedial sessions and daily revision should be the plan.",
+      "We expect a marked improvement next term with steady effort.",
+    ],
+  },
+  E: {
+    open: [
+      "{name} finishes with an average of {avg}, ranked {rank} of {size} in {class}; this is below the expected standard.",
+      "A difficult term for {name}: {avg} overall, position {rank} of {size} in {class}.",
+      "{name} struggled this term, averaging {avg} and ranking {rank} of {size} in {class}.",
+    ],
+    focus: [
+      "{subject} ({mark}) and the other low papers need to be re-taught and re-practised from the basics.",
+      "Foundation work must begin with {subject} ({mark}) and the other weak areas.",
+      "Rebuilding the basics of {subject} ({mark}) is the immediate priority.",
+    ],
+    close: [
+      "Immediate and sustained support is needed; we will work with the home on a recovery plan.",
+      "A fresh start next term with daily supervised revision is essential.",
+      "We urge a joint home–school plan to rebuild the basics.",
+    ],
+  },
+};
+
+/** Sentence 2: celebrates the strongest subject with its mark. */
+const STRONGEST_SENTENCES: string[] = [
+  "{subject} is the standout at {mark}; keep stretching that strength.",
+  "The best paper was {subject} at {mark} — real talent showing there.",
+  "Particular strength in {subject} ({mark}); well done.",
+  "{subject} ({mark}) led all subjects and deserves praise.",
+  "A fine result in {subject} ({mark}) shows what focused effort achieves.",
 ];
 
-/**
- * Parental involvement is a REQUIRED part of every comment record, so the
- * demo generator always provides a note for every non-missing student.
- */
-const parentalInvolvementNotes: string[] = [
-  "Parents attend all consultation sessions and review homework daily.",
-  "Guardian communicates regularly with the class teacher and follows up on assignments.",
-  "Strong home support; the reading log is signed and returned every week.",
-  "Parent visits the school each month and supports the study plan at home.",
-  "Guardian responds promptly to teacher calls and monitors revision closely.",
-  "Parents attended both PTA meetings this term and support home revision.",
-  "Grandparent is the primary guardian and supervises study time consistently.",
-  "Home follow-up is consistent; parents volunteer in class activities.",
+/** Sentence 3 variant when a subject has no mark recorded yet. */
+const NO_MARK_OBSERVATIONS: string[] = [
+  "{subject} is not yet assessed, so the average may still shift once the mark is entered.",
+  "No mark was recorded for {subject}; the picture will be complete once it is.",
+  "{subject} remains unassessed — the final result will firm up when the mark comes in.",
+];
+
+/** Sentence 3 fallback when every subject carries a mark and the weakest
+    subject is the same one as the strongest (single-subject edge). */
+const GENERIC_FOCUS_SENTENCES: string[] = [
+  "A balanced revision timetable across all subjects will consolidate this result.",
+  "Steady daily revision in every subject is the next step.",
+  "Consistent homework completion will keep the average moving up.",
+];
+
+/** Four-sentence parental involvement pools: opening, home support,
+    follow-up on weak areas, and partnership closing. */
+const PARENTAL_OPEN: string[] = [
+  "Parents attended both PTA meetings this term and reviewed the progress report with the class teacher.",
+  "Communication with home has been open and prompt throughout the term.",
+  "The guardian responds quickly to teacher calls and attends every consultation session.",
+  "Parents visited the school twice this term to review progress.",
+];
+
+const PARENTAL_HOME: string[] = [
+  "Home revision is supervised daily and the homework diary is signed every week.",
+  "A quiet study hour is enforced at home, and the reading log is returned signed.",
+  "The family keeps a fixed evening study routine with no interruptions.",
+  "The guardian reviews assignments each evening and follows up on corrections.",
+];
+
+const PARENTAL_FOLLOWUP: string[] = [
+  "The home has been asked to give extra practice in the weaker subjects and has agreed to a revision timetable.",
+  "Weak areas flagged at mid-term are being addressed with extra worksheets at home.",
+  "The guardian has arranged weekend practice in the subjects that trailed.",
+  "The family has committed to closer follow-up of homework in the weak subjects.",
+];
+
+const PARENTAL_CLOSING: string[] = [
+  "The school and home remain firmly aligned on the improvement plan.",
+  "We thank the family for its continued partnership in the child's education.",
+  "This level of home support makes a real difference; please keep it up.",
+  "Together, school and home will keep the student on track next term.",
 ];
 
 const COMMENTS_MISSING = new Set(["f1a-02", "f1a-06", "f1a-08", "f1a-11", "f1b-03"]);
 const COMMENTS_DRAFT = new Set(["f3a-04", "f3a-09", "cls-2a|f2a-05"]);
 
+function fill(t: string, v: Record<string, string>): string {
+  return t.replace(/\{(\w+)\}/g, (_, k: string) => v[k] ?? "");
+}
+
+const pick = <T,>(xs: readonly T[], rnd: () => number): T =>
+  xs[Math.floor(rnd() * xs.length)];
+
 export function commentFor(classId: string, studentId: string): CommentRecord {
-  const rnd = mulberry32(hashStr(`comment|${classId}|${studentId}`));
+  // Two seeded PRNGs: one for the teacher's paragraph, one for the
+  // parental paragraph, so the picks stay independent but stable.
+  const ctRnd = mulberry32(hashStr(`comment|ct|${classId}|${studentId}`));
+  const piRnd = mulberry32(hashStr(`comment|pi|${classId}|${studentId}`));
   const missing = COMMENTS_MISSING.has(studentId);
   const draft = COMMENTS_DRAFT.has(studentId);
-  const idx = Math.floor(rnd() * commentTemplates.length);
-  const pIdx = Math.floor(rnd() * parentalInvolvementNotes.length);
+  const updatedAt = `2026-03-0${1 + Math.floor(ctRnd() * 8)}`;
+
+  if (missing) {
+    return { studentId, classTeacher: null, parentalInvolvement: null, status: "draft", updatedAt };
+  }
+
+  const student = studentById(studentId);
+  const name = student?.name.split(" ")[0] ?? "The student";
+  const className = classById(classId)?.name ?? "class";
+
+  /* ---- Parental involvement: one sentence from each pool ---- */
+  const parentalInvolvement = [
+    pick(PARENTAL_OPEN, piRnd),
+    pick(PARENTAL_HOME, piRnd),
+    pick(PARENTAL_FOLLOWUP, piRnd),
+    pick(PARENTAL_CLOSING, piRnd),
+  ].join(" ");
+
+  /* ---- Class teacher's remark: 4 sentences ---- */
+  const result = studentResultOf(studentId);
+  if (!result || result.count === 0) {
+    // No marks recorded: keep four sentences, but quote nothing.
+    const unmarked = result
+      ? Object.entries(result.marks).find(([, m]) => m === null)?.[0]
+      : undefined;
+    const subj = unmarked
+      ? (subjects.find((s) => s.id === unmarked)?.name ?? "One subject")
+      : "Most subjects";
+    const ct = [
+      `${name}'s record is not yet complete for this term; marks are still being entered.`,
+      fill(pick(NO_MARK_OBSERVATIONS, ctRnd), { subject: subj }),
+      "Once all papers are marked, the average and class position will be finalised.",
+      "We encourage steady revision at home in the meantime.",
+    ].join(" ");
+    return { studentId, classTeacher: ct, parentalInvolvement, status: draft ? "draft" : "submitted", updatedAt };
+  }
+
+  const size = classResults(classId).length;
+  const band = CLASS_TEACHER_POOLS[result.grade] ? result.grade : "C";
+  const vars = {
+    name,
+    avg: result.average.toFixed(2),
+    rank: String(result.rank),
+    size: String(size),
+    class: className,
+  };
+
+  // Strongest and weakest assessed subjects (marks map → catalogue names).
+  let strongId: string | undefined;
+  let strongMark = -1;
+  let weakId: string | undefined;
+  let weakMark = 101;
+  let noMarkId: string | undefined;
+  for (const [sid, m] of Object.entries(result.marks)) {
+    if (m === null) {
+      noMarkId ??= sid;
+    } else if (m > strongMark) {
+      strongMark = m;
+      strongId = sid;
+    }
+    if (m !== null && m < weakMark) {
+      weakMark = m;
+      weakId = sid;
+    }
+  }
+  const subjName = (sid?: string) =>
+    sid ? (subjects.find((s) => s.id === sid)?.name ?? "one subject") : "one subject";
+
+  const sentence2 = fill(pick(STRONGEST_SENTENCES, ctRnd), {
+    subject: subjName(strongId),
+    mark: strongMark.toFixed(2),
+  });
+  const sentence3 = noMarkId
+    ? fill(pick(NO_MARK_OBSERVATIONS, ctRnd), { subject: subjName(noMarkId) })
+    : weakId && weakId !== strongId
+      ? fill(pick(CLASS_TEACHER_POOLS[band].focus, ctRnd), {
+          ...vars,
+          subject: subjName(weakId),
+          mark: weakMark.toFixed(2),
+        })
+      : pick(GENERIC_FOCUS_SENTENCES, ctRnd);
+
+  const classTeacher = [
+    fill(pick(CLASS_TEACHER_POOLS[band].open, ctRnd), vars),
+    sentence2,
+    sentence3,
+    pick(CLASS_TEACHER_POOLS[band].close, ctRnd),
+  ].join(" ");
+
   return {
     studentId,
-    classTeacher: missing ? null : commentTemplates[idx],
-    parentalInvolvement: missing ? null : parentalInvolvementNotes[pIdx],
-    status: missing ? "draft" : draft ? "draft" : "submitted",
-    updatedAt: `2026-03-0${1 + Math.floor(rnd() * 8)}`,
+    classTeacher,
+    parentalInvolvement,
+    status: draft ? "draft" : "submitted",
+    updatedAt,
   };
 }
 
