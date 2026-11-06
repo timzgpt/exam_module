@@ -132,7 +132,8 @@ export function ReportCardView({ child }: { child: Student }) {
           </p>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        {/* print-keep-together: the subject table is one atomic print block */}
+        <div className="print-keep-together mt-4 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -180,7 +181,7 @@ export function ReportCardView({ child }: { child: Student }) {
 
         {/* Summary: no rankings on the portal (B1.10) — average, grade or
             division, and subjects passed only. */}
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="print-keep-together mt-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border/80 p-3.5">
             <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
               Overall average
@@ -215,7 +216,7 @@ export function ReportCardView({ child }: { child: Student }) {
         {/* Attendance (A3.8) with the Swahili register label. */}
         <AttendanceSummaryCard variant="screen" summary={attendance} className="mt-3" />
 
-        <div className="mt-3 rounded-lg border border-border/80 bg-muted/40 p-4">
+        <div className="print-keep-together mt-3 rounded-lg border border-border/80 bg-muted/40 p-4">
           <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
             Class teacher&apos;s comments
           </p>

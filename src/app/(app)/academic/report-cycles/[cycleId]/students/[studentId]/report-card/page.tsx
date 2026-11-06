@@ -1,6 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -608,111 +607,113 @@ export default function ReportCardPage() {
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => {
-                const { subject, enrolled, mark, grade, ca, exam } = row;
-                // Progress = terminal − monthly, shown only when both
-                // components exist (single-assessment subjects carry their
-                // mark at 100 % and have no progress to report).
-                const delta = ca !== null && exam !== null ? exam - ca : null;
-                return (
-                  <Fragment key={subject.id}>
+            {/* One <tbody> per subject: a subject's mark row and its
+                comment row form one atomic print block, so a page break can
+                only fall BETWEEN subjects — never between a mark and its
+                comment. */}
+            {rows.map((row, rowIndex) => {
+              const { subject, enrolled, mark, grade, ca, exam } = row;
+              // Progress = terminal − monthly, shown only when both
+              // components exist (single-assessment subjects carry their
+              // mark at 100 % and have no progress to report).
+              const delta = ca !== null && exam !== null ? exam - ca : null;
+              return (
+                <tbody key={subject.id}>
+                  <tr>
+                    <td
+                      className={cn(
+                        CELL,
+                        "text-center text-2xs tabular text-muted-foreground",
+                      )}
+                    >
+                      {rowIndex + 1}
+                    </td>
+                    <td className={cn(CELL, "pl-4 text-[15px] font-semibold")}>
+                      {subject.name}
+                    </td>
+                    <td
+                      className={cn(
+                        CELL,
+                        "text-center text-[15px] tabular",
+                        ca === null && "text-muted-foreground",
+                      )}
+                    >
+                      {ca ?? "—"}
+                    </td>
+                    <td
+                      className={cn(
+                        CELL,
+                        "text-center text-[15px] tabular",
+                        exam === null && "text-muted-foreground",
+                      )}
+                    >
+                      {exam ?? "—"}
+                    </td>
+                    <td className={cn(CELL, "text-center text-[15px] font-bold tabular")}>
+                      {enrolled && mark !== null ? mark.toFixed(2) : "—"}
+                    </td>
+                    <td className={cn(CELL, "text-center")}>
+                      {enrolled && grade?.grade ? (
+                        <span
+                          className={cn(
+                            "inline-flex size-7 items-center justify-center rounded-full text-sm font-bold",
+                            grade.grade === topGrade
+                              ? "text-white"
+                              : "border border-border bg-white text-foreground",
+                          )}
+                          style={
+                            grade.grade === topGrade ? { backgroundColor: BRAND } : undefined
+                          }
+                        >
+                          {grade.grade}
+                        </span>
+                      ) : (
+                        <span className="text-[15px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className={cn(CELL, "text-center")}>
+                      {delta !== null ? (
+                        <span
+                          className={cn(
+                            "text-[15px] font-bold tabular",
+                            delta > 0
+                              ? "text-[#2D6A4E]"
+                              : delta < 0
+                                ? "text-[#C0392B]"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {delta > 0 ? "+" : delta < 0 ? "-" : ""}
+                          {Math.abs(delta).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-[15px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                  {/* Subject teacher's comment — terminal/annual cards only
+                      (mid-term and monthly templates have no subject
+                      comments), three personalised sentences, printed
+                      without a caption. */}
+                  {isTerminalLike ? (
                     <tr>
-                      <td
-                        className={cn(
-                          CELL,
-                          "text-center text-2xs tabular text-muted-foreground",
-                        )}
-                      >
-                        {rowIndex + 1}
-                      </td>
-                      <td className={cn(CELL, "pl-4 text-[15px] font-semibold")}>
-                        {subject.name}
-                      </td>
-                      <td
-                        className={cn(
-                          CELL,
-                          "text-center text-[15px] tabular",
-                          ca === null && "text-muted-foreground",
-                        )}
-                      >
-                        {ca ?? "—"}
-                      </td>
-                      <td
-                        className={cn(
-                          CELL,
-                          "text-center text-[15px] tabular",
-                          exam === null && "text-muted-foreground",
-                        )}
-                      >
-                        {exam ?? "—"}
-                      </td>
-                      <td className={cn(CELL, "text-center text-[15px] font-bold tabular")}>
-                        {enrolled && mark !== null ? mark.toFixed(2) : "—"}
-                      </td>
-                      <td className={cn(CELL, "text-center")}>
-                        {enrolled && grade?.grade ? (
-                          <span
-                            className={cn(
-                              "inline-flex size-7 items-center justify-center rounded-full text-sm font-bold",
-                              grade.grade === topGrade
-                                ? "text-white"
-                                : "border border-border bg-white text-foreground",
-                            )}
-                            style={
-                              grade.grade === topGrade ? { backgroundColor: BRAND } : undefined
-                            }
-                          >
-                            {grade.grade}
-                          </span>
-                        ) : (
-                          <span className="text-[15px] text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className={cn(CELL, "text-center")}>
-                        {delta !== null ? (
-                          <span
-                            className={cn(
-                              "text-[15px] font-bold tabular",
-                              delta > 0
-                                ? "text-[#2D6A4E]"
-                                : delta < 0
-                                  ? "text-[#C0392B]"
-                                  : "text-muted-foreground",
-                            )}
-                          >
-                            {delta > 0 ? "+" : delta < 0 ? "-" : ""}
-                            {Math.abs(delta).toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-[15px] text-muted-foreground">—</span>
-                        )}
+                      <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
+                        <span className="text-compact italic leading-relaxed text-foreground/80">
+                          {!enrolled
+                            ? "Not taking this subject."
+                            : mark !== null
+                              ? subjectComment(student.id, subject.id, mark, scheme, {
+                                  ca,
+                                  exam,
+                                })
+                              : "Not assessed."}
+                        </span>
                       </td>
                     </tr>
-                    {/* Subject teacher's comment — terminal/annual cards only
-                        (mid-term and monthly templates have no subject
-                        comments), three personalised sentences, printed
-                        without a caption. */}
-                    {isTerminalLike ? (
-                      <tr>
-                        <td colSpan={7} className={cn(CELL, "px-4 py-2")}>
-                          <span className="text-compact italic leading-relaxed text-foreground/80">
-                            {!enrolled
-                              ? "Not taking this subject."
-                              : mark !== null
-                                ? subjectComment(student.id, subject.id, mark, scheme, {
-                                    ca,
-                                    exam,
-                                  })
-                                : "Not assessed."}
-                          </span>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
+                  ) : null}
+                </tbody>
+              );
+            })}
           </table>
 
           <p className="mt-1.5 text-2xs text-muted-foreground">
@@ -982,33 +983,37 @@ export default function ReportCardPage() {
           </table>
 
           {/* Signature slots (A4 section 10): Class Teacher · Academic
-              Dean · Principal. A real sign-off adds images and timestamps. */}
-          <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
-            <div>
-              <div className="mx-auto w-40 border-t border-foreground/30" />
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Class Teacher
-              </p>
+              Dean · Principal. A real sign-off adds images and timestamps.
+              The whole sign-off block (signatures + seal) is one atomic
+              print block — it never splits across pages. */}
+          <div className="print-keep-together">
+            <div className="mt-10 grid grid-cols-2 gap-8 text-center text-compact sm:grid-cols-3">
+              <div>
+                <div className="mx-auto w-40 border-t border-foreground/30" />
+                <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Class Teacher
+                </p>
+              </div>
+              <div>
+                <div className="mx-auto w-40 border-t border-foreground/30" />
+                <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Academic Dean
+                </p>
+              </div>
+              <div>
+                <div className="mx-auto w-40 border-t border-foreground/30" />
+                <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Principal
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="mx-auto w-40 border-t border-foreground/30" />
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Academic Dean
-              </p>
-            </div>
-            <div>
-              <div className="mx-auto w-40 border-t border-foreground/30" />
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Principal
-              </p>
-            </div>
-          </div>
 
-          {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
-              literal character printed as "?" on old cards). */}
-          <p className="mt-6 text-center text-2xs text-muted-foreground">
-            {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
-          </p>
+            {/* Footer seal — diamond is the escaped \u25C6 (legacy bug 4: the
+                literal character printed as "?" on old cards). */}
+            <p className="mt-6 text-center text-2xs text-muted-foreground">
+              {"\u25C6"} {SCHOOL.name} · {SCHOOL.address} {"\u25C6"}
+            </p>
+          </div>
         </div>
       </div>
     </div>

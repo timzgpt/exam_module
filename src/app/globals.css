@@ -191,23 +191,89 @@
 }
 
 /* ------- Report card printing ------- */
+/* The PDF/print output must be exactly the .print-area card on white A4
+   paper: no app chrome, no container frame, no screen-only controls, and
+   pagination that flows naturally without slicing rows or sections. */
 @media print {
+  /* 1 · Everything outside the printable chain is removed from the layout
+     (display:none — unlike the old visibility:hidden trick it reserves no
+     space, so there is no offset above the card and no trailing blank
+     pages from hidden screen chrome). Ancestors of the card must stay to
+     keep it in the tree; the card itself and its descendants stay. */
+  body *:not(.print-area):not(.print-area *):not(:has(.print-area)) {
+    display: none !important;
+  }
+  /* Fallback for engines without :has() (the selector list above is then
+     invalid and dropped as a whole): the classic visibility trick still
+     hides the chrome. */
   body * {
     visibility: hidden;
   }
   .print-area,
   .print-area * {
     visibility: visible;
+  }
+
+  /* 2 · Ancestors of the card become plain white pass-throughs: no
+     container border, background, shadow or padding around the report. */
+  body :has(.print-area) {
+    display: block !important;
+    overflow: visible !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* 3 · The printed page IS the sheet: strip the on-screen preview chrome
+     (frame, padding, shadow, fixed sheet width) from the card itself and
+     let it flow in the normal document layout. Intentional table borders
+     inside the card are untouched. */
+  .print-area {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+
+  .print-area,
+  .print-area * {
     /* The maroon (#5C0A14) table headers must print as coloured. */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+
+  /* 4 · Intelligent pagination — nothing forces a page break, content
+     flows naturally, but no element is sliced in half: each table body
+     (whole section tables; per-subject groups inside the results table),
+     every row, the chart image and any .print-keep-together block stays
+     on one page. The maroon header bands repeat on continuation pages via
+     thead's default table-header-group behaviour. */
+  .print-area tr,
+  .print-area tbody,
+  .print-area thead,
+  .print-area img,
+  .print-keep-together {
+    break-inside: avoid;
   }
+
   @page {
     size: A4;
     margin: 12mm;
