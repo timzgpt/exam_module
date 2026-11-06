@@ -14,7 +14,7 @@ import {
   currentActor,
 } from "../src/lib/academic-store";
 import { useViewer } from "../src/lib/viewer";
-import { adoptedCurriculum, itemUsage } from "../src/lib/academic-admin";
+import { adoptedCurriculum, effectiveAssignedSubjectIds, itemUsage } from "../src/lib/academic-admin";
 import { studentsInClass, teacherById } from "../src/lib/demo-data";
 
 let failures = 0;
@@ -209,6 +209,31 @@ check("effective scoping still mirrors demo after reset",
     .every((a) => teacherById(a.teacherId) !== undefined));
 
 /* ── summary ──────────────────────────────────────────────────────── */
+/* ── 9 · Teacher access follows allocations (task §7/§12) ────────── */
+store.getState().resetToSeed();
+asMaster();
+const t1View = { role: "subject-teacher", teacherId: "t1" } as const;
+const mathsBefore = effectiveAssignedSubjectIds(store.getState(), t1View, FORM3A);
+check("t1 derives Mathematics access from active assignments",
+  mathsBefore.length === 1 && mathsBefore[0] === "s1");
+const reassignMaths = store.getState().assignTeacher({
+  teacherId: "t2", classId: FORM3A, itemId: "item-s1", academicYear: YEAR, role: "subject-teacher",
+});
+check("reassignment of Mathematics to t2 succeeds", reassignMaths.ok, reassignMaths.error ?? "");
+check("t1 loses marks-entry access after reassignment",
+  effectiveAssignedSubjectIds(store.getState(), t1View, FORM3A).length === 0);
+const t2View = { role: "subject-teacher", teacherId: "t2" } as const;
+check("t2 gains marks-entry access after reassignment",
+  effectiveAssignedSubjectIds(store.getState(), t2View, FORM3A).includes("s1"));
+// Safety net (§12): a class with NO assignment rows falls back to the demo map.
+const stripped = {
+  ...store.getState(),
+  assignments: store.getState().assignments.filter((a) => a.classId !== FORM3A),
+};
+const fallback = effectiveAssignedSubjectIds(stripped, t1View, FORM3A);
+check("class without assignment rows falls back to legacy derivation",
+  fallback.length === 1 && fallback[0] === "s1");
+
 asMaster();
 console.log(
   failures === 0

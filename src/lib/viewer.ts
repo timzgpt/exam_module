@@ -2,15 +2,17 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { classes, classSubjectsFor, subjectTeacherOf, teacherById, teachers } from "./demo-data";
-import type { ClassRoom, Teacher } from "./types";
+import { teacherById, teachers } from "./demo-data";
+import type { Teacher } from "./types";
 
 /**
- * Viewer / role model for marks entry (task §4). The app has no auth backend
+ * Viewer / role model for the app (task §4/§13). The app has no auth backend
  * yet, so the "current user" is a persisted demo viewer the UI scopes access
- * against. In a real deployment this is replaced by the authenticated session
- * and the same guards (`canEditSubject`, `assignedSubjectIdsForClass`) run on
- * the server before any write.
+ * against. Subject access itself (assignedSubjectIdsForClass / canEditSubject /
+ * useVisibleClassesForViewer) is DERIVED from the academic store's active
+ * teacher assignments — this module only owns the identity + role switcher.
+ * In a real deployment this is replaced by the authenticated session and the
+ * same guards run on the server before any write.
  *
  *   subject-teacher  — sees and edits ONLY their assigned subjects/classes
  *   academic-master  — sees every subject; monitors and approves (demo: can edit)
@@ -62,27 +64,6 @@ export function viewerLabel(v: Viewer): string {
   if (isScoped(v)) return `${teacherById(v.teacherId)?.name ?? "Teacher"} · Subject Teacher`;
   if (v.role === "administrator") return "Administrator";
   return "Academic Master";
-}
-
-/** Subject ids the viewer may enter marks for in a class (task §4). */
-export function assignedSubjectIdsForClass(v: Viewer, classId: string): string[] {
-  const all = classSubjectsFor(classId).map((cs) => cs.subjectId);
-  if (!isScoped(v)) return all;
-  return all.filter((sid) => subjectTeacherOf(sid, classId)?.id === v.teacherId);
-}
-
-/** Whether the viewer may edit a given subject's marks in a class. */
-export function canEditSubject(v: Viewer, classId: string, subjectId: string): boolean {
-  if (!isScoped(v)) return true; // master / administrator — demo super-users
-  return assignedSubjectIdsForClass(v, classId).includes(subjectId);
-}
-
-/** Classes the viewer may open: all for masters, assigned-only for teachers. */
-export function visibleClassesForViewer(v: Viewer): ClassRoom[] {
-  if (!isScoped(v)) return classes;
-  return classes.filter((c) =>
-    classSubjectsFor(c.id).some((cs) => subjectTeacherOf(cs.subjectId, c.id)?.id === v.teacherId),
-  );
 }
 
 /** Teachers assignable as the signed-in subject teacher (have ≥1 subject). */

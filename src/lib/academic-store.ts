@@ -25,8 +25,8 @@ import {
   type SubjectCombination,
   type TeacherItemAssignment,
 } from "./academic-admin";
-import { studentsInClass } from "./demo-data";
-import type { ClassSubject } from "./types";
+import { classes, studentsInClass } from "./demo-data";
+import type { ClassRoom, ClassSubject } from "./types";
 import { useViewer } from "./viewer";
 
 /**
@@ -917,6 +917,38 @@ export function useRegisteredItemIds(
     () => registeredItemIdsForStudent({ registrations }, classId, studentId),
     [registrations, classId, studentId],
   );
+}
+
+/**
+ * Classes the viewer may open (task §7): masters/administrators see every
+ * class; a subject teacher sees only classes where they hold an ACTIVE
+ * teacher assignment (derived from the academic store, so reassignments on
+ * the Teacher Allocation page apply immediately). Classes without any
+ * assignment rows fall back to the legacy demo derivation inside
+ * effectiveAssignedSubjectIds, keeping the app usable if config is reset.
+ */
+export function useVisibleClassesForViewer(viewer: {
+  role: string;
+  teacherId: string | null;
+}): ClassRoom[] {
+  useEffect(() => {
+    void useAcademicAdminStore.persist.rehydrate();
+  }, []);
+  const curricula = useAcademicAdminStore((s) => s.curricula);
+  const adoptions = useAcademicAdminStore((s) => s.adoptions);
+  const assignments = useAcademicAdminStore((s) => s.assignments);
+  const assessmentOverrides = useAcademicAdminStore((s) => s.assessmentOverrides);
+  return useMemo(() => {
+    if (viewer.role !== "subject-teacher" || !viewer.teacherId) return classes;
+    return classes.filter(
+      (c) =>
+        effectiveAssignedSubjectIds(
+          { curricula, adoptions, assignments, assessmentOverrides },
+          viewer,
+          c.id,
+        ).length > 0,
+    );
+  }, [viewer, curricula, adoptions, assignments, assessmentOverrides]);
 }
 
 /** Mount-time rehydration hook (prevents SSR/client hydration mismatches). */

@@ -38,16 +38,15 @@ import {
   schemeForClass,
   studentsInClass,
   subjectById,
-  subjectTeacherOf,
+  teacherById,
 } from "@/lib/demo-data";
+import { subjectTeachers, useViewer, viewerLabel, type Viewer } from "@/lib/viewer";
 import {
-  subjectTeachers,
-  useViewer,
-  viewerLabel,
-  visibleClassesForViewer,
-  type Viewer,
-} from "@/lib/viewer";
-import { assignedSubjectIdsForClass, canEditSubject, useAcademicAdminStore } from "@/lib/academic-store";
+  assignedSubjectIdsForClass,
+  canEditSubject,
+  useAcademicAdminStore,
+  useVisibleClassesForViewer,
+} from "@/lib/academic-store";
 import { effectiveClassSubjectsFor, registeredStudentsFor } from "@/lib/academic-admin";
 import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
@@ -166,7 +165,7 @@ export function SubjectMarksEntry({
   );
 
   const routeClass = classById(routeClassId);
-  const visibleClasses = useMemo(() => visibleClassesForViewer(viewer), [viewer]);
+  const visibleClasses = useVisibleClassesForViewer(viewer);
   // Effective allocation decides whether the deep-linked subject exists.
   const curricula = useAcademicAdminStore((s) => s.curricula);
   const adoptions = useAcademicAdminStore((s) => s.adoptions);
@@ -507,7 +506,9 @@ function SubjectMarkSheet({
   const subject = subjectById(subjectId)!;
   const scheme = schemeForClass(cls.id);
   const isPrimary = isPrimaryClass(cls.id);
-  const teacherName = subjectTeacherOf(subject.id, cls.id)?.name ?? "Unassigned";
+  // Teacher from the ACTIVE assignment (academic store) — §7 derivation.
+  const teacherName =
+    (classSubject.teacherId ? teacherById(classSubject.teacherId)?.name : null) ?? "Unassigned";
 
   const combined = combinedComponents(cycle);
   const w1 = combined ? combined[0].weight : classSubject.caMarks;
