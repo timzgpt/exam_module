@@ -24,10 +24,13 @@ import {
   type ChartVariant,
 } from "@/lib/chart/performance-chart";
 import {
+  useEffectiveClassSubjects,
+  useRegisteredItemIds,
+} from "@/lib/academic-store";
+import {
   attendanceRecordFor,
   classById,
   classes,
-  classSubjectsFor,
   classNameOf,
   commentFor,
   getComponents,
@@ -199,7 +202,10 @@ export default function ReportCardPage() {
   const classTeacherName =
     teacherById(classById(student.classId)?.classTeacherId)?.name ?? "\u2014";
 
-  const classSubjects = classSubjectsFor(student.classId);
+  // Task §12: subjects come from the class's effective allocation and the
+  // student's active registrations (seeded state mirrors the demo exactly).
+  const classSubjects = useEffectiveClassSubjects(student.classId);
+  const registeredItemIds = useRegisteredItemIds(student.classId, student.id);
   const scheme = schemeForClass(student.classId);
   // ── Two report card templates ────────────────────────────────────────
   // The student's school level selects the template, so choosing a class
@@ -225,7 +231,9 @@ export default function ReportCardPage() {
   const allRows = classSubjects.map((cs) => {
     const subject = subjectById(cs.subjectId)!;
     const comp = getComponents(student.classId, cs.subjectId)[student.id];
-    const enrolled = comp?.enrolled ?? true;
+    const enrolled = registeredItemIds
+      ? registeredItemIds.includes(`item-${cs.subjectId}`)
+      : (comp?.enrolled ?? true);
     const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
     const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
     return {

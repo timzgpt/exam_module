@@ -10,7 +10,7 @@
 
 import {
   adoptedCurriculum,
-  assignedSubjectIdsForClass,
+  effectiveAssignedSubjectIds,
   classCompleteness,
   buildSeedAcademicState,
   effectiveClassSubjectsFor,
@@ -48,13 +48,15 @@ check("catalogue registers subjects once (no per-class copies)",
   seed.items.filter((i) => i.name === "Mathematics").length === 1);
 check("codes are unique", new Set(seed.items.map((i) => i.code)).size === seed.items.length);
 check("duplicate code rejected",
-  validateItem(seed, { name: "Further Maths", code: "MTH", type: "subject", sections: ["Secondary"] }).length === 1);
+  validateItem(seed, { name: "Further Maths", code: "MTH", type: "subject", category: "Mathematics", sections: ["Secondary"] }).length === 1);
 check("duplicate name rejected",
-  validateItem(seed, { name: "mathematics", code: "FMT", type: "subject", sections: ["Secondary"] }).length === 1);
+  validateItem(seed, { name: "mathematics", code: "FMT", type: "subject", category: "Mathematics", sections: ["Secondary"] }).length === 1);
 check("item without sections rejected",
-  validateItem(seed, { name: "X", code: "XXX", type: "subject", sections: [] }).length === 1);
+  validateItem(seed, { name: "X", code: "XXX", type: "subject", category: "Sciences", sections: [] }).length === 1);
+check("item without category rejected",
+  validateItem(seed, { name: "X", code: "XXX", type: "subject", category: "  ", sections: ["Primary"] }).some((e) => e.includes("Category")));
 check("valid new item passes",
-  validateItem(seed, { name: "Further Maths", code: "FMT", type: "subject", sections: ["Secondary"] }).length === 0);
+  validateItem(seed, { name: "Further Maths", code: "FMT", type: "subject", category: "Mathematics", sections: ["Secondary"] }).length === 0);
 check("subjects available to both sections",
   seed.items.filter((i) => i.type === "subject").every((i) => i.sections.includes("Primary") && i.sections.includes("Secondary")));
 check("learning areas are Early Years only",
@@ -119,11 +121,11 @@ check("teacher allocation mirrors demo subjectTeacherOf",
   effectiveClassSubjectsFor(seed, FORM3A).every((cs) => cs.teacherId !== ""));
 const master = { role: "academic-master", teacherId: null };
 check("academic master sees every subject",
-  assignedSubjectIdsForClass(seed, master, FORM3A).length === 9);
+  effectiveAssignedSubjectIds(seed, master, FORM3A).length === 9);
 const teacher = seed.assignments.find((a) => a.classId === FORM3A && a.role === "subject-teacher")!;
 const scoped = { role: "subject-teacher", teacherId: teacher.teacherId };
 check("subject-teacher sees only assigned subjects (when scoped)",
-  assignedSubjectIdsForClass(seed, scoped, FORM3A).every((sid) =>
+  effectiveAssignedSubjectIds(seed, scoped, FORM3A).every((sid) =>
     seed.assignments.some((a) => a.classId === FORM3A && a.itemId === `item-${sid}` && a.teacherId === teacher.teacherId)));
 const wl = workloadFor(seed, "t1");
 check("workload counts classes and items for t1", wl.items.length > 0 && wl.classes.length > 0,

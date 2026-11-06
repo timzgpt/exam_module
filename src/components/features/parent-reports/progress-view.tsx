@@ -9,7 +9,6 @@ import { routes } from "@/lib/demo-config";
 import {
   classById,
   classNameOf,
-  classSubjectsFor,
   currentCycle,
   getComponents,
   schemeForClass,
@@ -35,6 +34,7 @@ import {
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffectiveClassSubjects } from "@/lib/academic-store";
 
 /** Tiny stable string hash (Java-style, can be negative). Distinct from the
  * FNV-1a hashStr in demo-data; kept page-local on purpose. */
@@ -63,7 +63,8 @@ export function ProgressView({ child }: { child: Student }) {
 
   // Class-subject order (set on the Class subjects page); non-enrolled
   // subsidiaries stay in the list with "—".
-  const subjectRows = classSubjectsFor(child.classId).map((cs) => {
+  const classSubjects = useEffectiveClassSubjects(child.classId);
+  const subjectRows = classSubjects.map((cs) => {
     const comp = getComponents(child.classId, cs.subjectId)[child.id];
     return {
       sub: subjectById(cs.subjectId)!,

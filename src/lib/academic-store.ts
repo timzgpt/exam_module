@@ -2,10 +2,13 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ACADEMIC_SEED_VERSION,
   adoptionKey,
+  effectiveAssignedSubjectIds,
+  effectiveClassSubjectsFor,
+  registeredItemIdsForStudent,
   assessmentKey,
   buildSeedAcademicState,
   itemById,
@@ -23,6 +26,7 @@ import {
   type TeacherItemAssignment,
 } from "./academic-admin";
 import { studentsInClass } from "./demo-data";
+import type { ClassSubject } from "./types";
 import { useViewer } from "./viewer";
 
 /**
@@ -855,6 +859,58 @@ function bulkHelpers(data: AcademicAdminData, classId: string, year: string) {
     (c) => c.id === data.adoptions[adoptionKey(classId, year)]?.curriculumId,
   );
   return { adoptedCurriculum: curriculum, studentsInClassOf: studentsInClass(classId) };
+}
+
+/* ----------------------------------------------------------------
+ * Role-aware access helpers for marks entry (task §12). They read the
+ * academic store non-reactively (actions/entry guards run after mount
+ * hydration) and delegate to the pure helpers in academic-admin.ts.
+ * ---------------------------------------------------------------- */
+
+export function assignedSubjectIdsForClass(
+  viewer: { role: string; teacherId: string | null },
+  classId: string,
+): string[] {
+  const s = useAcademicAdminStore.getState();
+  return effectiveAssignedSubjectIds(s, viewer, classId);
+}
+
+export function canEditSubject(
+  viewer: { role: string; teacherId: string | null },
+  classId: string,
+  subjectId: string,
+): boolean {
+  return assignedSubjectIdsForClass(viewer, classId).includes(subjectId);
+}
+
+/** Effective class subjects as a reactive hook (report cards, analysis). */
+export function useEffectiveClassSubjects(classId: string): ClassSubject[] {
+  useEffect(() => {
+    void useAcademicAdminStore.persist.rehydrate();
+  }, []);
+  const curricula = useAcademicAdminStore((s) => s.curricula);
+  const adoptions = useAcademicAdminStore((s) => s.adoptions);
+  const assignments = useAcademicAdminStore((s) => s.assignments);
+  const assessmentOverrides = useAcademicAdminStore((s) => s.assessmentOverrides);
+  return useMemo(
+    () => effectiveClassSubjectsFor({ curricula, adoptions, assignments, assessmentOverrides }, classId),
+    [curricula, adoptions, assignments, assessmentOverrides, classId],
+  );
+}
+
+/** The student's actively registered item ids (null = no records yet). */
+export function useRegisteredItemIds(
+  classId: string,
+  studentId: string,
+): string[] | null {
+  useEffect(() => {
+    void useAcademicAdminStore.persist.rehydrate();
+  }, []);
+  const registrations = useAcademicAdminStore((s) => s.registrations);
+  return useMemo(
+    () => registeredItemIdsForStudent({ registrations }, classId, studentId),
+    [registrations, classId, studentId],
+  );
 }
 
 /** Mount-time rehydration hook (prevents SSR/client hydration mismatches). */

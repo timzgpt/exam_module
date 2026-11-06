@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/table";
 import { usePrintDownload } from "@/hooks/use-print-download";
 import { useClassTemplateKind } from "@/hooks/use-class-template";
+import { useEffectiveClassSubjects, useRegisteredItemIds } from "@/lib/academic-store";
 import { SCHOOL } from "@/lib/demo-config";
 import {
   attendanceRecordFor,
   classById,
   classNameOf,
-  classSubjectsFor,
   commentFor,
   currentCycle,
   getComponents,
@@ -71,11 +71,16 @@ export function ReportCardView({ child }: { child: Student }) {
   const isPrimary = isPrimaryClass(child.classId);
   // Class-subject order (set on the Class subjects page). A subject with no
   // mark at all is omitted entirely; non-enrolled subsidiaries stay with "—".
-  const rows = classSubjectsFor(child.classId)
+  // Registration-aware rows (task §12); seeded state mirrors the demo.
+  const classSubjects = useEffectiveClassSubjects(child.classId);
+  const registeredItemIds = useRegisteredItemIds(child.classId, child.id);
+  const rows = classSubjects
     .map((cs) => {
       const subject = subjectById(cs.subjectId)!;
       const comp = getComponents(child.classId, cs.subjectId)[child.id];
-      const enrolled = comp?.enrolled ?? true;
+      const enrolled = registeredItemIds
+        ? registeredItemIds.includes(`item-${cs.subjectId}`)
+        : (comp?.enrolled ?? true);
       const mark = enrolled ? result?.marks[cs.subjectId] ?? null : null;
       const grade = mark !== null ? gradeFor(mark, scheme) : undefined;
       return {

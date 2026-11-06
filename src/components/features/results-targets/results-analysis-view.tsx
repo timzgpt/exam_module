@@ -19,7 +19,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useClassContext, useCycleContext } from "@/hooks/use-academic-context";
 import {
   classResults,
-  classSubjectsFor,
   getComponents,
   isPrimaryClass,
   schemeForClass,
@@ -41,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ArrowDownRight, Award, CheckCircle2, Download, Percent } from "lucide-react";
 import { useMemo } from "react";
+import { useEffectiveClassSubjects } from "@/lib/academic-store";
 
 const BRAND_COLOR = "var(--primary)";
 
@@ -52,7 +52,7 @@ export function ResultsAnalysisView() {
 
   const results = useMemo(() => classResults(cls.id), [cls.id]);
   const subjectStats = useMemo(() => subjectAveragesFor(cls.id), [cls.id]);
-  const classSubjects = useMemo(() => classSubjectsFor(cls.id), [cls.id]);
+  const classSubjects = useEffectiveClassSubjects(cls.id);
   const scheme = schemeForClass(cls.id);
   const isPrimary = isPrimaryClass(cls.id);
 

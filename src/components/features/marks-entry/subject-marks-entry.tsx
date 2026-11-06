@@ -30,7 +30,6 @@ import { useAppContext, selectCycles } from "@/lib/store";
 import { combinedComponents } from "@/lib/cycle-components";
 import {
   classById,
-  classSubjectsFor,
   eligibleStudentsFor,
   getComponents,
   getMarks,
@@ -42,14 +41,14 @@ import {
   subjectTeacherOf,
 } from "@/lib/demo-data";
 import {
-  assignedSubjectIdsForClass,
-  canEditSubject,
   subjectTeachers,
   useViewer,
   viewerLabel,
   visibleClassesForViewer,
   type Viewer,
 } from "@/lib/viewer";
+import { assignedSubjectIdsForClass, canEditSubject, useAcademicAdminStore } from "@/lib/academic-store";
+import { effectiveClassSubjectsFor, registeredStudentsFor } from "@/lib/academic-admin";
 import { averageOf, fmtTotalMark, formatAvg, gradeFor, subjectTotal } from "@/lib/grading";
 import { cn } from "@/lib/utils";
 import type { ClassRoom, MarkStatusCode, ReportCycle } from "@/lib/types";
@@ -168,6 +167,15 @@ export function SubjectMarksEntry({
 
   const routeClass = classById(routeClassId);
   const visibleClasses = useMemo(() => visibleClassesForViewer(viewer), [viewer]);
+  // Effective allocation decides whether the deep-linked subject exists.
+  const curricula = useAcademicAdminStore((s) => s.curricula);
+  const adoptions = useAcademicAdminStore((s) => s.adoptions);
+  const assignments = useAcademicAdminStore((s) => s.assignments);
+  const assessmentOverrides = useAcademicAdminStore((s) => s.assessmentOverrides);
+  const effectiveSubjects = useMemo(
+    () => effectiveClassSubjectsFor({ curricula, adoptions, assignments, assessmentOverrides }, routeClassId),
+    [curricula, adoptions, assignments, assessmentOverrides, routeClassId],
+  );
 
   // ── Filter draft (committed only on Search via navigation) ──────
   const computeDraft = () => ({
@@ -253,7 +261,7 @@ export function SubjectMarksEntry({
   const loadedValid =
     !!subjectParam &&
     !!routeClass &&
-    classSubjectsFor(routeClassId).some((cs) => cs.subjectId === subjectParam);
+    effectiveSubjects.some((cs) => cs.subjectId === subjectParam);
   const loadedPermitted = loadedValid && canEditSubject(viewer, routeClassId, subjectParam);
 
   const changeSubject = () => router.push(pathname);
@@ -476,8 +484,26 @@ function SubjectMarkSheet({
   onChangeSubject: () => void;
 }) {
   const { toast } = useToast();
-  const students = useMemo(() => studentsInClass(cls.id), [cls.id]);
-  const classSubject = classSubjectsFor(cls.id).find((c) => c.subjectId === subjectId)!;
+  // Task §12: the sheet resolves the EFFECTIVE allocation (adopted
+  // curriculum + assessment overrides) and only REGISTERED students.
+  const curricula = useAcademicAdminStore((s) => s.curricula);
+  const adoptions = useAcademicAdminStore((s) => s.adoptions);
+  const assignments = useAcademicAdminStore((s) => s.assignments);
+  const assessmentOverrides = useAcademicAdminStore((s) => s.assessmentOverrides);
+  const registrations = useAcademicAdminStore((s) => s.registrations);
+  const classSubjects = useMemo(
+    () => effectiveClassSubjectsFor({ curricula, adoptions, assignments, assessmentOverrides }, cls.id),
+    [curricula, adoptions, assignments, assessmentOverrides, cls.id],
+  );
+  const registeredStudents = useMemo(
+    () => registeredStudentsFor({ registrations }, cls.id, `item-${subjectId}`),
+    [registrations, cls.id, subjectId],
+  );
+  const students = useMemo(
+    () => registeredStudents ?? studentsInClass(cls.id),
+    [registeredStudents, cls.id],
+  );
+  const classSubject = classSubjects.find((c) => c.subjectId === subjectId)!;
   const subject = subjectById(subjectId)!;
   const scheme = schemeForClass(cls.id);
   const isPrimary = isPrimaryClass(cls.id);
@@ -572,7 +598,9 @@ function SubjectMarkSheet({
   const invalidCount = rows.filter(
     (r) => parseCell(r.cells.ca).state === "invalid" || parseCell(r.cells.exam).state === "invalid",
   ).length;
-  const eligibleCount = eligibleStudentsFor(cls.id, subjectId).length;
+  const eligibleCount = registeredStudents
+    ? registeredStudents.length
+    : eligibleStudentsFor(cls.id, subjectId).length;
   const enteredPct = eligibleCount ? Math.round((entered.length / eligibleCount) * 100) : 0;
   const classAverage = averageOf(entered.map((r) => r.mark.total as number));
 

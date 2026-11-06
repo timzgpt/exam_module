@@ -21,6 +21,8 @@ import {
 } from "./nursery";
 import type { ClassSubject, SchoolSection, Student } from "./types";
 
+export type { SchoolSection };
+
 /* ================================================================
  * Academic Administration — data model (module task §10)
  * ================================================================
@@ -583,7 +585,10 @@ export function buildSeedAcademicState(): AcademicAdminData {
 export const adoptionKey = (classId: string, year: string) => `${classId}|${year}`;
 export const assessmentKey = (classId: string, itemId: string) => `${classId}|${itemId}`;
 
-export function itemById(data: AcademicAdminData, id: string): AcademicItem | undefined {
+export function itemById(
+  data: Pick<AcademicAdminData, "items">,
+  id: string,
+): AcademicItem | undefined {
   return data.items.find((i) => i.id === id);
 }
 
@@ -593,7 +598,7 @@ export function itemBySubject(data: AcademicAdminData, subjectId: string): Acade
 
 /** Curriculum adopted by a class for an academic year (undefined = none). */
 export function adoptedCurriculum(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "adoptions" | "curricula">,
   classId: string,
   year = "2026",
 ): Curriculum | undefined {
@@ -609,7 +614,7 @@ const DEMO_WEIGHTS = { caMarks: 25, examMarks: 75, fullMarks: 100 };
  * the class has no adoption, so existing pipelines never break.
  */
 export function effectiveClassSubjectsFor(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "assessmentOverrides">,
   classId: string,
   year = "2026",
 ): ClassSubject[] {
@@ -647,7 +652,7 @@ export function effectiveClassSubjectsFor(
 
 /** Active teacher assignment for one class + item (latest wins). */
 export function activeAssignmentFor(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "assignments">,
   classId: string,
   itemId: string,
   year = "2026",
@@ -664,25 +669,34 @@ export function activeAssignmentFor(
 }
 
 /**
- * Subject ids the viewer may enter marks for in a class. When the academic
- * store holds assignments for the class, they are authoritative; otherwise
- * the demo derivation applies.
+ * Subject ids the viewer may enter marks for in a class (task §12/§13).
+ * When the academic store holds teacher assignments for the class they are
+ * authoritative and the scoping is strict: a subject teacher with no active
+ * assignment rows in a configured class sees NOTHING there. Classes without
+ * any assignment rows fall back to the legacy demo derivation so the app
+ * keeps working if configuration is reset.
  */
-export function assignedSubjectIdsForClass(
-  data: AcademicAdminData,
+export function effectiveAssignedSubjectIds(
+  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "assessmentOverrides">,
   viewer: { role: string; teacherId: string | null },
   classId: string,
 ): string[] {
   const all = effectiveClassSubjectsFor(data, classId).map((cs) => cs.subjectId);
   if (viewer.role !== "subject-teacher" || !viewer.teacherId) return all;
+  const classConfigured = data.assignments.some(
+    (a) => a.classId === classId && a.academicYear === "2026",
+  );
+  if (!classConfigured) {
+    return all.filter((sid) => subjectTeacherOf(sid, classId)?.id === viewer.teacherId);
+  }
   const mine = data.assignments.filter(
     (a) =>
       a.classId === classId &&
       a.teacherId === viewer.teacherId &&
       a.status === "assigned" &&
-      a.endsAt === null,
+      a.endsAt === null &&
+      a.academicYear === "2026",
   );
-  if (mine.length === 0) return all;
   const mineItems = new Set(mine.map((a) => a.itemId));
   return all.filter((sid) => mineItems.has(`item-${sid}`));
 }
@@ -693,7 +707,7 @@ export function assignedSubjectIdsForClass(
  * eligibility).
  */
 export function registeredStudentsFor(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "registrations">,
   classId: string,
   itemId: string,
   year = "2026",
@@ -707,7 +721,7 @@ export function registeredStudentsFor(
 }
 
 export function registeredItemIdsForStudent(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "registrations">,
   classId: string,
   studentId: string,
   year = "2026",
@@ -741,7 +755,10 @@ export interface ItemUsage {
   assignments: number;
 }
 
-export function itemUsage(data: AcademicAdminData, itemId: string): ItemUsage {
+export function itemUsage(
+  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "registrations">,
+  itemId: string,
+): ItemUsage {
   return {
     curricula: data.curricula.filter((c) => c.items.some((ci) => ci.itemId === itemId)),
     adoptions: Object.values(data.adoptions)
@@ -758,7 +775,7 @@ export function itemUsage(data: AcademicAdminData, itemId: string): ItemUsage {
 
 /** Teacher workload: distinct classes and items from active assignments. */
 export function workloadFor(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "assignments" | "curricula">,
   teacherId: string,
   year = "2026",
 ): { classes: string[]; items: { itemId: string; classId: string }[]; periods: number } {
@@ -786,6 +803,7 @@ export function validateItem(
   const errors: string[] = [];
   if (!draft.name.trim()) errors.push("Name is required.");
   if (!draft.code.trim()) errors.push("Code is required.");
+  if (!draft.category?.trim()) errors.push("Category is required.");
   if (draft.sections.length === 0)
     errors.push("Choose at least one applicable school section.");
   const code = draft.code.trim().toUpperCase();
@@ -808,7 +826,7 @@ export interface RegistrationValidation {
 }
 
 export function validateRegistration(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "registrations" | "items" | "combinations" | "registrationModes">,
   studentId: string,
   classId: string,
   optionalItemIds: string[],
@@ -891,7 +909,7 @@ export interface ClassCompleteness {
 }
 
 export function classCompleteness(
-  data: AcademicAdminData,
+  data: Pick<AcademicAdminData, "curricula" | "adoptions" | "assignments" | "registrations" | "items">,
   classId: string,
   year = "2026",
 ): ClassCompleteness {

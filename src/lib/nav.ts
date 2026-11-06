@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ClipboardList,
   FileText,
+  GraduationCap,
   IdCard,
   Layers,
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
   MessageSquareText,
   PenLine,
   SlidersHorizontal,
+  Users,
 } from "lucide-react";
 import type { NavItemDef } from "./types";
 
@@ -24,6 +26,75 @@ import type { NavItemDef } from "./types";
  * from the contextual selection store (see lib/store.ts + demo-config.ts).
  */
 export const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
+  {
+    label: "Academic management",
+    items: [
+      {
+        key: "academic-dashboard",
+        label: "Academic Dashboard",
+        group: "Academic management",
+        hrefTemplate: "/academic",
+        icon: LayoutDashboard,
+        description: "Configuration completeness across sections",
+      },
+      {
+        key: "academic-years",
+        label: "Academic Years & Terms",
+        group: "Academic management",
+        hrefTemplate: "/academic/years",
+        icon: CalendarRange,
+        description: "Academic years and their terms",
+      },
+      {
+        key: "academic-catalogue",
+        label: "Subject catalogue",
+        group: "Academic management",
+        hrefTemplate: "/academic/catalogue",
+        icon: BookOpen,
+        description: "Central subject & learning area catalogue",
+      },
+      {
+        key: "academic-curricula",
+        label: "Curriculum Management",
+        group: "Academic management",
+        hrefTemplate: "/academic/curricula",
+        icon: Layers,
+        description: "Section curricula, combinations and modes",
+      },
+      {
+        key: "academic-allocation",
+        label: "Class Subject Allocation",
+        group: "Academic management",
+        hrefTemplate: "/academic/allocation",
+        icon: ClipboardList,
+        description: "Apply curricula to class streams",
+      },
+      {
+        key: "academic-teachers",
+        label: "Teacher Allocation",
+        group: "Academic management",
+        hrefTemplate: "/academic/teacher-allocation",
+        icon: Users,
+        description: "Responsible teachers per class subject",
+      },
+      {
+        key: "academic-registrations",
+        label: "Student Registration",
+        group: "Academic management",
+        hrefTemplate: "/academic/registrations",
+        icon: ListChecks,
+        description: "Student subject registration and coverage",
+      },
+      {
+        key: "academic-assessment",
+        label: "Assessment Configuration",
+        group: "Academic management",
+        hrefTemplate: "/academic/assessment-config",
+        icon: SlidersHorizontal,
+        description: "Assessment types and weightings per class subject",
+      },
+    ],
+  },
   {
     label: "Exams",
     items: [
@@ -257,6 +328,7 @@ export function breadcrumbFor(
 }
 
 function groupTitle(group: string): string {
+  if (group === "Academic management") return "Academic management";
   if (group === "Report cards") return "Report cards";
   if (group === "Parent portal") return "Parent portal";
   if (group === "Classes") return "Classes";
