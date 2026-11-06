@@ -268,10 +268,13 @@ export function SubjectMarksEntry({
 
       {/* ── Filter panel ─────────────────────────────────────────── */}
       <SectionCard>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        {/* Examination gets the widest track so full cycle names fit;
+            every field can still shrink (min-w-0) and ellipsize. Six
+            across only from xl — md/lg use three pairs per row. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.1fr)]">
           <FilterField label="Exam Group">
             <Select value={draft.examGroup} onValueChange={pickExamGroup}>
-              <SelectTrigger aria-label="Exam Group"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0" aria-label="Exam Group"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {examGroups.map((g) => (
                   <SelectItem key={g} value={g}>{EXAM_GROUP_LABEL[g]}</SelectItem>
@@ -282,7 +285,7 @@ export function SubjectMarksEntry({
 
           <FilterField label="Examination">
             <Select value={draft.examId} onValueChange={pickExam}>
-              <SelectTrigger aria-label="Examination"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0" aria-label="Examination"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {examsInGroup.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
@@ -292,14 +295,19 @@ export function SubjectMarksEntry({
           </FilterField>
 
           <FilterField label="Session">
-            <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-compact text-foreground">
-              {selectedExam.academicYear} · {selectedExam.term}
+            <div
+              title={`${selectedExam.academicYear} · ${selectedExam.term}`}
+              className="flex h-9 w-full min-w-0 items-center overflow-hidden rounded-md border border-input bg-muted/40 px-3 text-compact whitespace-nowrap text-foreground"
+            >
+              <span className="truncate">
+                {selectedExam.academicYear} · {selectedExam.term}
+              </span>
             </div>
           </FilterField>
 
           <FilterField label="Class">
             <Select value={draft.classLevel} onValueChange={pickLevel}>
-              <SelectTrigger aria-label="Class"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0" aria-label="Class"><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
                 {classLevels.map((l) => (
                   <SelectItem key={l} value={l}>{l}</SelectItem>
@@ -310,7 +318,7 @@ export function SubjectMarksEntry({
 
           <FilterField label="Section">
             <Select value={draft.section} onValueChange={pickSection}>
-              <SelectTrigger aria-label="Section"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0" aria-label="Section"><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
                 {sectionsForLevel.map((s) => (
                   <SelectItem key={s} value={s}>Section {s}</SelectItem>
@@ -321,7 +329,7 @@ export function SubjectMarksEntry({
 
           <FilterField label="Subject">
             <Select value={draft.subjectId || undefined} onValueChange={pickSubject}>
-              <SelectTrigger aria-label="Subject"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0" aria-label="Subject"><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
                 {subjectOptions.length === 0 ? (
                   <SelectItem value="none" disabled>No subjects assigned</SelectItem>
@@ -367,7 +375,7 @@ export function SubjectMarksEntry({
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid min-w-0 gap-1.5">
       <Label className="text-2xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
         {label} <span className="text-destructive">*</span>
       </Label>
